@@ -28,7 +28,7 @@
 | 항목 | 용도 | 비고 |
 |---|---|---|
 | GitHub | 코드 저장소 (`lythean1004/family-shield`) | 생성 완료 |
-| Supabase 프로젝트 **2개** | `family-shield-dev`(개발·평가), `family-shield-prod`(시연) | 리전은 서울(ap-northeast-2) 권장. 무료 요금제는 미사용 시 일시정지·백업 제한이 있어 시연 전 요금제 확인 |
+| Supabase | 개발 중: **로컬 Supabase**(CLI + Docker). 클라우드 프로젝트는 **배포 시점(6주차, 실제 휴대폰 테스트 시작)에 생성** | 무료 요금제는 7일 이상 사용하지 않으면 일시정지되므로 미리 만들지 않음. 생성 시 리전 서울(ap-northeast-2), 시연용 하나로 시작 |
 | Vercel | PWA 정적 배포, 보안 헤더(CSP) 설정 | GitHub 연동. 프리뷰 배포는 공개 URL이 되므로 보호 설정 필요 |
 | Figma | 화면 시안, 클릭 프로토타입(Figma Make 선택) | **가짜 데이터로만** 사용 |
 | LLM 제공사 계정 3곳 | 모델 비교(7주차) | 결제 한도·사용량 알림 설정 필수 |
@@ -64,10 +64,10 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 | **1. PRD 정리** | 0장 6개 항목 반영, PRD v0.3을 `docs/prd.md`로 저장소에 정리 | 규칙표로 개발용 20건의 `level_rule`이 모두 계산됨 |
 | **2. 근거 카드 마무리** | needs_review 항목(118, 1566-1188, 지급정지 기한 등) 원문 대조, 보호나라 이용조건 확인 | 화면에 쓸 카드가 모두 active, 출처·확인일 있음 |
 | **3. Figma 시안** | 부모님 판별(P1~P8), 보호자 응답(C1~C3), 설정(S1~S6, 동의) 화면. 큰 글씨·버튼 3개 이하 | 지인 2~3명이 SC1을 도움 없이 끝냄 |
-| **4. 기반 구현** | Supabase 스키마·RLS(dev), PWA 뼈대, 오프라인 번호 카드 | RLS 테스트 통과(역할별로 남의 데이터가 안 보임) |
+| **4. 기반 구현** | 로컬 Supabase 스키마·RLS, PWA 뼈대, 오프라인 번호 카드 | RLS 테스트 통과(역할별로 남의 데이터가 안 보임) |
 | **5. 판별 파이프라인** | 코드 추출 → 마스킹 → LLM → 검증 → 합집합 → 규칙 엔진, 평가 스크립트 | 개발용 20건 자동 실행, 원문이 DB·로그 어디에도 없음 |
 | **6. 모델 비교·선정** | 평가용 100건 완성, 3개 모델 측정 | 첫 측정 결과 문서화 |
-| **7. 가족 확인** | 초대 코드, 동의, 웹 푸시, 확인 요청 상태 흐름, 폴링, 인증 단계 | SC1 시연(휴대폰 2대) |
+| **7. 가족 확인** | **클라우드 Supabase 생성·Vercel 배포(3-2 배포 시점 설정)**, 초대 코드, 동의, 웹 푸시, 확인 요청 상태 흐름, 폴링, 인증 단계 | SC1 시연(휴대폰 2대) |
 | **8. 사후 대응·예비 문자** | F6, 예비 문자(링크 없음), 시험 알림 | SC3 시연 |
 | **9. 사용성 테스트** | 역할극 5~10명 | 결과 기록 |
 | **10. 마무리** | 수정, 2차 측정, 결과 공개 | 최종 시연 |
@@ -86,14 +86,22 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 - [ ] `main` 브랜치 보호(직접 push 금지, PR로만 병합)
 - [ ] `.gitignore`에 `.env*`, `supabase/.temp`, `.vercel` 포함 확인
 
-### 3-2. Supabase (dev와 prod 각각)
+### 3-2. Supabase
 
+**개발 중(1~5주차): 로컬**
+- [ ] Supabase CLI와 Docker Desktop 설치, `supabase init`으로 로컬 설정을 저장소에 둠(`supabase/` 폴더, 비밀값 제외)
+- [ ] 스키마·RLS·pg_cron 설정은 마이그레이션 파일로 관리 → 클라우드에 그대로 적용
+- [ ] 로컬 인증은 테스트용 전화번호/OTP로 진행(실제 문자 발송 없음)
+- [ ] Edge Functions 비밀값은 로컬 `supabase/functions/.env`(커밋 금지)
+
+**배포 시점(6주차~): 클라우드 프로젝트 생성 후 아래 설정**
 - [ ] 리전 서울, DB 비밀번호는 비밀번호 관리자에 보관
+- [ ] 로컬 마이그레이션 적용(`supabase db push`)
 - [ ] Auth: 이메일 가입 끄기, **휴대폰 인증만** 켜기. OTP 만료·재전송 간격·시간당 발송 한도 설정
 - [ ] Auth: CAPTCHA(hCaptcha 또는 Cloudflare Turnstile) 켜기 → 인증 문자 남용 방지
 - [ ] Auth: 세션 설정(JWT 1시간, 리프레시 토큰 재사용 감지 켬, 미사용 만료·사용자당 세션 하나는 요금제 지원 여부 확인)
 - [ ] Database: 모든 테이블 RLS 켬. 새 테이블은 RLS 없이는 만들지 않음
-- [ ] Edge Functions Secrets: `LLM_API_KEY`, `SMS_API_KEY`, `VAPID_PRIVATE_KEY`, `PHONE_HMAC_SECRET` (dev·prod 값 분리)
+- [ ] Edge Functions Secrets: `LLM_API_KEY`, `SMS_API_KEY`, `VAPID_PRIVATE_KEY`, `PHONE_HMAC_SECRET` (로컬 값과 다른 새 값으로 생성)
 - [ ] pg_cron: 10분마다 `purge_at` 지난 행 삭제
 - [ ] 백업 보존 기간 확인(0장 5번)
 - [ ] API 설정: 쓰지 않는 스키마 노출 끄기
@@ -116,7 +124,7 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 
 - [ ] `docs/project.md`를 PRD v0.3 기준으로 갱신 (CLAUDE.md가 이 문서를 범위 기준으로 씀)
 - [ ] `.claude/settings.json`에 `.env*` 읽기 금지 권한 추가 (`Read(./.env*)` deny)
-- [ ] MCP 연결 시 원칙: Supabase MCP는 **dev 프로젝트만, 가능하면 읽기 전용**으로 연결. prod와 service_role 키는 Claude Code에 주지 않음
+- [ ] 개발 중에는 로컬 Supabase만 쓰므로 Supabase MCP 연결이 필요 없음. 클라우드 생성 후 연결한다면 **읽기 전용**으로, service_role 키는 Claude Code에 주지 않음
 - [ ] Vercel·Figma MCP는 필요할 때만 연결. 배포·삭제 같은 작업은 실행 전에 확인받기
 
 ### 3-6. 키 생성과 보관
