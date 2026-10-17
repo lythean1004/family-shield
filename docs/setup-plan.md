@@ -101,7 +101,7 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 - [ ] Auth: CAPTCHA(hCaptcha 또는 Cloudflare Turnstile) 켜기 → 인증 문자 남용 방지
 - [ ] Auth: 세션 설정(JWT 1시간, 리프레시 토큰 재사용 감지 켬, 미사용 만료·사용자당 세션 하나는 요금제 지원 여부 확인)
 - [ ] Database: 모든 테이블 RLS 켬. 새 테이블은 RLS 없이는 만들지 않음
-- [ ] Edge Functions Secrets: `LLM_API_KEY`, `SMS_API_KEY`, `VAPID_PRIVATE_KEY`, `PHONE_HMAC_SECRET` (로컬 값과 다른 새 값으로 생성)
+- [ ] Edge Functions Secrets: `LLM_API_KEY`, `SMS_API_KEY`, `VAPID_PRIVATE_KEY`, `PHONE_HMAC_SECRET`, `URL_REPUTATION_API_KEY` (로컬 값과 다른 새 값으로 생성)
 - [ ] pg_cron: 10분마다 `purge_at` 지난 행 삭제
 - [ ] 백업 보존 기간 확인(0장 5번)
 - [ ] API 설정: 쓰지 않는 스키마 노출 끄기
@@ -137,6 +137,7 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 | 문자 API 키 | Supabase Edge Functions Secrets | 안 됨 |
 | VAPID 공개키 / 비밀키 | 공개키는 프론트, 비밀키는 Secrets | 공개키만 |
 | 번호 HMAC 비밀키 | Supabase Edge Functions Secrets | 안 됨 |
+| URL 평판 조회 API 키 | Supabase Edge Functions Secrets | 안 됨 |
 
 ---
 
@@ -152,6 +153,9 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 4. **번호 HMAC은 가명정보.** HMAC 비밀키는 Secrets에만, 24시간 뒤 판별 건과 함께 삭제. “개인정보를 저장하지 않는다”고 쓰지 않고 “가명처리해 24시간 보관”이라고 정확히 씀.
 5. **자녀 요약은 문장 틀로만.** AI가 쓴 문장은 자녀에게 보내지 않음(원문 재전송 방지). 푸시 본문에는 요청 ID와 고정 문구만.
 6. **가족 암호는 어디에도 저장하지 않음.** 입력창에 “가족 암호는 여기에 쓰지 마세요” 표시.
+7. **캡처 이미지는 휴대폰 밖으로 보내지 않음.** 글자 인식은 기기 안에서 하고, 인식된 글도 마스킹을 거친 뒤에만 AI로 보냄.
+8. **링크 평판 조회에는 도메인만.** 경로·쿼리에 개인 토큰이 있을 수 있으므로 전체 URL을 보내지 않고, 링크에 접속하지 않음.
+9. **오판 신고 사례 저장은 별도 동의 후, 마스킹된 문장만.** 사람이 비식별 여부를 검토하고, 동의를 끄면 삭제.
 
 ### 4-2. 접근 권한 (Supabase RLS)
 
