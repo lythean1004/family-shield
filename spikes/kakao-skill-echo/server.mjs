@@ -29,8 +29,14 @@ export function buildReply(payload, elapsedMs) {
 const server = http.createServer((req, res) => {
   const started = Date.now();
   if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true });
-  if (req.method !== "POST" || req.url !== "/api/kakao-skill") return send(res, 404, { error: "not found" });
-  if (req.headers["x-skill-token"] !== TOKEN) return send(res, 403, { error: "forbidden" });
+  if (req.method !== "POST" || req.url !== "/api/kakao-skill") {
+    console.log(`${new Date().toISOString()} 404 ${req.method} ${req.url}`);
+    return send(res, 404, { error: "not found" });
+  }
+  if (req.headers["x-skill-token"] !== TOKEN) {
+    console.log(`${new Date().toISOString()} 403 토큰 불일치`);
+    return send(res, 403, { error: "forbidden" });
+  }
 
   let size = 0;
   const chunks = [];
