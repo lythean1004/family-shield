@@ -175,6 +175,44 @@
 
 ---
 
+## 7-1. 대안 플랫폼 (기존 안 유지, 막힐 때만 전환)
+
+**결정(2026-10-21):** Supabase + Vercel을 그대로 쓴다. 아래 트리거가 생길 때만 해당 부분을 대안으로 옮긴다. 서브에이전트 2명이 공식 문서로 Firebase와 Cloudflare를 조사했다(가입·결제 없음).
+
+### 한눈에 비교
+
+| 항목 | Supabase + Vercel (현재) | Cloudflare | Firebase |
+|---|---|---|---|
+| 카드 없이 시작 | 가능 | 가능(가입 시 카드 필요 여부는 미확인) | **서버 함수·휴대폰 인증 문자는 Blaze(카드 등록) 필수** |
+| 호스팅 상업 이용 | Vercel Hobby는 ‘비상업적 개인 용도만’ | 무료 요금제 금지 조항 없음 | 열어 본 문서에 언급 없음 |
+| DB와 권한 | Postgres + RLS | D1(SQLite), **RLS 없음 → 코드로 권한 검사** | Firestore + Security Rules(규칙 테스트 도구 있음) |
+| 휴대폰 인증 | Send SMS Hook + 솔라피 | **기능 없음**(직접 구현은 보안 위험 큼) | 기본 제공(Blaze), 하루 3,000건, 한국 문자 업체 선택 불가 |
+| 24시간 뒤 삭제 | pg_cron, 무료는 자동 백업 없음 | 크론 무료(계정당 5개), **D1 Time Travel이 7일 보관(끌 수 없음)** | TTL은 만료 후 ‘보통 24시간 안’ 삭제 → 예약 함수(Blaze) 병행 필요 |
+| 웹 푸시 | Deno 라이브러리 실측 필요 | Web Crypto 라이브러리 실측 필요 | FCM 무료, 가장 안정적(발송 서버는 필요) |
+| 로컬 개발 | Docker 필요(메모리 빠듯) | Docker 불필요(wrangler) | Docker 불필요, Java 21 이상 필요 |
+| 전환 노력 | – | **호스팅만: 0.5~1일** / 전면: 30~40시간(추정) | 전면: 25~35시간(추정) |
+
+### 전환 트리거와 갈 곳
+
+| 상황 | 옮길 곳 | 범위 |
+|---|---|---|
+| 운영사나 Vercel이 지원금 과제를 Hobby의 ‘상업적 이용’으로 판단 | **Cloudflare(Workers 정적 파일 또는 Pages)** | 호스팅만. DB·인증은 Supabase 유지. CSP `connect-src`에 Supabase 주소 추가 |
+| Deno에서 웹 푸시가 대안 라이브러리까지 실패 | 푸시 발송만 Vercel 함수 또는 Cloudflare Worker로, 또는 FCM 도입(발송 서버 필요) | 푸시 발송 부분만 |
+| Supabase Edge Functions 한도·지연 문제 | 해당 함수만 Cloudflare Workers로(DB는 Hyperdrive 또는 Supabase API로 연결) | 함수 단위 |
+| Send SMS Hook + 솔라피 연동이 1~2주차 시험에서 끝내 실패 | Firebase Auth 휴대폰 인증 검토(**Blaze·카드 필요** → 운영사 정산 확인 후) | 인증만, 나머지는 유지하는 혼합안 먼저 검토 |
+| Supabase 무료 프로젝트가 정지·한도로 시연이 반복해서 끊김 | Supabase Pro($25/월)를 먼저 검토, 그래도 안 되면 Firebase 전면 전환 | 전면 전환은 마지막 수단 |
+
+### 대안 쪽 주의점
+- **Cloudflare D1**은 Time Travel이 7일 보관되어 지운 데이터가 7일간 복구 가능한 상태로 남는다. 쓰게 되면 안내 문구에 밝혀야 한다. 지역은 ‘아시아’ 힌트만 줄 수 있고 서울 보장은 없다.
+- **Cloudflare Workers** 무료는 요청당 CPU 10ms(외부 API 대기 시간은 제외). 푸시 암호화·출력 검증이 그 안에 끝나는지 실측 필요.
+- **Firebase** 예산 알림은 서비스를 멈추지 않는다(Cloud Functions에는 지출 상한 기능이 있음). 새 프로젝트는 문자 발송 지역이 막혀 있어 한국을 직접 허용해야 한다. Hosting 기본 주소(`*.web.app`)에서는 HSTS를 구글 값으로 덮어쓴다.
+- 대안 모두 해외 처리 가능성이 있어 국외 이전 고지 검토는 똑같이 필요하다.
+
+### 대안 조사 근거(조사자가 연 문서)
+- Cloudflare: [Pages 한도](https://developers.cloudflare.com/pages/platform/limits/), [헤더](https://developers.cloudflare.com/workers/static-assets/headers/), [Workers 한도](https://developers.cloudflare.com/workers/platform/limits/), [Workers 가격](https://developers.cloudflare.com/workers/platform/pricing/), [Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/), [D1 한도](https://developers.cloudflare.com/d1/platform/limits/), [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/), [D1 위치](https://developers.cloudflare.com/d1/configuration/data-location/), [Hyperdrive + Supabase](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-database-providers/supabase/), [Turnstile](https://developers.cloudflare.com/turnstile/plans/), [약관](https://www.cloudflare.com/terms/)
+- Firebase: [가격](https://firebase.google.com/pricing), [Functions 시작](https://firebase.google.com/docs/functions/get-started), [예약 함수](https://firebase.google.com/docs/functions/schedule-functions), [요금 폭탄 방지](https://firebase.google.com/docs/projects/billing/avoid-surprise-bills), [Auth 한도](https://firebase.google.com/docs/auth/limits), [휴대폰 인증](https://firebase.google.com/docs/auth/web/phone-auth), [Firestore TTL](https://firebase.google.com/docs/firestore/ttl), [보안 규칙 조건](https://firebase.google.com/docs/firestore/security/rules-conditions), [위치](https://firebase.google.com/docs/firestore/locations), [FCM 웹](https://firebase.google.com/docs/cloud-messaging/js/client), [Hosting 설정](https://firebase.google.com/docs/hosting/full-config), [에뮬레이터](https://firebase.google.com/docs/emulator-suite/install_and_configure), [데이터 처리 약관](https://firebase.google.com/terms/data-processing-terms)
+- 확인하지 못한 것: Cloudflare 무료 가입의 카드 필요 여부, Firebase 한국 문자 공식 요금·발신자 표시, Spark의 TTL 지원, 각 대안의 실제 CPU 시간·메모리
+
 ## 8. 확인하지 못한 것
 
 - 한글 문자 캡처의 실제 글자 인식 정확도·속도, 아이폰 한국어 음성 기본 탑재 여부, 홈 화면 앱에서의 음성 동작
