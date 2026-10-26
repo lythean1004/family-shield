@@ -112,18 +112,20 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 
 ### 3-3. NCP VM (D29, 2026-10-26 Vercel에서 교체)
 
-서버 기본 보안(sudo 사용자, SSH 키, firewalld, fail2ban, SELinux 유지, Nginx, certbot)은 2026-10-26 세팅함. 아래는 이 프로젝트용 추가 항목.
+서버 기본 보안 세팅 완료(2026-10-26): 운영 사용자 `fsops`(uid=1002, wheel), SSH 키 인증만(PermitRootLogin no, PasswordAuthentication no), firewalld(default=drop, 22는 운영자 IP만, 80·443 전체), fail2ban(sshd jail, bantime 1h, maxretry 5), dnf-automatic(security 자동 적용), 프로젝트 디렉터리 생성. SELinux는 VM 배정 당시부터 Disabled 상태(NCP VM 기본값, 추후 필요 시 켜기). Nginx는 활성 상태.
 
-- [ ] ACG: 443·80만 전체 공개, 22는 운영자 IP만, **3000 삭제**
+아래는 이 프로젝트 배포용 추가 항목.
+
+- [ ] **NCP ACG**: 443·80만 전체 공개, 22는 운영자 IP만, **3000 삭제**
 - [ ] 도메인 확보 → A 레코드 101.79.8.126 → certbot으로 HTTPS 발급·자동 갱신
-- [ ] 디렉터리: `/srv/family-shield/web`(PWA 정적), `/srv/family-shield/skill`(스킬 서버), `/etc/family-shield/skill.env`(비밀값, root 소유 600)
-- [ ] Nginx: `/api/kakao-skill`만 `127.0.0.1:3000`으로 프록시, 나머지는 정적 파일 + `try_files $uri /index.html`
+- [ ] Nginx: `/api/kakao-skill`만 `127.0.0.1:3000`으로 프록시, 나머지는 `/srv/family-shield/web` 정적 파일 + `try_files $uri /index.html`
 - [ ] Nginx 보안 헤더: CSP, HSTS, `frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, `X-Content-Type-Options: nosniff`
 - [ ] Nginx: `client_max_body_size 64k`, `limit_req`, **요청 본문을 로그에 남기는 log_format 금지**, logrotate 7일
-- [ ] systemd: 스킬 서버 전용 사용자, `EnvironmentFile=`, `NoNewPrivileges`·`ProtectSystem=strict` 등 하드닝, 자동 재시작
+- [ ] systemd: 스킬 서버 전용 사용자, `EnvironmentFile=/etc/family-shield/skill.env`, `NoNewPrivileges`·`ProtectSystem=strict` 등 하드닝, 자동 재시작
 - [ ] 배포 전 스냅샷, 배포 후 journald·Nginx 로그에 원문이 없는지 확인
 - [ ] 브라우저로 나가는 값은 **Supabase URL과 anon(publishable) 키뿐**
-- [ ] Node 버전 상향(22 이상)은 **개발 완료 후** 진행(사용자 결정 2026-10-26). 그 전까지 서버 배포 시 버전 호환을 확인
+- [x] `/srv/family-shield/web`, `/srv/family-shield/skill`, `/etc/family-shield/skill.env`(root 소유 600) 생성 완료
+- [ ] Node 버전 상향(22 이상)은 **개발 완료 후** 진행(현재 v20.20.2, 사용자 결정 2026-10-26)
 
 ### 3-4. Figma
 
