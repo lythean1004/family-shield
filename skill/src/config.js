@@ -5,7 +5,7 @@
  * (`/etc/family-shield/skill.env`, 600)이 넣어 준다. 저장소에는 값이 없다.
  *
  * 필수: SKILL_HEADER_TOKEN, AI_API_KEY
- * 선택: AI_BASE_URL, AI_MODEL, AI_TIMEOUT_MS, SKILL_PORT, SKILL_HOST,
+ * 선택: AI_BASE_URL, AI_MODEL, AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, SKILL_PORT, SKILL_HOST,
  *       WEB_BASE_URL, PHONE_HMAC_SECRET, PROMPT_VERSION, MAX_CONCURRENT,
  *       SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS
  */
@@ -15,6 +15,7 @@ const DEFAULTS = {
   SKILL_HOST: "127.0.0.1",
   AI_MODEL: "gemini-3.1-flash-lite",
   AI_TIMEOUT_MS: "3000",
+  AI_WEB_TIMEOUT_MS: "8000",
   PROMPT_VERSION: "v1",
   MAX_CONCURRENT: "8",
   URL_LOOKUP_TIMEOUT_MS: "800",
@@ -41,6 +42,8 @@ export function loadConfig(env = process.env) {
         apiKey: get("AI_API_KEY"),
         baseUrl: get("AI_BASE_URL") || undefined, // 없으면 ai-client.js 기본값
         timeoutMs: Number(get("AI_TIMEOUT_MS")),
+        // F4-6: 웹 /api/analyze 채널은 카카오 5초 제한이 없으므로 더 넉넉히(기본 8초).
+        webTimeoutMs: Number(get("AI_WEB_TIMEOUT_MS")),
         promptVersion: get("PROMPT_VERSION"),
       },
       webBaseUrl: get("WEB_BASE_URL") || null,

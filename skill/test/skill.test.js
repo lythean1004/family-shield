@@ -1,10 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { handleRequest, handleResultLookup, makeHandler } from "../src/handler.js";
+import { handleRequest, handleResultLookup, handleAnalyze, makeHandler } from "../src/handler.js";
 import { createMemoryResultStore } from "../../packages/core/src/result-token.js";
 import { readRequest, simpleText, quickReply, anonymousCode } from "../src/kakao.js";
 import { loadConfig, tokenMatches } from "../src/config.js";
+import { createRateLimiter, createConcurrencyLimit, clientKey } from "../src/rate-limit.js";
 
 // ── kakao.js ─────────────────────────────────────────────────────────────────
 describe("카카오 파서", () => {
@@ -283,6 +284,182 @@ describe("카카오 파서 - parentInputs", () => {
   it("params가 없으면 parentInputs는 빈 객체", () => {
     const p = { userRequest: { utterance: "x" } };
     assert.deepEqual(readRequest(p).parentInputs, {});
+  });
+});
+
+// ── handleAnalyze (POST /api/analyze) ─────────────────────────────────────────
+describe("handleAnalyze", () => {
+  const fakeCfg = {
+    ai: {
+      model: "fake", apiKey: "k", timeoutMs: 1000, promptVersion: "v1",
+      fetchImpl: fakeGateway(["SIG_FAMILY_IMPERSONATION", "SIG_MONEY"], "family"),
+    },
+    hmacKey: null, cards: [], urlReputation: null,
+  };
+
+  it("빈 문자열은 400 empty", async () => {
+    const r = await handleAnalyze({ text: "  " }, fakeCfg);
+    assert.equal(r.status, 400);
+    assert.equal(r.body.reason, "empty");
+  });
+
+  it("정상 입력은 200 + toResultView 필드만", async () => {
+    const r = await handleAnalyze({ text: "엄마 나 딸인데 50만원만 보내줘" }, fakeCfg);
+    assert.equal(r.status, 200);
+    assert.equal(r.body.ok, true);
+    const v = r.body.result;
+    assert.ok(v.level && v.fired_rules && Array.isArray(v.signals_final));
+    assert.equal(v.masked, undefined);
+    assert.equal(v.phoneHmacs, undefined);
+    assert.equal(v.domains, undefined);
+  });
+
+  it("2000자 초과는 400 too_long", async () => {
+    const r = await handleAnalyze({ text: "가".repeat(2001) }, fakeCfg);
+    assert.equal(r.status, 400);
+    assert.equal(r.body.reason, "too_long");
+  });
+});
+
+// ── rate-limit.js ─────────────────────────────────────────────────────────────
+describe("createRateLimiter", () => {
+  it("분당 한도 내면 ok", () => {
+    const rl = createRateLimiter({ maxPerMinute: 3, maxPerDay: 100 });
+    assert.equal(rl.check("k1").ok, true);
+    assert.equal(rl.check("k1").ok, true);
+    assert.equal(rl.check("k1").ok, true);
+  });
+
+  it("분당 한도 초과면 false reason=minute", () => {
+    const rl = createRateLimiter({ maxPerMinute: 2, maxPerDay: 100 });
+    rl.check("k2"); rl.check("k2");
+    const r = rl.check("k2");
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "minute");
+    assert.ok(r.retryAfterMs > 0);
+  });
+
+  it("일일 한도 초과면 false reason=day", () => {
+    const rl = createRateLimiter({ maxPerMinute: 100, maxPerDay: 2 });
+    rl.check("k3"); rl.check("k3");
+    const r = rl.check("k3");
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "day");
+  });
+
+  it("키가 다르면 독립적으로 잡힌다", () => {
+    const rl = createRateLimiter({ maxPerMinute: 1, maxPerDay: 100 });
+    assert.equal(rl.check("a").ok, true);
+    assert.equal(rl.check("b").ok, true);
+    assert.equal(rl.check("a").ok, false);
+  });
+
+  it("빈 키는 anon으로 잡힌다", () => {
+    const rl = createRateLimiter({ maxPerMinute: 1, maxPerDay: 100 });
+    assert.equal(rl.check("").ok, true);
+    assert.equal(rl.check("").ok, false);
+  });
+});
+
+describe("createConcurrencyLimit", () => {
+  it("max 이내는 바로 acquire", async () => {
+    const cl = createConcurrencyLimit({ max: 2 });
+    await cl.acquire();
+    assert.equal(cl.running, 1);
+    cl.release();
+    assert.equal(cl.running, 0);
+  });
+
+  it("max 초과면 release까지 대기", async () => {
+    const cl = createConcurrencyLimit({ max: 1 });
+    await cl.acquire();
+    let entered = false;
+    const p = (async () => { await cl.acquire(); entered = true; })();
+    assert.equal(entered, false);
+    cl.release();
+    await p;
+    assert.equal(entered, true);
+    cl.release();
+  });
+});
+
+describe("clientKey", () => {
+  it("botUserKey 있으면 kakao: 우선", () => {
+    const req = { headers: { "x-forwarded-for": "1.2.3.4" }, socket: { remoteAddress: "9.9.9.9" } };
+    assert.equal(clientKey(req, "bot123"), "kakao:bot123");
+  });
+
+  it("botUserKey 없으면 x-forwarded-for 첫 값", () => {
+    const req = { headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" }, socket: { remoteAddress: "9.9.9.9" } };
+    assert.equal(clientKey(req, null), "ip:1.2.3.4");
+  });
+
+  it("둘 다 없으면 socket.remoteAddress", () => {
+    const req = { headers: {}, socket: { remoteAddress: "9.9.9.9" } };
+    assert.equal(clientKey(req, null), "ip:9.9.9.9");
+  });
+});
+
+// ── HTTP 서버: /api/analyze + rate limit ─────────────────────────────────────
+describe("HTTP 서버 - /api/analyze", () => {
+  function makeTestConfig(extra = {}) {
+    return {
+      headerToken: "h", webBaseUrl: null, hmacKey: null,
+      maxPerMinute: extra.maxPerMinute ?? 5, maxPerDay: 50, maxConcurrent: 8,
+      ai: {
+        model: "fake", apiKey: "k", timeoutMs: 1000, promptVersion: "v1",
+        fetchImpl: fakeGateway(["SIG_FAMILY_IMPERSONATION", "SIG_MONEY"], "family"),
+      },
+    };
+  }
+
+  it("정상 응답 200 + cache-control: no-store", async () => {
+    const server = createServer(makeHandler(makeTestConfig()));
+    await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const res = await fetch(`${base}/api/analyze`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: "엄마 나 딸인데 50만원 보내줘" }),
+      });
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get("cache-control"), "no-store");
+      const body = await res.json();
+      assert.equal(body.ok, true);
+      assert.ok(body.result.level);
+    } finally { server.close(); }
+  });
+
+  it("분당 한도 초과시 429 + retry-after 헤더", async () => {
+    const server = createServer(makeHandler(makeTestConfig({ maxPerMinute: 2 })));
+    await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const post = (t) => fetch(`${base}/api/analyze`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: t }),
+      });
+      await post("엄마 50만원"); await post("엄마 60만원");
+      const res = await post("엄마 70만원");
+      assert.equal(res.status, 429);
+      assert.ok(res.headers.get("retry-after"));
+      const body = await res.json();
+      assert.equal(body.ok, false);
+      assert.equal(body.reason, "rate_limited");
+    } finally { server.close(); }
+  });
+
+  it("빈 body 400 bad json", async () => {
+    const server = createServer(makeHandler(makeTestConfig()));
+    await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const res = await fetch(`${base}/api/analyze`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: "NOT_JSON",
+      });
+      assert.equal(res.status, 400);
+    } finally { server.close(); }
   });
 });
 

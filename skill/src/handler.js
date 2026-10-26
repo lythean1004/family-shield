@@ -14,11 +14,12 @@
  * 이 파일은 Node built-in `http` 서버와 독립 함수 두 가지로 쓸 수 있다.
  * 테스트에서는 handleRequest()를 직접 가져다 쓴다.
  */
-import { analyze } from "../../packages/core/src/pipeline.js";
-import { createMemoryResultStore, redactToken } from "../../packages/core/src/result-token.js";
+import { analyze, MAX_INPUT_CHARS } from "../../packages/core/src/pipeline.js";
+import { createMemoryResultStore, redactToken, toResultView } from "../../packages/core/src/result-token.js";
 import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
 import { readRequest, simpleText, quickReply } from "./kakao.js";
 import { tokenMatches } from "./config.js";
+import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
 
 const HEADER_TOKEN_KEY = "x-skill-token";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -157,6 +158,46 @@ export function handleResultLookup(token, resultStore) {
 }
 
 /**
+ * POST /api/analyze — 웹 직접 입력(PRD F4-1). 카카오 포맷이 아닌 JSON { text } 를 받는다.
+ * token 헤더 검사는 하지 않는다(웹은 공개 화면). 대신 호출 한도(F4-9)가 걸려 있다.
+ *
+ * 요청: { "text": string }
+ * 응답 200: { ok: true, result: <toResultView> }
+ * 응답 400: { ok: false, reason: "empty"|"too_long" }
+ * 응답 429: { ok: false, reason: "rate_limited", retryAfterMs }
+ *
+ * @param {{ text: string, parentInputs?: object }} params
+ * @param {{ ai: object, hmacKey?: string|null, cards?: object[], urlReputation?: object|null }} cfg
+ * @returns {Promise<{ status: number, body: object }>}
+ */
+export async function handleAnalyze(params, cfg) {
+  const text = typeof params.text === "string" ? params.text : "";
+  const trimmed = text.trim();
+  if (trimmed.length < 2) {
+    return { status: 400, body: { ok: false, reason: "empty" } };
+  }
+  if ([...text].length > MAX_INPUT_CHARS) {
+    return { status: 400, body: { ok: false, reason: "too_long" } };
+  }
+
+  let result;
+  try {
+    result = await analyze({
+      text,
+      parentInputs: params.parentInputs ?? {},
+      hmacKey: cfg.hmacKey ?? undefined,
+      cards: cfg.cards ?? [],
+      ai: cfg.ai,
+      urlReputation: cfg.urlReputation ?? null,
+    });
+  } catch (err) {
+    console.error(`pipeline error: ${err.message}`);
+    return { status: 500, body: { ok: false, reason: "pipeline_error" } };
+  }
+  return { status: 200, body: { ok: true, result: toResultView(result) } };
+}
+
+/**
  * Node http.createServer 콜백.
  * @param {object} config  loadConfig()의 config 객체
  */
@@ -168,6 +209,12 @@ export function makeHandler(config) {
     apiKey: config.safeBrowsingKey,
     timeoutMs: config.urlLookupTimeoutMs || 800,
   });
+  // F4-9 호출 한도 + 동시성 제한. 프로세스 안에서만 동작(운영에서는 Redis로 교체, [임시]).
+  const rateLimiter = createRateLimiter({
+    maxPerMinute: config.maxPerMinute || 5,
+    maxPerDay: config.maxPerDay || 50,
+  });
+  const concurrency = createConcurrencyLimit({ max: config.maxConcurrent || 8 });
 
   return async function handler(req, res) {
     const started = Date.now();
@@ -189,6 +236,34 @@ export function makeHandler(config) {
       return send(status, body, { "cache-control": "no-store" });
     }
 
+    // 웹 직접 입력(PRD F4-1). 토큰 헤더 없음. 한도·동시성만 건다.
+    if (req.method === "POST" && req.url?.startsWith("/api/analyze")) {
+      const key = clientKey(req);
+      const limit = rateLimiter.check(key);
+      if (!limit.ok) {
+        return send(429, { ok: false, reason: "rate_limited", retryAfterMs: limit.retryAfterMs },
+          { "retry-after": String(Math.ceil(limit.retryAfterMs / 1000)) });
+      }
+      await concurrency.acquire();
+      try {
+        const rawBody = await readBody(req);
+        if (!rawBody) return send(400, { ok: false, reason: "body too large" });
+        let payload;
+        try { payload = JSON.parse(rawBody); }
+        catch { return send(400, { ok: false, reason: "bad json" }); }
+        const text = typeof payload?.text === "string" ? payload.text : "";
+        const parentInputs = payload?.parentInputs ?? {};
+        const { status, body } = await handleAnalyze(
+          { text, parentInputs },
+          // F4-6: 웹 채널은 카카오 5초 제한이 없으므로 webTimeoutMs(기본 8초)로 덮어 쓴다.
+          { ai: { ...config.ai, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation },
+        );
+        return send(status, body, { "cache-control": "no-store" });
+      } finally {
+        concurrency.release();
+      }
+    }
+
     if (req.method !== "POST" || !req.url?.startsWith("/api/kakao-skill")) {
       return send(404, { error: "not found" });
     }
@@ -207,10 +282,27 @@ export function makeHandler(config) {
     const parsed = readRequest(payload);
     if (!parsed) return send(400, { error: "invalid kakao payload" });
 
-    const { status, body } = await handleRequest(
-      { utterance: parsed.text, parentInputs: parsed.parentInputs ?? {} },
-      { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation },
-    );
-    send(status, body);
+    // 카카오 스킬에도 같은 한도·동시성을 건다(botUserKey 우선).
+    const key = clientKey(req, parsed.botUserKey);
+    const limit = rateLimiter.check(key);
+    if (!limit.ok) {
+      return send(429, {
+        version: "2.0",
+        template: {
+          outputs: [{ simpleText: { text: "조금 전에 여러 번 물어보셨어요. 1분 뒤에 다시 시도해 주세요." } }],
+        },
+      });
+    }
+
+    await concurrency.acquire();
+    try {
+      const { status, body } = await handleRequest(
+        { utterance: parsed.text, parentInputs: parsed.parentInputs ?? {} },
+        { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation },
+      );
+      send(status, body);
+    } finally {
+      concurrency.release();
+    }
   };
 }
