@@ -16,7 +16,7 @@
 
 | # | 문제 | 제안 |
 |---|---|---|
-| 1 | 모델 후보 확인. Claude Haiku 5.5(`claude-haiku-5-5`)는 Anthropic 모델표에서 확인됨: 입력 $0.10 / 출력 $0.50 (100만 토큰당, 프롬프트 10만 토큰 이하). GPT-5.4 nano, Gemini 3.1 Flash-Lite의 이름·가격은 대화 중 검색 결과라 공식 페이지 재확인 필요 | PRD 13-2에 확인일을 적고, Gemini 쪽 가격은 OpenRouter가 아닌 Google 공식 가격 페이지 기준으로 다시 확인 |
+| 1 | ~~모델 후보 확인~~ **완료(D30, 2026-10-26)**: 카카오 스킬은 `gemini-3.1-flash-lite`(0.9~1.7초, $0.0002/건), 웹은 `claude-sonnet-5-5`(6~10초, $0.0036/건). aitestbed.kr 중계 서버(LiteLLM). Haiku 5.5는 중계 서버에 없음 | PRD 13-2 갱신 완료 |
 | 2 | 규칙표와 평가셋 정답이 어긋남. DEV-C01(요구 없는 새 번호 가족 문자)과 DEV-C02(링크 없는 택배 주소 확인)는 정답이 ‘주의’인데 R7 조건(링크·돈·개인정보·재촉·비밀)에 해당하지 않아 규칙상 ‘확인 필요’가 나옴 | R7에 “가족 사칭 + 새 번호”와 “기관 사칭 + 정보 확인 요청”을 넣을지, 정답을 ‘확인 필요’로 고칠지 결정 |
 | 3 | 코드 신호 이름이 두 벌(평가셋: `LINK`, `MONEY_KW`… / PRD: `SIG_LINK`…) | 신호 ID를 한 벌로 통일하고, 코드 신호와 AI 신호를 구분하는 접두어만 둠 |
 | 4 | `impersonation_type` 정의 미확정 | “문자가 스스로 밝힌 발신자 유형(진위 판단 안 함)”으로 확정하고 시스템 프롬프트도 같은 뜻으로 고침 |
@@ -148,11 +148,11 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 | 카카오 스킬 헤더 토큰 | NCP VM `/etc/family-shield/skill.env` (600) + 오픈빌더 스킬 헤더 | 안 됨 |
 | 스킬 서버가 쓰는 LLM·HMAC·URL 평판 키 | NCP VM `/etc/family-shield/skill.env` (600). Supabase 함수가 쓰는 키는 Supabase Secrets (D29) | 안 됨 |
 | Supabase service_role 키 | 사용하지 않음이 원칙. 필요 시 Edge Functions 기본 제공 값만 | **절대 안 됨** |
-| LLM API 키 3종 | Supabase Edge Functions Secrets | 안 됨 |
+| LLM API 키 (Gemini·Sonnet 겸용) | NCP VM `/etc/family-shield/skill.env` (600) | 안 됨 |
 | 문자 API 키 | Supabase Edge Functions Secrets | 안 됨 |
 | VAPID 공개키 / 비밀키 | 공개키는 프론트, 비밀키는 Secrets | 공개키만 |
-| 번호 HMAC 비밀키 | Supabase Edge Functions Secrets | 안 됨 |
-| URL 평판 조회 API 키 | Supabase Edge Functions Secrets | 안 됨 |
+| 번호 HMAC 비밀키 | NCP VM `/etc/family-shield/skill.env` (600) | 안 됨 |
+| URL 평판 조회 API 키 | NCP VM `/etc/family-shield/skill.env` (600) | 안 됨 |
 
 ---
 
