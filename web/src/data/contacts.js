@@ -4,7 +4,11 @@
 export const CHECKED_AT = '2026-10-15'
 
 // normalNote: F2-5 "진짜라면 이렇게 와요" — 기관이 실제로 연락하는 방식.
-// 근거 카드 원문 확인 전까지 보수적으로 작성한다.
+// 상태: needs_review(원문 미대조). 2026-10-27 자동 수집 시도 결과
+//   - fss.or.kr / police.go.kr: 접속 실패(fetch failed)
+//   - spo.go.kr: 공소청 개편으로 기존 경로 404, 대검찰청 번호 02-3480-2000도 재확인 필요
+//   - counterscam112.go.kr(피싱안심SOS, 1394): 메인만 열림, 예방 수칙 본문은 스크립트 렌더링
+// 원문을 사람이 직접 확인해 content/evidence/에 출처·확인일을 남긴 뒤 이 문구를 고친다.
 export const OFFICIAL_CONTACTS = [
   {
     id: 'police',
