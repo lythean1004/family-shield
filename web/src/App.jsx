@@ -19,6 +19,7 @@ import CallResultScreen from './screens/CallResultScreen.jsx'
 import NoLinkFooter     from './components/NoLinkFooter.jsx'
 import { DEV_RESULT } from './data/result.js'
 import SettingsScreen   from './screens/SettingsScreen.jsx'
+import FamilyDashboardScreen from './screens/FamilyDashboardScreen.jsx'
 
 function Placeholder({ title }) {
   return (
@@ -51,6 +52,8 @@ export default function App() {
         <Route path="/check/who"         element={<WhoScreen fallbackResult={DEV_RESULT} />} />
         <Route path="/check/callresult"  element={<CallResultScreen fallbackResult={DEV_RESULT} />} />
 
+        {/* F5-10: 보호자 대시보드 — /family/* 앞에 두어 순서도 명시적으로 보장 */}
+        <Route path="/family/dashboard" element={<FamilyDashboardScreen />} />
         {/* 보호자 화면 C2·C3. 로그인·대상자 확인은 4주차(Supabase Auth) */}
         <Route path="/family/*"       element={<FamilyScreen />} />
 

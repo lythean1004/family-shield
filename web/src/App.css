@@ -462,6 +462,27 @@
 }
 .normal-note-card__label { display: block; font-weight: 700; margin-bottom: var(--sp-1); }
 
+/* ── F5-10 보호자 대시보드 ─────────────────────────── */
+.dashboard-empty { color: var(--c-text-sub); }
+.dashboard-list { list-style: none; padding: 0; margin: 0 0 var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-4); }
+.dashboard-card {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card);
+  padding: var(--sp-4);
+}
+.dashboard-card__row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.dashboard-card__time { font-size: var(--fs-small); color: var(--c-text-sub); }
+.dashboard-card__meta { font-size: var(--fs-small); color: var(--c-text-sub); margin-bottom: var(--sp-2); }
+.dashboard-card__answer { font-size: var(--fs-small); color: var(--c-action); margin: 0; font-weight: 700; }
+.dashboard-card__pending {
+  display: inline-block;
+  font-size: var(--fs-small);
+  font-weight: 700;
+  color: var(--c-caution);
+  text-decoration: underline;
+}
+.dashboard-card__pending:focus-visible { outline: 3px solid var(--c-action); outline-offset: 2px; }
+
 /* ── C2 보호자 ───────────────────────────────────── */
 .guardian-head { font-size: var(--fs-small); color: var(--c-text-sub); margin: 0 0 var(--sp-3); }
 .confirm-box {

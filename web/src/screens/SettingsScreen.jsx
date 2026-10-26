@@ -66,6 +66,19 @@ export default function SettingsScreen() {
         )}
       </section>
 
+      {/* F5-10: 보호자 대시보드 링크 */}
+      <section className="settings-section" aria-label="보호자 대시보드">
+        <p className="settings-section__title">보호자 화면</p>
+        <p className="screen-body">
+          최근 24시간의 확인 요청과 응답 상태를 볼 수 있어요.
+        </p>
+        <div className="screen-actions">
+          <ActionButton variant="secondary" onClick={() => navigate('/family/dashboard')}>
+            확인 요청 내역 보기
+          </ActionButton>
+        </div>
+      </section>
+
       <div className="screen-actions">
         <ActionButton variant="secondary" onClick={() => navigate('/')}>처음으로</ActionButton>
       </div>

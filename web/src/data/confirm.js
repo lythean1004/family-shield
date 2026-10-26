@@ -95,6 +95,20 @@ export function createConfirmStore({ storage = defaultStorage(), clock = Date.no
       const req = read(id)
       if (req) write({ ...req, deviceSuspect: true })
     },
+    /** F5-10: 최근 windowMs 이내 요청 목록 (localStorage 전체 스캔) */
+    listRecent(windowMs = 24 * 60 * 60 * 1000) {
+      if (!storage) return []
+      const cutoff = clock() - windowMs
+      const result = []
+      for (let i = 0; i < storage.length; i++) {
+        const k = storage.key(i)
+        if (!k?.startsWith(KEY)) continue
+        const id = k.slice(KEY.length)
+        const req = read(id)
+        if (req && req.sentAt >= cutoff) result.push(req)
+      }
+      return result.sort((a, b) => b.sentAt - a.sentAt)
+    },
   }
 }
 
