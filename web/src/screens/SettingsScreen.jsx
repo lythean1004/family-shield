@@ -69,6 +69,39 @@ export default function SettingsScreen() {
       <div className="screen-actions">
         <ActionButton variant="secondary" onClick={() => navigate('/')}>처음으로</ActionButton>
       </div>
+
+      {/* F3-1: 암호 정하는 방법 안내 */}
+      <section className="settings-section" aria-label="가족 암호">
+        <p className="settings-section__title">가족 암호 정하기 (F3-1)</p>
+        <p className="screen-body">
+          사기범이 가족인 척 연락할 때 바로 확인할 수 있는 암호를 미리 정해 두세요.
+        </p>
+        <ul className="settings-list">
+          <li>질문과 답 형태로 정하세요. 예: "우리 강아지 이름이 뭐야?"</li>
+          <li>SNS나 인터넷에 나온 적 없는 내용으로 정하세요.</li>
+          <li>반드시 <strong>만나거나 목소리로 통화할 때</strong> 말로 정하세요. 문자·카카오톡으로 보내지 마세요.</li>
+        </ul>
+        <p className="screen-body settings-note">
+          암호를 이 앱에 저장하지 마세요. 가족끼리 기억만 해 두세요.
+        </p>
+      </section>
+
+      {/* F3-3: 가족 약속 3가지 */}
+      <section className="settings-section" aria-label="가족 약속">
+        <p className="settings-section__title">가족 약속 3가지 (F3-3)</p>
+        <ol className="settings-list">
+          <li>
+            <strong>새 번호로 연락이 오면</strong> — 원래 알던 번호로 직접 전화해서 확인하세요.
+          </li>
+          <li>
+            <strong>가족이라며 전화가 오면</strong> — 암호를 물어보세요. 모르면 가족이 아니에요.
+          </li>
+          <li>
+            <strong>돈 얘기는 목소리로 통화한 뒤에만</strong> — 문자·카카오톡으로 온 송금 요청은 절대 응하지 마세요.
+          </li>
+        </ol>
+      </section>
+
       <NoLinkFooter />
     </main>
   )
