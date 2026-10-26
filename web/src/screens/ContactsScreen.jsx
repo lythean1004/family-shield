@@ -16,7 +16,16 @@ export default function ContactsScreen() {
       <p className="screen-body">문자에 적힌 번호 말고, 여기 있는 번호로 직접 거세요.</p>
       <div className="contact-list">
         {OFFICIAL_CONTACTS.map((c) => (
-          <CallButton key={c.id} name={c.name} number={c.number} source={sourceText()} />
+          <div key={c.id} className="contact-card">
+            <CallButton name={c.name} number={c.number} source={sourceText()} />
+            {/* F2-5: 진짜라면 이렇게 와요 */}
+            {c.normalNote && (
+              <p className="normal-note-card">
+                <span className="normal-note-card__label">진짜라면 이렇게 와요</span>
+                {c.normalNote}
+              </p>
+            )}
+          </div>
         ))}
       </div>
       <NoLinkFooter />
