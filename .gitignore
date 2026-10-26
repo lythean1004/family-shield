@@ -4,7 +4,7 @@
 node_modules/
 __pycache__/
 Resource/
-data/
+/data/
 .pytest_cache/
 
 # 개인정보가 든 문서 (커밋 금지)
