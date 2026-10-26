@@ -1,0 +1,19 @@
+{
+  "name": "@family-shield/core",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "판별 파이프라인 코어: 마스킹, 신호 상수, AI 출력 검증기, 규칙 엔진",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:watch": "node --test --watch test/*.test.js"
+  },
+  "exports": {
+    "./masking":   "./src/masking.js",
+    "./signals":   "./src/signals.js",
+    "./validator": "./src/validator.js",
+    "./rules":     "./src/rule-engine.js",
+    "./summarizer":"./src/summarizer.js",
+    "./extract":   "./src/extract.js",
+    "./links":     "./src/links.js"
+  }
+}

@@ -48,4 +48,8 @@ private/ 폴더(개인정보가 든 문서)는 커밋하지 않는다.
 - 작업이 끝나면 docs/worklog.md 갱신을 제안한다.
 
 ## 기술 스택
-미정. docs/decisions.md 참조.
+- 프론트엔드: Vite + React + React Router + PWA 플러그인(D28, docs/frontend-structure.md 2장). 서버 렌더링 없이 정적 배포.
+- 백엔드: Supabase. 개발 중에는 로컬(CLI + Docker), 클라우드 프로젝트는 4주차(11/10경) 생성.
+- AI: Claude Haiku 5.5, Gemini 3.1 Flash-Lite 2개를 평가셋으로 비교 후 선정(D4).
+- 배포: Vercel Hobby(보안 헤더만, 전용 기능은 쓰지 않음).
+- 자세한 근거는 docs/decisions.md, docs/prd.md 13장.
