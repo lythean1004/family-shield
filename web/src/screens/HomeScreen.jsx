@@ -27,6 +27,10 @@ export default function HomeScreen() {
         <ActionButton variant="secondary" onClick={() => navigate('/demo')}>
           예시 보기
         </ActionButton>
+        {/* F7: 연습 모드 */}
+        <ActionButton variant="secondary" onClick={() => navigate('/quiz')}>
+          오늘의 퀴즈 (연습)
+        </ActionButton>
       </div>
       <p className="screen-body home-settings">
         <button type="button" className="text-link" onClick={() => navigate('/settings')}>설정</button>

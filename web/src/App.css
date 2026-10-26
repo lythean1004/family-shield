@@ -483,6 +483,48 @@
 }
 .dashboard-card__pending:focus-visible { outline: 3px solid var(--c-action); outline-offset: 2px; }
 
+/* ── F7 연습 모드 퀴즈 ─────────────────────────────── */
+.practice-badge {
+  display: inline-block;
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-1) var(--sp-3);
+  border: 2px solid var(--c-check);
+  border-radius: 999px;
+  background: var(--c-check-bg);
+  color: var(--c-check);
+  font-size: var(--fs-small);
+  font-weight: 700;
+}
+.quiz-progress { font-size: var(--fs-small); color: var(--c-text-sub); margin: 0 0 var(--sp-2); }
+.quiz-message {
+  margin: 0 0 var(--sp-4);
+  padding: var(--sp-4);
+  border-left: 4px solid var(--c-border);
+  background: var(--c-surface);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+}
+.quiz-choice {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  padding: var(--sp-3) var(--sp-4);
+  border: 2px solid var(--c-border);
+  border-radius: var(--radius-btn);
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-size: var(--fs-body);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.quiz-choice:focus-visible { outline: 3px solid var(--c-focus); outline-offset: 2px; }
+.quiz-choice--selected { border-color: var(--c-action); font-weight: 700; }
+.quiz-result-label { font-size: var(--fs-body); font-weight: 700; margin: var(--sp-3) 0; }
+.quiz-result-label--correct { color: var(--c-action); }
+.quiz-result-label--wrong { color: var(--c-danger); }
+.quiz-score { font-size: var(--fs-body); }
+
 /* ── C2 보호자 ───────────────────────────────────── */
 .guardian-head { font-size: var(--fs-small); color: var(--c-text-sub); margin: 0 0 var(--sp-3); }
 .confirm-box {
