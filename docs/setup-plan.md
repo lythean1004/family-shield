@@ -112,7 +112,7 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 
 ### 3-3. NCP VM (D29, 2026-10-26 Vercel에서 교체)
 
-서버 기본 보안 세팅 완료(2026-10-26): 운영 사용자 `fsops`(uid=1002, wheel), SSH 키 인증만(PermitRootLogin no, PasswordAuthentication no), firewalld(default=drop, 22는 운영자 IP만, 80·443 전체), fail2ban(sshd jail, bantime 1h, maxretry 5), dnf-automatic(security 자동 적용), 프로젝트 디렉터리 생성. SELinux는 VM 배정 당시부터 Disabled 상태(NCP VM 기본값, 추후 필요 시 켜기). Nginx는 활성 상태.
+서버 기본 보안 세팅 완료(2026-10-26): 운영 사용자 `fsops`(uid=1002, wheel, 비밀번호 잠금·만료 없음, 키 로그인만), sudo는 `/etc/sudoers.d/fsops`의 NOPASSWD 명령 목록(tee·cp·install 등이 포함돼 사실상 root와 같음. 편의용이지 보안 경계가 아님), sshd(`AllowUsers fsops`, PermitRootLogin no, PasswordAuthentication no, MaxAuthTries 3, LoginGraceTime 30, ClientAliveInterval 60, X11Forwarding no, LogLevel VERBOSE, 드롭인 `/etc/ssh/sshd_config.d/00-hardening.conf` + Include 추가, 원본 백업 `sshd_config.bak.*`), root `authorized_keys` 삭제, 기존 `ops`(uid=1001) 계정은 잠금·nologin·wheel 제외, firewalld(default=drop, 22는 운영자 IP만, 80·443 전체), fail2ban(sshd jail, bantime 1h, maxretry 5), dnf-automatic(security 자동 적용), 프로젝트 디렉터리 생성. SELinux는 VM 배정 당시부터 Disabled 상태(NCP VM 기본값, 추후 필요 시 켜기). Nginx는 활성 상태.
 
 아래는 이 프로젝트 배포용 추가 항목.
 
