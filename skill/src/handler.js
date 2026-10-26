@@ -15,6 +15,8 @@
  * 테스트에서는 handleRequest()를 직접 가져다 쓴다.
  */
 import { analyze } from "../../packages/core/src/pipeline.js";
+import { createMemoryResultStore, redactToken } from "../../packages/core/src/result-token.js";
+import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
 import { readRequest, simpleText, quickReply } from "./kakao.js";
 import { tokenMatches } from "./config.js";
 
@@ -64,14 +66,16 @@ function buildReplyText(result) {
 /**
  * 판정에 맞는 빠른 버튼을 만든다.
  * D25: 가족방패는 먼저 링크를 보내지 않으므로 webLink는 사용자 요청 버튼만 허용.
+ * D34: [자세히 보기]는 1회용 토큰 주소(/check/result?t=…). 저장소가 없으면 버튼을 만들지 않는다.
  */
-function buildQuickReplies(result, webBaseUrl) {
+function buildQuickReplies(result, webBaseUrl, resultStore) {
   const replies = [];
   if (result.level === "위험" || result.level === "주의") {
     replies.push(quickReply.message("이미 당했어요", "이미 당했어요"));
   }
-  if (webBaseUrl) {
-    replies.push(quickReply.webLink("자세히 보기", `${webBaseUrl}/check`));
+  if (webBaseUrl && resultStore) {
+    const token = resultStore.put(result);
+    replies.push(quickReply.webLink("자세히 보기", `${webBaseUrl}/check/result?t=${token}`));
   }
   replies.push(quickReply.message("처음으로", "처음으로"));
   return replies;
@@ -99,7 +103,8 @@ function readBody(req) {
  * 핵심 판별 로직 — 테스트에서 직접 호출한다.
  *
  * @param {{ utterance: string, parentInputs?: object }} params
- * @param {{ ai: object, hmacKey?: string|null, cards?: object[], webBaseUrl?: string|null }} cfg
+ * @param {{ ai: object, hmacKey?: string|null, cards?: object[], webBaseUrl?: string|null,
+ *           resultStore?: ReturnType<typeof createMemoryResultStore>|null }} cfg
  * @returns {Promise<{ status: number, body: object }>}
  */
 export async function handleRequest(params, cfg) {
@@ -126,6 +131,7 @@ export async function handleRequest(params, cfg) {
       hmacKey: cfg.hmacKey ?? undefined,
       cards: cfg.cards ?? [],
       ai: cfg.ai,
+      urlReputation: cfg.urlReputation ?? null,
     });
   } catch (err) {
     console.error(`pipeline error: ${err.message}`);
@@ -133,8 +139,21 @@ export async function handleRequest(params, cfg) {
   }
 
   const text = buildReplyText(result);
-  const replies = buildQuickReplies(result, cfg.webBaseUrl);
+  const replies = buildQuickReplies(result, cfg.webBaseUrl, cfg.resultStore ?? null);
   return { status: 200, body: simpleText(text, replies) };
+}
+
+/**
+ * GET /api/result?t=… — 1회용 토큰으로 판별 결과 조회(PRD 13-4).
+ * 성공: 200 { ok: true, result }  /  만료·사용됨·없음: 410 { ok: false, reason }
+ * 응답은 캐시하지 않는다(no-store).
+ */
+export function handleResultLookup(token, resultStore) {
+  if (!resultStore) return { status: 410, body: { ok: false, reason: "missing" } };
+  const r = resultStore.redeem(token);
+  return r.ok
+    ? { status: 200, body: { ok: true, result: r.result } }
+    : { status: 410, body: { ok: false, reason: r.reason } };
 }
 
 /**
@@ -142,18 +161,32 @@ export async function handleRequest(params, cfg) {
  * @param {object} config  loadConfig()의 config 객체
  */
 export function makeHandler(config) {
+  // Supabase(result_tokens) 연결 전까지는 프로세스 메모리에 10분만 둔다(PRD 13-4 ③ 이전 단계).
+  const resultStore = config.webBaseUrl ? createMemoryResultStore() : null;
+  // 평판 조회기: 캐시를 프로세스 동안 공유한다. 키가 없으면 null(조회 안 함).
+  const urlReputation = createSafeBrowsingChecker({
+    apiKey: config.safeBrowsingKey,
+    timeoutMs: config.urlLookupTimeoutMs || 800,
+  });
+
   return async function handler(req, res) {
     const started = Date.now();
 
-    function send(status, body) {
-      res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+    function send(status, body, extraHeaders = {}) {
+      res.writeHead(status, { "content-type": "application/json; charset=utf-8", ...extraHeaders });
       res.end(JSON.stringify(body));
-      // 원문 없이 상태 코드·경과시간만 기록 (PRD 13-3)
-      console.log(`${new Date().toISOString()} ${req.method} ${req.url} ${status} ${Date.now() - started}ms`);
+      // 원문 없이 상태 코드·경과시간만 기록 (PRD 13-3). 토큰 값은 가린다(13-4).
+      console.log(`${new Date().toISOString()} ${req.method} ${redactToken(req.url)} ${status} ${Date.now() - started}ms`);
     }
 
     if (req.method === "GET" && req.url === "/health") {
       return send(200, { ok: true, model: config.ai.model });
+    }
+
+    if (req.method === "GET" && req.url?.startsWith("/api/result")) {
+      const token = new URL(req.url, "http://local").searchParams.get("t");
+      const { status, body } = handleResultLookup(token, resultStore);
+      return send(status, body, { "cache-control": "no-store" });
     }
 
     if (req.method !== "POST" || !req.url?.startsWith("/api/kakao-skill")) {
@@ -176,7 +209,7 @@ export function makeHandler(config) {
 
     const { status, body } = await handleRequest(
       { utterance: parsed.text, parentInputs: parsed.parentInputs ?? {} },
-      { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl },
+      { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation },
     );
     send(status, body);
   };

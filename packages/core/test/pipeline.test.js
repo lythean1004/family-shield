@@ -111,3 +111,39 @@ describe("파이프라인 - 대체(fallback)", () => {
     assert.equal(r.truncated, true);
   });
 });
+
+describe("파이프라인 - URL 평판 조회 (F4-11, R10)", () => {
+  it("악성 도메인이면 SIG_MALICIOUS_URL → 위험(R10), 조회기에는 도메인만 간다", async () => {
+    let asked;
+    const r = await analyze({
+      text: "택배 주소 확인 http://evil.invalid/track?id=SECRET123",
+      urlReputation: async (domains) => { asked = domains; return { ok: true, malicious: ["evil.invalid"] }; },
+    });
+    assert.deepEqual(asked, ["evil.invalid"]);
+    assert.ok(r.signals_code.includes("SIG_MALICIOUS_URL"));
+    assert.equal(r.level, "위험");
+    assert.ok(r.fired_rules.includes("R10"));
+    assert.deepEqual(r.url_reputation, { ok: true, hits: 1, reason: null });
+    assert.ok(!JSON.stringify(r.url_reputation).includes("evil"));
+  });
+
+  it("조회 실패해도 판정을 낮추지 않는다(링크 신호로 주의 유지)", async () => {
+    const r = await analyze({
+      text: "택배 주소 확인 http://evil.invalid/track",
+      urlReputation: async () => { throw new Error("down"); },
+    });
+    assert.equal(r.level, "주의");
+    assert.equal(r.url_reputation.ok, false);
+  });
+
+  it("단축 URL만 있으면 조회하지 않는다(D11)", async () => {
+    let called = false;
+    const r = await analyze({
+      text: "확인 bit.ly/abc",
+      urlReputation: async () => { called = true; return { ok: true, malicious: [] }; },
+    });
+    assert.equal(called, false);
+    assert.equal(r.url_reputation, null);
+  });
+});
+

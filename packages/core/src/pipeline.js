@@ -15,6 +15,7 @@ import { mask } from "./masking.js";
 import { extractSignals } from "./ai-client.js";
 import { decide } from "./rule-engine.js";
 import { summarize } from "./summarizer.js";
+import { SIG_MALICIOUS_URL } from "./signals.js";
 
 /** F4-1 입력 길이 상한 [임시] */
 export const MAX_INPUT_CHARS = 2000;
@@ -30,6 +31,7 @@ export const MAX_INPUT_CHARS = 2000;
  *   cards?: { id: string, summary: string }[],
  *   ai?: null | { model: string, apiKey?: string, baseUrl?: string, timeoutMs?: number,
  *                 promptVersion?: string, fetchImpl?: typeof fetch },
+ *   urlReputation?: null | ((domains: string[]) => Promise<{ ok: boolean, malicious: string[] }>),
  * }} input
  */
 export async function analyze({
@@ -40,6 +42,7 @@ export async function analyze({
   hmacKey,
   cards = [],
   ai = null,
+  urlReputation = null,
 }) {
   const raw = typeof text === "string" ? text : "";
   const truncated = [...raw].length > MAX_INPUT_CHARS;
@@ -54,7 +57,11 @@ export async function analyze({
   // ② 마스킹
   const { masked, phoneHmacs } = mask(input, { hmacKey, familyNames });
 
-  // ③④ AI
+  // ③④ AI  +  ①' 링크 도메인 평판 조회(F4-11). 둘은 서로 기다리지 않고 함께 돈다.
+  const reputationP = urlReputation && code.domains.length
+    ? urlReputation(code.domains).catch(() => ({ ok: false, malicious: [], reason: "error" }))
+    : Promise.resolve(null);
+
   let aiResult = null;
   let fallbackReason = null;
   if (!ai || !ai.model) {
@@ -69,10 +76,12 @@ export async function analyze({
     if (!aiResult.ok) fallbackReason = aiResult.reason;
   }
   const aiData = aiResult?.ok ? aiResult.data : null;
+  const reputation = await reputationP;
 
-  // ⑤ 합집합
+  // ⑤ 합집합 (평판 조회 실패는 신호를 빼지 않을 뿐, 판정을 낮추지 않는다)
   const signalsAi = aiData?.signals ?? [];
-  const signalsFinal = [...new Set([...code.signals, ...signalsAi])];
+  const signalsCode = reputation?.malicious?.length ? [...code.signals, SIG_MALICIOUS_URL] : code.signals;
+  const signalsFinal = [...new Set([...signalsCode, ...signalsAi])];
 
   // ⑥ 규칙
   const { level, fired_rules } = decide({
@@ -87,7 +96,7 @@ export async function analyze({
   return {
     level,
     fired_rules,
-    signals_code: code.signals,
+    signals_code: signalsCode,
     signals_ai: signalsAi,
     signals_final: signalsFinal,
     domains: code.domains,
@@ -102,5 +111,7 @@ export async function analyze({
     fallback_reason: fallbackReason,
     truncated,
     ai_meta: aiResult?.meta ?? null,
+    // 평판 조회 결과(도메인 이름은 담지 않는다): null = 조회 안 함
+    url_reputation: reputation ? { ok: reputation.ok, hits: reputation.malicious.length, reason: reputation.reason ?? null } : null,
   };
 }

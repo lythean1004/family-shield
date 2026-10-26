@@ -3,6 +3,7 @@
  * 평가 실행기 (PRD 15장)
  *
  *   node eval/run.mjs [--model gemini-3.1-flash-lite] [--timeout 3000] [--out eval/results/x.jsonl] [--no-ai]
+ *                     [--data eval/test.jsonl] [--repeat 3]
  *
  * 환경 변수: AI_API_KEY(필수, --no-ai면 불필요), AI_BASE_URL(선택, 전체 chat/completions 주소)
  *
@@ -28,6 +29,9 @@ const NO_AI = argv.includes("--no-ai");
 const MODEL = flag("--model", "gemini-3.1-flash-lite");
 const TIMEOUT_MS = Number(flag("--timeout", "3000"));
 const OUT_PATH = flag("--out", null);
+const DATA_PATH = flag("--data", join(here, "dev.jsonl"));
+// 일관성(PRD 15-2): 같은 케이스를 N번 돌려 판정이 모두 같은 비율. 첫 번째 실행으로 나머지 지표를 잰다.
+const REPEAT = Math.max(1, Number(flag("--repeat", "1")));
 const API_KEY = process.env.AI_API_KEY;
 const BASE_URL = process.env.AI_BASE_URL || undefined;
 
@@ -36,7 +40,7 @@ if (!NO_AI && !API_KEY) {
   process.exit(1);
 }
 
-const cases = readFileSync(join(here, "dev.jsonl"), "utf8")
+const cases = readFileSync(resolve(DATA_PATH), "utf8")
   .split(/\r?\n/)
   .filter((l) => l.trim())
   .map((l) => JSON.parse(l));
@@ -57,6 +61,17 @@ for (const c of cases) {
     registeredLast4: c.fixture?.registered_member?.last4,
     ai,
   });
+  // 반복 실행: 판정만 모아 일관성을 잰다(원문·신호는 저장하지 않음)
+  const repeatLevels = [r.level];
+  for (let k = 1; k < REPEAT; k++) {
+    const again = await analyze({
+      text: c.message_text,
+      parentInputs: c.parent_inputs ?? {},
+      registeredLast4: c.fixture?.registered_member?.last4,
+      ai,
+    });
+    repeatLevels.push(again.level);
+  }
 
   const missedAi = g.signals_ai.filter((s) => !r.signals_final.includes(s));
   const missedCode = g.signals_code.filter((s) => !r.signals_code.includes(s));
@@ -81,6 +96,8 @@ for (const c of cases) {
     timed_out: Boolean(r.ai_meta?.timed_out),
     latency_ms: r.ai_meta?.latency_ms ?? 0,
     cost_usd: r.ai_meta?.cost_usd ?? null,
+    repeat_levels: REPEAT > 1 ? repeatLevels : undefined,
+    consistent: new Set(repeatLevels).size === 1,
   };
   row.pass = row.level_match && row.ai_sig_recall && row.code_sig_match;
   rows.push(row);
@@ -137,6 +154,9 @@ const summary = {
   latency_max_ms: lat.at(-1) ?? 0,
   cost_usd_total: Number(cost.toFixed(6)),
   cost_usd_per_case: costKnown ? Number((cost / costKnown).toFixed(6)) : null,
+  data: DATA_PATH,
+  repeat: REPEAT,
+  consistency: REPEAT > 1 ? pct(rows.filter((r) => r.consistent).length, n) : null,
 };
 
 console.log("-".repeat(80));
@@ -145,6 +165,7 @@ console.log(`놓침률 ${summary.miss_rate} (목표 5% 이하)  오경보율 ${s
 console.log(`사칭 유형 정확도 ${summary.impersonation_type_acc}  대체 ${summary.fallback}건  시간 초과 ${summary.timeouts}건 (${summary.timeout_rate})`);
 console.log(`지연 p50 ${summary.latency_p50_ms}ms  p95 ${summary.latency_p95_ms}ms  최대 ${summary.latency_max_ms}ms`);
 console.log(`비용 합계 $${summary.cost_usd_total}  건당 $${summary.cost_usd_per_case ?? "-"}`);
+if (summary.consistency) console.log(`일관성(${REPEAT}회 판정 동일) ${summary.consistency}`);
 if (summary.under_call.length) console.log(`정답보다 낮게 판정: ${summary.under_call.join(", ")}`);
 
 if (OUT_PATH) {

@@ -13,6 +13,8 @@ import CallButton from '../components/CallButton.jsx'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
 import { POLICE, sourceText } from '../data/contacts.js'
+import { confirmStore } from '../data/confirm.js'
+import { loadCurrentRequestId } from '../data/session.js'
 
 const CHOICES = [
   { id: 'link',  label: '링크를 눌렀어요',     infected: true },
@@ -33,6 +35,13 @@ export default function HelpScreen() {
   const [choice, setChoice] = useState(null)
   const picked = CHOICES.find((c) => c.id === choice)
 
+  const pick = (c) => {
+    setChoice(c.id)
+    // 링크·앱이면 진행 중인 가족 확인 요청에 표시 → 보호자 화면이 "다른 방법으로 연락"(F6-3, C3)
+    const reqId = loadCurrentRequestId()
+    if (c.infected && reqId) confirmStore.markDeviceSuspect(reqId)
+  }
+
   return (
     <main className="mode-parent">
       {!picked && (
@@ -42,7 +51,7 @@ export default function HelpScreen() {
           <ul className="action-choice-list">
             {CHOICES.map((c) => (
               <li key={c.id}>
-                <button type="button" className="demo-list__btn" onClick={() => setChoice(c.id)}>
+                <button type="button" className="demo-list__btn" onClick={() => pick(c)}>
                   {c.label}
                 </button>
               </li>

@@ -251,3 +251,93 @@
   border: 0;
 }
 
+
+/* ── 글자 링크 (오판 신고, 닫기) ─────────────────── */
+.text-link {
+  display: inline-block;
+  min-height: 48px; /* U10 터치 영역 */
+  padding: var(--sp-3) 0;
+  background: none;
+  border: 0;
+  font-size: var(--fs-small);
+  color: var(--c-action);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── 오판 신고 (F4-13) ───────────────────────────── */
+.misjudge {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card);
+  padding: var(--sp-4);
+  margin: var(--sp-4) 0;
+}
+.misjudge__q { font-size: var(--fs-body); font-weight: 700; margin: 0 0 var(--sp-3); }
+.misjudge__list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+.misjudge__choice {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-btn);
+  font-size: var(--fs-small);
+  text-align: left;
+  cursor: pointer;
+}
+.misjudge__done { font-size: var(--fs-small); color: var(--c-text-sub); margin: var(--sp-4) 0; }
+
+/* ── P4 로딩 뼈대 (U9) ───────────────────────────── */
+.skeleton { display: flex; flex-direction: column; gap: var(--sp-4); }
+.skeleton__block {
+  height: 3rem;
+  border-radius: var(--radius-btn);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+}
+.skeleton__block--banner { height: 6rem; border-radius: var(--radius-card); }
+.skeleton__block--button { height: 64px; }
+
+/* ── P6 가족 답 기다리기 ─────────────────────────── */
+.wait-warning {
+  font-size: var(--fs-title);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--c-danger);
+  background: var(--c-danger-bg);
+  border-radius: var(--radius-card);
+  padding: var(--sp-4);
+  margin: 0 0 var(--sp-6);
+}
+.wait-status { color: var(--c-text-sub); }
+.wait-dots { display: inline-flex; gap: 0.25em; margin-left: 0.4em; vertical-align: middle; }
+.wait-dots i {
+  width: 0.35em; height: 0.35em;
+  border-radius: 50%;
+  background: currentColor;
+  animation: wait-dot 1.2s infinite ease-in-out;
+}
+.wait-dots i:nth-child(2) { animation-delay: 0.2s; }
+.wait-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes wait-dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .wait-dots i { animation: none; opacity: 0.6; }
+}
+.dev-note {
+  font-size: var(--fs-small);
+  color: var(--c-text-sub);
+  border: 1px dashed var(--c-border);
+  border-radius: var(--radius-btn);
+  padding: var(--sp-3);
+  margin-top: var(--sp-6);
+}
+
+/* ── C2 보호자 ───────────────────────────────────── */
+.guardian-head { font-size: var(--fs-small); color: var(--c-text-sub); margin: 0 0 var(--sp-3); }
+.confirm-box {
+  border: 2px solid var(--c-caution);
+  background: var(--c-caution-bg);
+  border-radius: var(--radius-card);
+  padding: var(--sp-4);
+}
+

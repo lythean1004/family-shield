@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { handleRequest } from "../src/handler.js";
+import { createServer } from "node:http";
+import { handleRequest, handleResultLookup, makeHandler } from "../src/handler.js";
+import { createMemoryResultStore } from "../../packages/core/src/result-token.js";
 import { readRequest, simpleText, quickReply, anonymousCode } from "../src/kakao.js";
 import { loadConfig, tokenMatches } from "../src/config.js";
 
@@ -161,6 +163,90 @@ describe("핸들러 - R1과 한계 문구", () => {
     const r = await handleRequest({ utterance: "[검찰청] 링크: http://x.invalid/a" }, c);
     const text = r.body.template.outputs[0].simpleText.text;
     assert.ok(text.includes("참고용"), "한계 문구 포함");
+  });
+});
+
+describe("자세히 보기 1회용 토큰 (D34, PRD 13-4)", () => {
+  const dangerAi = { ...cfg.ai, fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") };
+
+  function detailUrl(body) {
+    return body.template.quickReplies.find((q) => q.label === "자세히 보기")?.webLinkUrl;
+  }
+
+  it("WEB_BASE_URL과 저장소가 있으면 버튼 주소가 /check/result?t=토큰", async () => {
+    const store = createMemoryResultStore();
+    const r = await handleRequest(
+      { utterance: "[검찰청] 링크: http://x.invalid/a" },
+      { ...cfg, ai: dangerAi, webBaseUrl: "https://fs.example", resultStore: store },
+    );
+    assert.match(detailUrl(r.body), /^https:\/\/fs\.example\/check\/result\?t=[A-Za-z0-9_-]{22}$/);
+    assert.equal(store.size(), 1);
+  });
+
+  it("WEB_BASE_URL이 없으면 버튼이 없다", async () => {
+    const r = await handleRequest({ utterance: "[검찰청] 링크: http://x.invalid/a" }, { ...cfg, ai: dangerAi });
+    assert.equal(detailUrl(r.body), undefined);
+  });
+
+  it("조회는 한 번만 되고, 결과에 원문이 없다", async () => {
+    const store = createMemoryResultStore();
+    const utterance = "[검찰청] 사건 확인 링크: http://x.invalid/a";
+    const r = await handleRequest({ utterance }, { ...cfg, ai: dangerAi, webBaseUrl: "https://fs.example", resultStore: store });
+    const token = new URL(detailUrl(r.body)).searchParams.get("t");
+
+    const first = handleResultLookup(token, store);
+    assert.equal(first.status, 200);
+    assert.equal(first.body.result.level, "위험");
+    assert.ok(!JSON.stringify(first.body).includes("x.invalid"), "도메인·원문 없음");
+    assert.ok(!JSON.stringify(first.body).includes("사건 확인"), "원문 없음");
+
+    const second = handleResultLookup(token, store);
+    assert.equal(second.status, 410);
+    assert.equal(second.body.reason, "used");
+  });
+
+  it("저장소가 없거나 모르는 토큰이면 410", () => {
+    assert.equal(handleResultLookup("x".repeat(22), null).status, 410);
+    assert.equal(handleResultLookup("x".repeat(22), createMemoryResultStore()).body.reason, "missing");
+  });
+});
+
+describe("HTTP 서버 - 결과 조회 경로", () => {
+  it("GET /api/result: 한 번 200, 다음 410, 로그에 토큰 없음", async () => {
+    const config = {
+      headerToken: "h", webBaseUrl: "https://fs.example", hmacKey: null,
+      ai: { model: "fake", apiKey: "k", timeoutMs: 1000, promptVersion: "v1",
+            fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") },
+    };
+    const server = createServer(makeHandler(config));
+    await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const logs = [];
+    const origLog = console.log;
+    console.log = (m) => logs.push(String(m));
+    try {
+      const skill = await fetch(`${base}/api/kakao-skill`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-skill-token": "h" },
+        body: JSON.stringify({ userRequest: { utterance: "[검찰청] 링크: http://x.invalid/a" } }),
+      }).then((r) => r.json());
+      const url = skill.template.quickReplies.find((q) => q.label === "자세히 보기").webLinkUrl;
+      const token = new URL(url).searchParams.get("t");
+
+      const a = await fetch(`${base}/api/result?t=${token}`);
+      assert.equal(a.status, 200);
+      assert.equal(a.headers.get("cache-control"), "no-store");
+      assert.equal((await a.json()).result.level, "위험");
+
+      const b = await fetch(`${base}/api/result?t=${token}`);
+      assert.equal(b.status, 410);
+
+      assert.ok(logs.length >= 3);
+      assert.ok(logs.every((l) => !l.includes(token)), "로그에 토큰 원문이 없다");
+    } finally {
+      console.log = origLog;
+      server.close();
+    }
   });
 });
 

@@ -9,6 +9,10 @@ import DemoScreen    from './screens/DemoScreen.jsx'
 import HangupScreen  from './screens/HangupScreen.jsx'
 import ResultScreen  from './screens/ResultScreen.jsx'
 import HelpScreen    from './screens/HelpScreen.jsx'
+import CallScreen    from './screens/CallScreen.jsx'
+import WaitScreen    from './screens/WaitScreen.jsx'
+import AnswerScreen  from './screens/AnswerScreen.jsx'
+import FamilyScreen  from './screens/FamilyScreen.jsx'
 import NoLinkFooter  from './components/NoLinkFooter.jsx'
 import { DEV_RESULT } from './data/result.js'
 
@@ -31,16 +35,15 @@ export default function App() {
         <Route path="/demo"           element={<DemoScreen />} />
         <Route path="/help"           element={<HelpScreen />} />
 
-        {/* 부모님 판별 흐름 */}
+        {/* 부모님 판별 흐름. 결과는 ?t= 1회용 토큰(D34) → 이 탭 sessionStorage → 없으면 개발용 가짜 결과 */}
         <Route path="/check/hangup"   element={<HangupScreen />} />
-        {/* /check/result: 실제 서비스에서는 URL 토큰(D34)으로 판별 건을 받음. 지금은 가짜 데이터 */}
-        <Route path="/check/result"   element={<ResultScreen result={DEV_RESULT} hasFamilyConsent />} />
-        <Route path="/check/call"     element={<Placeholder title="전화 받았는지" />} />
-        <Route path="/check/wait"     element={<Placeholder title="가족 답 기다리는 중" />} />
-        <Route path="/check/answer"   element={<Placeholder title="가족 답 반영 결과" />} />
+        <Route path="/check/result"   element={<ResultScreen fallbackResult={DEV_RESULT} hasFamilyConsent />} />
+        <Route path="/check/call"     element={<CallScreen fallbackResult={DEV_RESULT} />} />
+        <Route path="/check/wait"     element={<WaitScreen />} />
+        <Route path="/check/answer"   element={<AnswerScreen fallbackResult={DEV_RESULT} />} />
 
-        {/* 보호자 화면 (Supabase 연결 뒤) */}
-        <Route path="/family/*"       element={<Placeholder title="가족용 화면" />} />
+        {/* 보호자 화면 C2·C3. 로그인·대상자 확인은 4주차(Supabase Auth) */}
+        <Route path="/family/*"       element={<FamilyScreen />} />
 
         <Route path="*"               element={<Placeholder title="페이지를 찾을 수 없어요" />} />
       </Routes>

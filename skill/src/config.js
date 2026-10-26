@@ -6,7 +6,8 @@
  *
  * 필수: SKILL_HEADER_TOKEN, AI_API_KEY
  * 선택: AI_BASE_URL, AI_MODEL, AI_TIMEOUT_MS, SKILL_PORT, SKILL_HOST,
- *       WEB_BASE_URL, PHONE_HMAC_SECRET, PROMPT_VERSION, MAX_CONCURRENT
+ *       WEB_BASE_URL, PHONE_HMAC_SECRET, PROMPT_VERSION, MAX_CONCURRENT,
+ *       SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS
  */
 
 const DEFAULTS = {
@@ -16,6 +17,7 @@ const DEFAULTS = {
   AI_TIMEOUT_MS: "3000",
   PROMPT_VERSION: "v1",
   MAX_CONCURRENT: "8",
+  URL_LOOKUP_TIMEOUT_MS: "800",
 };
 
 /**
@@ -42,6 +44,9 @@ export function loadConfig(env = process.env) {
         promptVersion: get("PROMPT_VERSION"),
       },
       webBaseUrl: get("WEB_BASE_URL") || null,
+      // URL 평판 조회(F4-11). 없으면 조회하지 않는다(링크 신호는 그대로).
+      safeBrowsingKey: get("SAFE_BROWSING_API_KEY") || null,
+      urlLookupTimeoutMs: Number(get("URL_LOOKUP_TIMEOUT_MS")),
       // 번호 HMAC 키. 없으면 HMAC을 만들지 않는다(마스킹 자체는 동작).
       hmacKey: get("PHONE_HMAC_SECRET") || null,
       maxConcurrent: Number(get("MAX_CONCURRENT")),

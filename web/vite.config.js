@@ -9,7 +9,11 @@ const coreSrc = fileURLToPath(new URL('../packages/core/src', import.meta.url))
 
 export default defineConfig({
   resolve: { alias: { '@core': coreSrc } },
-  server: { fs: { allow: ['..'] } },
+  server: {
+    fs: { allow: ['..'] },
+    // 개발: /api(1회용 결과 조회)는 로컬 스킬 서버로. 운영에서는 Nginx가 같은 경로를 넘긴다.
+    proxy: { '/api': 'http://127.0.0.1:3000' },
+  },
   plugins: [
     react(),
     VitePWA({

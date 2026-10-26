@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">
-  <!-- 위험(D33): 팔각형 + 느낌표. 색은 --c-danger(#b42318) -->
+  <!-- 위험(D33): 팔각형 + 느낌표. 색은 c-danger(#b42318) -->
   <path d="M16 3h16l13 13v16L32 45H16L3 32V16z" fill="#b42318"/>
   <rect x="21.5" y="11" width="5" height="17" rx="2.5" fill="#fff"/>
   <circle cx="24" cy="35" r="3.2" fill="#fff"/>

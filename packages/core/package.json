@@ -16,6 +16,8 @@
     "./extract": "./src/extract.js",
     "./links": "./src/links.js",
     "./ai-client": "./src/ai-client.js",
-    "./pipeline": "./src/pipeline.js"
+    "./pipeline": "./src/pipeline.js",
+    "./result-token": "./src/result-token.js",
+    "./url-reputation": "./src/url-reputation.js"
   }
 }
