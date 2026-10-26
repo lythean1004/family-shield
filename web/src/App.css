@@ -1,0 +1,20 @@
+main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+h1 { font-size: 1.6rem; margin: 0 0 1rem; }
+nav { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
+nav a, .call {
+  display: block;
+  padding: 1rem;
+  border: 2px solid #1a56db;
+  border-radius: 0.75rem;
+  color: #1a56db;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+.call { background: #1a56db; color: #fff; font-size: 1.4rem; }
+.notice { font-weight: 700; }
+.limit { font-size: 0.85rem; color: #444; border-top: 1px solid #ccc; padding-top: 0.75rem; }
