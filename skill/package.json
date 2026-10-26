@@ -1,0 +1,13 @@
+{
+  "name": "@family-shield/skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "카카오 스킬 서버 (NCP VM, systemd)",
+  "main": "src/server.mjs",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "dev": "node --env-file=.env.skill.local src/server.mjs",
+    "test": "node --test test/*.test.js"
+  }
+}
