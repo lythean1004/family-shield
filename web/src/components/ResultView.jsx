@@ -19,6 +19,7 @@ import LimitNotice from './LimitNotice.jsx'
 import ActionButton from './ActionButton.jsx'
 import CallButton from './CallButton.jsx'
 import MisjudgeLink from './MisjudgeLink.jsx'
+import SpeakButton from './SpeakButton.jsx'
 import { levelKey, verdictDescription, AI_FALLBACK_TEXT } from '../data/result.js'
 import { POLICE, sourceText } from '../data/contacts.js'
 
@@ -39,9 +40,19 @@ export default function ResultView({
   const toContacts = () => navigate('/contacts')
   const toHelp = () => navigate('/help')
 
+  // F4-12 음성 읽기: 판정 + 이유(최대 3문장) + 한계 문구
+  const speakText = [
+    verdictDescription(result.level, type),
+    ...explanation.slice(0, 3),
+    '이 결과는 참고용입니다. 의심되면 반드시 직접 공식 번호로 확인하세요.',
+  ].join(' ')
+
   return (
     <>
-      <VerdictBanner level={key} description={verdictDescription(result.level, type)} />
+      <div className="verdict-row">
+        <VerdictBanner level={key} description={verdictDescription(result.level, type)} />
+        <SpeakButton text={speakText} />
+      </div>
 
       {key !== 'check' && (
         <section aria-label="이유">

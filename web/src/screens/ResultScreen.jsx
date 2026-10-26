@@ -15,9 +15,12 @@ import {
   fetchResultByToken, loadCurrentResult, saveCurrentResult, saveCurrentRequestId,
 } from '../data/session.js'
 import { confirmStore } from '../data/confirm.js'
+import { loadFamilyConsent } from '../data/consent.js'
 
-export default function ResultScreen({ fallbackResult, familyName, hasFamilyConsent }) {
+export default function ResultScreen({ fallbackResult, familyName, hasFamilyConsent: consentProp }) {
   const navigate = useNavigate()
+  // F5-9: 동의 ②가 없으면 가족 확인 버튼 대신 공식 번호. prop이 오면 그것을 우선(테스트·데모용).
+  const [hasFamilyConsent] = useState(() => consentProp ?? loadFamilyConsent())
   const [params, setParams] = useSearchParams()
   const token = params.get('t')
   const [state, setState] = useState(() =>

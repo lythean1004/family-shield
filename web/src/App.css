@@ -332,6 +332,113 @@
   margin-top: var(--sp-6);
 }
 
+
+/* ── verdict-row (SpeakButton 배치용) ──────────────── */
+.verdict-row { position: relative; }
+.speak-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  min-height: 44px;
+  border: 1.5px solid var(--c-border);
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--c-text-sub);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.speak-btn:hover { background: var(--c-bg-raised); }
+.speak-btn:focus-visible { outline: 3px solid var(--c-action); outline-offset: 2px; }
+.speak-btn[aria-pressed="true"] { color: var(--c-action); border-color: var(--c-action); }
+
+/* ── InputScreen ──────────────────────────────────── */
+.input-textarea-label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: var(--sp-2);
+}
+.input-textarea {
+  display: block;
+  width: 100%;
+  padding: var(--sp-3);
+  border: 2px solid var(--c-border);
+  border-radius: var(--radius-btn);
+  font-size: var(--fs-body);
+  font-family: inherit;
+  line-height: 1.6;
+  resize: vertical;
+  background: var(--c-bg);
+  color: var(--c-text);
+  transition: border-color 0.12s ease;
+}
+.input-textarea:focus { outline: none; border-color: var(--c-action); }
+.input-textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+.input-count {
+  font-size: var(--fs-small);
+  color: var(--c-text-sub);
+  text-align: right;
+  margin: var(--sp-1) 0 var(--sp-4);
+}
+
+/* ── 접근성 유틸 ──────────────────────────────────── */
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+/* 텍스트 링크(작은 글자, 밑줄) */
+.text-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--c-action);
+  font-size: var(--fs-small);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.text-link:hover { opacity: 0.8; }
+.home-settings { text-align: right; margin-top: var(--sp-4); }
+
+/* ── 설정 /settings (F5-9) ───────────────────────── */
+.settings-section {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+.settings-section__title { font-size: var(--fs-body); font-weight: 700; margin: 0 0 var(--sp-3); }
+.settings-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
+.settings-toggle-label { font-size: var(--fs-body); font-weight: 700; }
+.settings-toggle {
+  position: relative;
+  width: 88px;
+  min-height: 48px;
+  border: 2px solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-surface);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.settings-toggle__thumb {
+  position: absolute;
+  top: 4px; left: 4px;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--c-text-sub);
+  transition: transform 0.15s ease;
+}
+.settings-toggle--on { background: var(--c-action); border-color: var(--c-action); }
+.settings-toggle--on .settings-toggle__thumb { transform: translateX(40px); background: var(--c-action-text); }
+@media (prefers-reduced-motion: reduce) { .settings-toggle__thumb { transition: none; } }
+.settings-note { color: var(--c-text-sub); font-size: var(--fs-small); margin-top: var(--sp-4); }
+
 /* ── C2 보호자 ───────────────────────────────────── */
 .guardian-head { font-size: var(--fs-small); color: var(--c-text-sub); margin: 0 0 var(--sp-3); }
 .confirm-box {

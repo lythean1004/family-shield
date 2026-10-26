@@ -28,6 +28,9 @@ export default function HomeScreen() {
           예시 보기
         </ActionButton>
       </div>
+      <p className="screen-body home-settings">
+        <button type="button" className="text-link" onClick={() => navigate('/settings')}>설정</button>
+      </p>
       <NoLinkFooter />
     </main>
   )
