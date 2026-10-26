@@ -28,19 +28,40 @@ const SIGNAL_PHRASE = {
 };
 
 /**
+ * 마지막 글자에 받침이 있으면 "이라고", 없으면 "라고" (딸이라고 / 엄마라고)
+ * @param {string} word
+ */
+function withRago(word) {
+  const code = word.charCodeAt(word.length - 1);
+  const isHangul = code >= 0xac00 && code <= 0xd7a3;
+  const hasFinal = isHangul && (code - 0xac00) % 28 !== 0;
+  return `${word}${hasFinal ? "이라고" : "라고"} 함`;
+}
+
+/**
+ * 신호 ID → 문구 배열 (알 수 없는 ID는 빠지고, 같은 문구는 한 번만)
+ * 웹 SignalList와 자녀 알림 요약이 같은 표를 쓴다.
+ * @param {string[]} signals
+ * @param {{ impersonated_relation?: string | null }} [meta]
+ * @returns {string[]}
+ */
+export function summarizePhrases(signals, meta = {}) {
+  const phrases = signals.flatMap((id) => {
+    if (id === "SIG_FAMILY_IMPERSONATION") {
+      const rel = meta.impersonated_relation;
+      return rel ? [withRago(rel)] : ["가족이라고 함"];
+    }
+    const phrase = SIGNAL_PHRASE[id];
+    return phrase ? [phrase] : [];
+  });
+  return [...new Set(phrases)];
+}
+
+/**
  * @param {string[]} signals
  * @param {{ impersonated_relation?: string | null }} [meta]
  * @returns {string}
  */
 export function summarize(signals, meta = {}) {
-  const phrases = signals.flatMap((id) => {
-    if (id === "SIG_FAMILY_IMPERSONATION") {
-      const rel = meta.impersonated_relation;
-      return rel ? [`${rel}이라고 함`] : ["가족이라고 함"];
-    }
-    const phrase = SIGNAL_PHRASE[id];
-    return phrase ? [phrase] : [];
-  });
-
-  return phrases.join(" · ");
+  return summarizePhrases(signals, meta).join(" · ");
 }

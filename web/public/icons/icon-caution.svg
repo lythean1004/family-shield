@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">
+  <!-- 주의(D33): 삼각형 + 느낌표. 색은 --c-caution(#9a4a00) -->
+  <path d="M24 3.5c1.3 0 2.5.7 3.1 1.8l19 33.4c1.3 2.3-.4 5.3-3.1 5.3H5c-2.7 0-4.4-3-3.1-5.3l19-33.4c.6-1.1 1.8-1.8 3.1-1.8z" fill="#9a4a00"/>
+  <rect x="21.5" y="15" width="5" height="14" rx="2.5" fill="#fff"/>
+  <circle cx="24" cy="36" r="3" fill="#fff"/>
+</svg>

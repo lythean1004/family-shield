@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { summarize } from "../src/summarizer.js";
+import { summarize, summarizePhrases } from "../src/summarizer.js";
 
 describe("요약 문구 생성", () => {
   it("단일 신호를 문구로 변환한다", () => {
@@ -29,6 +29,27 @@ describe("요약 문구 생성", () => {
 
   it("빈 배열이면 빈 문자열", () => {
     assert.equal(summarize([]), "");
+  });
+
+  it("받침 없는 관계는 '라고 함' (엄마라고 함)", () => {
+    assert.equal(summarize(["SIG_FAMILY_IMPERSONATION"], { impersonated_relation: "엄마" }), "엄마라고 함");
+    assert.equal(summarize(["SIG_FAMILY_IMPERSONATION"], { impersonated_relation: "언니" }), "언니라고 함");
+  });
+
+  it("받침 있는 관계는 '이라고 함' (아들이라고 함)", () => {
+    assert.equal(summarize(["SIG_FAMILY_IMPERSONATION"], { impersonated_relation: "아들" }), "아들이라고 함");
+    assert.equal(summarize(["SIG_FAMILY_IMPERSONATION"], { impersonated_relation: "동생" }), "동생이라고 함");
+  });
+
+  it("summarizePhrases는 문구 배열을 돌려준다(웹 SignalList용)", () => {
+    assert.deepEqual(
+      summarizePhrases(["SIG_FAMILY_IMPERSONATION", "SIG_NEW_NUMBER", "UNKNOWN"], { impersonated_relation: "딸" }),
+      ["딸이라고 함", "새 번호로 연락"],
+    );
+  });
+
+  it("같은 문구는 한 번만", () => {
+    assert.deepEqual(summarizePhrases(["SIG_MONEY", "SIG_MONEY"]), ["송금 요구"]);
   });
 
   it("PRD 9-9 전체 신호 매핑을 확인한다", () => {
