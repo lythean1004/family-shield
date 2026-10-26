@@ -37,11 +37,19 @@ const LEVEL_TEXT = {
 
 /**
  * 판정 결과를 카카오 응답 텍스트로 변환한다.
+ * R1(통화 중)은 끊기 안내를 첫 줄에, 나머지 설명을 그 뒤에 붙이고 한계 문구로 닫는다.
  * explanation이 있으면 붙이고, 없으면 신호 요약을 쓴다.
  */
 function buildReplyText(result) {
   const lvl = LEVEL_TEXT[result.level] ?? result.level;
-  const lines = [`[${lvl}]`];
+  const lines = [];
+
+  // 통화 중 R1이면 끊기 안내를 가장 먼저(F4-4). 이후 나머지 안내도 함께 표시.
+  if (result.fired_rules?.includes("R1")) {
+    lines.push(FIXED.CALL_IN_PROGRESS);
+  }
+
+  lines.push(`[${lvl}]`);
 
   if (result.explanation_for_parent?.length) {
     lines.push(...result.explanation_for_parent);
@@ -49,10 +57,7 @@ function buildReplyText(result) {
     lines.push(`감지된 신호: ${result.summary}`);
   }
 
-  // 통화 중 R1이면 항상 가장 먼저 전화 끊기 안내
-  if (result.fired_rules.includes("R1")) return FIXED.CALL_IN_PROGRESS;
-
-  lines.push(FIXED.DISCLAIMER);
+  lines.push(FIXED.DISCLAIMER); // F4-8: 모든 결과 화면에 한계 문구
   return lines.join("\n");
 }
 
@@ -108,7 +113,8 @@ export async function handleRequest(params, cfg) {
   if (parentInputs.call_in_progress) {
     return {
       status: 200,
-      body: simpleText(FIXED.CALL_IN_PROGRESS, [quickReply.message("도움이 필요해요", "도움이 필요해요")]),
+      // F4-4 끊기 안내가 첫 줄, F4-8 한계 문구는 빠른 경로에도 붙인다
+      body: simpleText(FIXED.CALL_IN_PROGRESS + FIXED.DISCLAIMER, [quickReply.message("도움이 필요해요", "도움이 필요해요")]),
     };
   }
 
@@ -169,7 +175,7 @@ export function makeHandler(config) {
     if (!parsed) return send(400, { error: "invalid kakao payload" });
 
     const { status, body } = await handleRequest(
-      { utterance: parsed.text, parentInputs: {} },
+      { utterance: parsed.text, parentInputs: parsed.parentInputs ?? {} },
       { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl },
     );
     send(status, body);

@@ -11,13 +11,34 @@ export const MAX_TEXT_CHARS = 1000;
 export const MAX_OUTPUTS = 3;
 export const MAX_QUICK_REPLIES = 3;
 
-/** 요청에서 부모님이 쓴 글과 봇 사용자 키를 꺼낸다. 없으면 null. */
+/** 요청에서 부모님이 쓴 글, 봇 사용자 키, 화면 입력값을 꺼낸다. 없으면 null. */
 export function readRequest(payload) {
   const userRequest = payload?.userRequest;
   if (!userRequest || typeof userRequest !== "object") return null;
   const text = typeof userRequest.utterance === "string" ? userRequest.utterance : "";
   const botUserKey = userRequest.user?.properties?.botUserKey ?? userRequest.user?.id ?? null;
-  return { text, botUserKey };
+
+  // 카카오 블록 파라미터(이전 화면 입력값).
+  // 오픈빌더 v2: userRequest.params 또는 detail_params["param"].value
+  const raw = userRequest.params ?? {};
+  const get = (key) => {
+    const v = raw[key];
+    if (v == null) return undefined;
+    // detail_params 형태 { value: "true" } 또는 평탄 "true"
+    const str = typeof v === "object" ? (v.value ?? "") : String(v);
+    return str;
+  };
+  const parentInputs = {};
+  const cip = get("call_in_progress");
+  if (cip != null) parentInputs.call_in_progress = cip === "true";
+  const cb = get("called_before");
+  if (cb != null) parentInputs.called_before = cb === "true";
+  const fd = get("family_denied");
+  if (fd != null) parentInputs.family_denied = fd === "true";
+  const sl4 = get("sender_last4");
+  if (sl4 != null) parentInputs.sender_last4 = sl4 || null;
+
+  return { text, botUserKey, parentInputs };
 }
 
 /** 텍스트 말풍선 하나짜리 응답. 버튼은 최대 3개만 남긴다. */

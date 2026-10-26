@@ -143,3 +143,60 @@ describe("핸들러 - 기본", () => {
     assert.equal(r.status, 200);
   });
 });
+
+describe("핸들러 - R1과 한계 문구", () => {
+  it("R1 판정이어도 한계 문구가 포함된다", async () => {
+    // call_in_progress=true면 pipeline이 R1을 실행, buildReplyText에 DISCLAIMER가 붙어야 함
+    const r = await handleRequest(
+      { utterance: "검찰청입니다", parentInputs: { call_in_progress: true } },
+      cfg,
+    );
+    const text = r.body.template.outputs[0].simpleText.text;
+    assert.ok(text.includes("끊으세요"), "끊기 안내 포함");
+    assert.ok(text.includes("참고용"), "한계 문구 포함");
+  });
+
+  it("R1이 아닌 위험 판정에도 한계 문구가 포함된다", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") } };
+    const r = await handleRequest({ utterance: "[검찰청] 링크: http://x.invalid/a" }, c);
+    const text = r.body.template.outputs[0].simpleText.text;
+    assert.ok(text.includes("참고용"), "한계 문구 포함");
+  });
+});
+
+describe("카카오 파서 - parentInputs", () => {
+  it("params에서 call_in_progress를 파싱한다", () => {
+    const p = {
+      userRequest: {
+        utterance: "문자내용",
+        user: { properties: { botUserKey: "u1" } },
+        params: { call_in_progress: "true" },
+      },
+    };
+    const r = readRequest(p);
+    assert.equal(r.parentInputs.call_in_progress, true);
+  });
+
+  it("params에서 called_before를 파싱한다", () => {
+    const p = { userRequest: { utterance: "x", params: { called_before: "true" } } };
+    assert.equal(readRequest(p).parentInputs.called_before, true);
+  });
+
+  it("detail_params 형태({ value }) 도 파싱한다", () => {
+    const p = {
+      userRequest: {
+        utterance: "x",
+        params: { call_in_progress: { value: "true" }, sender_last4: { value: "1234" } },
+      },
+    };
+    const r = readRequest(p).parentInputs;
+    assert.equal(r.call_in_progress, true);
+    assert.equal(r.sender_last4, "1234");
+  });
+
+  it("params가 없으면 parentInputs는 빈 객체", () => {
+    const p = { userRequest: { utterance: "x" } };
+    assert.deepEqual(readRequest(p).parentInputs, {});
+  });
+});
+
