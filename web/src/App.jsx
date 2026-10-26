@@ -19,6 +19,8 @@ import CallResultScreen from './screens/CallResultScreen.jsx'
 import NoLinkFooter     from './components/NoLinkFooter.jsx'
 import { DEV_RESULT } from './data/result.js'
 import SettingsScreen   from './screens/SettingsScreen.jsx'
+import ShareScreen       from './screens/ShareScreen.jsx'
+import QuizScreen        from './screens/QuizScreen.jsx'
 import FamilyDashboardScreen from './screens/FamilyDashboardScreen.jsx'
 
 function Placeholder({ title }) {
@@ -56,6 +58,11 @@ export default function App() {
         <Route path="/family/dashboard" element={<FamilyDashboardScreen />} />
         {/* 보호자 화면 C2·C3. 로그인·대상자 확인은 4주차(Supabase Auth) */}
         <Route path="/family/*"       element={<FamilyScreen />} />
+
+        {/* F4-2: 안드로이드 공유 수신 */}
+        <Route path="/share"          element={<ShareScreen />} />
+        {/* F7: 연습 모드 퀴즈 */}
+        <Route path="/quiz"           element={<QuizScreen />} />
 
         <Route path="*"               element={<Placeholder title="페이지를 찾을 수 없어요" />} />
       </Routes>

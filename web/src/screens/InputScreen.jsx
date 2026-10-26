@@ -11,7 +11,7 @@
  * 입력 길이 상한은 서버(MAX_INPUT_CHARS=2000)와 같다. 넘기면 버튼이 비활성화.
  */
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
 import { saveCurrentResult } from '../data/session.js'
@@ -33,7 +33,9 @@ function analyzeText(text, { fetchImpl = fetch, base = '' } = {}) {
 
 export default function InputScreen() {
   const navigate = useNavigate()
-  const [text, setText] = useState('')
+  const location = useLocation()
+  // F4-2: Web Share Target이 /share → 이 화면으로 리다이렉트하며 sharedText를 state로 넘긴다.
+  const [text, setText] = useState(() => location.state?.sharedText ?? '')
   const [status, setStatus] = useState('idle') // idle | loading | error
   const [error, setError] = useState(null)
 

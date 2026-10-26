@@ -33,6 +33,13 @@ export default defineConfig({
         lang: 'ko',
         // 임시 SVG 아이콘. 아이폰 홈 화면용 PNG(192/512)는 화면 확정 뒤 추가(D31)
         icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        // F4-2: 안드로이드 문자 앱 공유 버튼으로 텍스트를 받는다(GET).
+        // 아이폰은 Web Share Target 미지원이므로 안드로이드 전용.
+        share_target: {
+          action: '/share',
+          method: 'GET',
+          params: { text: 'text', title: 'title', url: 'url' },
+        },
       },
     }),
   ],
