@@ -76,6 +76,10 @@ export default function InputScreen() {
       </p>
 
       <label className="input-textarea-label" htmlFor="fs-input-text">문자 내용</label>
+      {/* F3-5: 입력창에 암호 경고 — 가족 암호를 여기 입력하면 안 됨을 명시 */}
+      <p className="input-passphrase-warning" aria-live="polite">
+        가족 암호는 여기에 쓰지 마세요.
+      </p>
       <textarea
         id="fs-input-text"
         className="input-textarea"

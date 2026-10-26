@@ -438,6 +438,29 @@
 .settings-toggle--on .settings-toggle__thumb { transform: translateX(40px); background: var(--c-action-text); }
 @media (prefers-reduced-motion: reduce) { .settings-toggle__thumb { transition: none; } }
 .settings-note { color: var(--c-text-sub); font-size: var(--fs-small); margin-top: var(--sp-4); }
+/* F3-1/F3-3 안내 목록 */
+.settings-list { margin: 0 0 var(--sp-3); padding-left: 1.4em; line-height: 1.7; }
+.settings-list li + li { margin-top: var(--sp-2); }
+
+/* F3-5 입력창 암호 경고 */
+.input-passphrase-warning {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  color: var(--c-caution);
+}
+
+/* F2-5 진짜라면 이렇게 와요 */
+.contact-card { display: flex; flex-direction: column; gap: var(--sp-2); }
+.normal-note-card {
+  margin: 0;
+  padding: var(--sp-3);
+  border-left: 4px solid var(--c-border);
+  background: var(--c-surface);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+}
+.normal-note-card__label { display: block; font-weight: 700; margin-bottom: var(--sp-1); }
 
 /* ── C2 보호자 ───────────────────────────────────── */
 .guardian-head { font-size: var(--fs-small); color: var(--c-text-sub); margin: 0 0 var(--sp-3); }
