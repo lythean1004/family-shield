@@ -51,5 +51,6 @@ private/ 폴더(개인정보가 든 문서)는 커밋하지 않는다.
 - 프론트엔드: Vite + React + React Router + PWA 플러그인(D28, docs/frontend-structure.md 2장). 서버 렌더링 없이 정적 배포.
 - 백엔드: Supabase. 개발 중에는 로컬(CLI + Docker), 클라우드 프로젝트는 4주차(11/10경) 생성.
 - AI: Claude Haiku 5.5, Gemini 3.1 Flash-Lite 2개를 평가셋으로 비교 후 선정(D4).
-- 배포: Vercel Hobby(보안 헤더만, 전용 기능은 쓰지 않음).
+- 배포: 배정받은 NCP VM(Rocky Linux 8.10, 101.79.8.126). Nginx가 PWA 정적 파일과 HTTPS를 맡고, 카카오 스킬 서버(Node)는 127.0.0.1:3000에서 systemd로 실행(D29, docs/ncp-kakao-skill-review.md). DB·인증은 Supabase. Vercel은 쓰지 않음.
+- 서버 작업: 설치·설정 변경·재시작 같은 서버 상태 변경은 실행 전에 확인받는다. 비밀값은 저장소가 아니라 서버의 권한 600 환경 파일에만 둔다.
 - 자세한 근거는 docs/decisions.md, docs/prd.md 13장.

@@ -4,7 +4,9 @@
 
 > **2026-10-23 업데이트:** 0장 6개 항목은 PRD v0.5(2026-10-21)에서 모두 반영했다. 마감은 12/11, 중간과제 11/16, 일정 8주, 모델 비교 2개. 이 문서의 3장 사전 구성 체크리스트와 4장 보안 체크리스트는 여전히 유효하다. 최신 기준은 docs/prd.md, docs/feasibility.md, docs/decisions.md를 볼 것.
 
-도구 구성: Claude Code(구현) · Figma(시안·클릭 프로토타입) · Supabase(DB·인증·서버 함수) · Vercel(PWA 배포, 필요 시)
+> **2026-10-26 업데이트(D29):** 배포처를 Vercel에서 **배정받은 NCP VM(Rocky 8.10, 101.79.8.126)**으로 바꿨다. 3-3장은 NCP VM 체크리스트로 교체했고, 3-6장 비밀값 위치를 고쳤다. 상세 근거는 docs/ncp-kakao-skill-review.md.
+
+도구 구성: Claude Code(구현) · Figma(시안·클릭 프로토타입) · Supabase(DB·인증·삭제 Cron) · NCP VM(PWA 정적 호스팅·카카오 스킬 서버)
 
 ---
 
@@ -108,13 +110,20 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 - [ ] 백업 보존 기간 확인(0장 5번)
 - [ ] API 설정: 쓰지 않는 스키마 노출 끄기
 
-### 3-3. Vercel
+### 3-3. NCP VM (D29, 2026-10-26 Vercel에서 교체)
 
-- [ ] GitHub 저장소 연결, 운영 배포는 `main`만
-- [ ] Environment Variables: 브라우저로 나가는 값은 **Supabase URL과 anon(publishable) 키뿐**. 다른 비밀값은 Vercel에 두지 않음(서버 함수는 Supabase에서 실행)
-- [ ] Preview/Production 환경 변수 분리(프리뷰는 dev Supabase)
-- [ ] Deployment Protection으로 프리뷰 URL 보호
-- [ ] `vercel.json` 보안 헤더: CSP, HSTS, `frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, `Permissions-Policy`
+서버 기본 보안(sudo 사용자, SSH 키, firewalld, fail2ban, SELinux 유지, Nginx, certbot)은 2026-10-26 세팅함. 아래는 이 프로젝트용 추가 항목.
+
+- [ ] ACG: 443·80만 전체 공개, 22는 운영자 IP만, **3000 삭제**
+- [ ] 도메인 확보 → A 레코드 101.79.8.126 → certbot으로 HTTPS 발급·자동 갱신
+- [ ] 디렉터리: `/srv/family-shield/web`(PWA 정적), `/srv/family-shield/skill`(스킬 서버), `/etc/family-shield/skill.env`(비밀값, root 소유 600)
+- [ ] Nginx: `/api/kakao-skill`만 `127.0.0.1:3000`으로 프록시, 나머지는 정적 파일 + `try_files $uri /index.html`
+- [ ] Nginx 보안 헤더: CSP, HSTS, `frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, `X-Content-Type-Options: nosniff`
+- [ ] Nginx: `client_max_body_size 64k`, `limit_req`, **요청 본문을 로그에 남기는 log_format 금지**, logrotate 7일
+- [ ] systemd: 스킬 서버 전용 사용자, `EnvironmentFile=`, `NoNewPrivileges`·`ProtectSystem=strict` 등 하드닝, 자동 재시작
+- [ ] 배포 전 스냅샷, 배포 후 journald·Nginx 로그에 원문이 없는지 확인
+- [ ] 브라우저로 나가는 값은 **Supabase URL과 anon(publishable) 키뿐**
+- [ ] Node 버전 상향(22 이상)은 **개발 완료 후** 진행(사용자 결정 2026-10-26). 그 전까지 서버 배포 시 버전 호환을 확인
 
 ### 3-4. Figma
 
@@ -133,7 +142,9 @@ PRD 17장 일정을 기준으로, **코드 없이 할 일 → 시안 → 구현*
 
 | 비밀값 | 어디에 | 브라우저 노출 |
 |---|---|---|
-| Supabase anon(publishable) 키 | Vercel 환경변수 | 노출됨 (RLS가 지켜야 함) |
+| Supabase anon(publishable) 키 | 웹 빌드 환경변수(`VITE_*`) | 노출됨 (RLS가 지켜야 함) |
+| 카카오 스킬 헤더 토큰 | NCP VM `/etc/family-shield/skill.env` (600) + 오픈빌더 스킬 헤더 | 안 됨 |
+| 스킬 서버가 쓰는 LLM·HMAC·URL 평판 키 | NCP VM `/etc/family-shield/skill.env` (600). Supabase 함수가 쓰는 키는 Supabase Secrets (D29) | 안 됨 |
 | Supabase service_role 키 | 사용하지 않음이 원칙. 필요 시 Edge Functions 기본 제공 값만 | **절대 안 됨** |
 | LLM API 키 3종 | Supabase Edge Functions Secrets | 안 됨 |
 | 문자 API 키 | Supabase Edge Functions Secrets | 안 됨 |
