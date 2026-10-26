@@ -7,10 +7,24 @@
 // 저장하는 것은 F5-8 범위뿐: 판정·신호·사칭 관계·끝 4자리·보낸 시각. 원문·AI 설명은 넣지 않는다(U8).
 import { decide } from '../../../packages/core/src/rule-engine.js'
 
+// F5-1: 가족 사칭 확인 답변 3종
 export const ANSWERS = {
   NOT_SENT: 'not_sent',   // 보낸 적 없어요 → R5
   WILL_CALL: 'will_call', // 지금 엄마께 전화할게요
   SENT: 'sent',           // 제가 보냈어요 → 판정 그대로(F5-5)
+}
+
+// F5-3: 링크·수상한 문자 확인 답변 3종 ("애들한테 물어보기" 흐름)
+export const ANSWERS_LINK = {
+  DONT_PRESS: 'dont_press',  // 누르지 마세요
+  WILL_CALL:  'will_call',   // 제가 전화할게요
+  WAIT:       'wait',        // 잠깐 기다려 주세요
+}
+
+// 확인 요청 유형: 가족 사칭(F5-1) vs 링크·일반 문자 확인(F5-3)
+export const REQUEST_TYPES = {
+  IMPERSONATION: 'impersonation', // F5-1
+  LINK_CHECK:    'link_check',    // F5-3
 }
 
 // 개발용 가족 정보. 번호는 테스트 번호 대역(010-0000-XXXX)만 쓴다(PRD 15-1 작성 원칙).
@@ -51,11 +65,12 @@ export function createConfirmStore({ storage = defaultStorage(), clock = Date.no
   const write = (req) => storage?.setItem(KEY + req.id, JSON.stringify(req))
 
   return {
-    create(result, { senderLast4 = null } = {}) {
+    create(result, { senderLast4 = null, requestType = REQUEST_TYPES.IMPERSONATION } = {}) {
       const req = {
         id: newId(),
         state: 'pending',
         sentAt: clock(),
+        requestType,
         summary: toGuardianSummary(result, senderLast4),
         answer: null,
         respondedAt: null,
@@ -69,7 +84,8 @@ export function createConfirmStore({ storage = defaultStorage(), clock = Date.no
     respond(id, answer) {
       const req = read(id)
       if (!req || req.state !== 'pending') return req
-      if (!Object.values(ANSWERS).includes(answer)) throw new Error('unknown answer')
+      const allAnswers = [...Object.values(ANSWERS), ...Object.values(ANSWERS_LINK)]
+      if (!allAnswers.includes(answer)) throw new Error('unknown answer')
       const next = { ...req, state: 'responded', answer, respondedAt: clock() }
       write(next)
       return next

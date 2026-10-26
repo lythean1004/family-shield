@@ -16,6 +16,7 @@ import {
 } from '../data/session.js'
 import { confirmStore } from '../data/confirm.js'
 import { loadFamilyConsent } from '../data/consent.js'
+import { REQUEST_TYPES } from '../data/confirm.js'
 
 export default function ResultScreen({ fallbackResult, familyName, hasFamilyConsent: consentProp }) {
   const navigate = useNavigate()
@@ -44,7 +45,11 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
 
   const askFamily = () => {
     saveCurrentResult(state.result)
-    const req = confirmStore.create(state.result)
+    // F5-3: 가족 사칭이면 IMPERSONATION, 그 외(링크·일반)는 LINK_CHECK
+    const requestType = state.result?.impersonation_type === 'family'
+      ? REQUEST_TYPES.IMPERSONATION
+      : REQUEST_TYPES.LINK_CHECK
+    const req = confirmStore.create(state.result, { requestType })
     saveCurrentRequestId(req.id)
     navigate('/check/wait')
   }

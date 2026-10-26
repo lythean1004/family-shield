@@ -14,7 +14,7 @@ import SignalList from '../components/SignalList.jsx'
 import ActionButton from '../components/ActionButton.jsx'
 import CallButton from '../components/CallButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { ANSWERS, confirmStore, DEV_FAMILY, formatTime } from '../data/confirm.js'
+import { ANSWERS, ANSWERS_LINK, REQUEST_TYPES, confirmStore, DEV_FAMILY, formatTime } from '../data/confirm.js'
 import { levelKey } from '../data/result.js'
 
 export default function FamilyScreen() {
@@ -55,6 +55,7 @@ function RequestScreen() {
     return <DoneScreen />
   }
 
+  const isLinkCheck = req.requestType === REQUEST_TYPES.LINK_CHECK
   const s = req.summary
   return (
     <main className="mode-guardian">
@@ -67,26 +68,45 @@ function RequestScreen() {
         <p className="screen-body">보낸 번호 끝 4자리: <span className="tabular">{s.sender_last4}</span></p>
       )}
 
-      <h1 className="screen-title">이 문자를 보냈나요?</h1>
-
-      {!confirmSent ? (
-        <div className="screen-actions">
-          <ActionButton variant="primary" onClick={() => answer(ANSWERS.NOT_SENT)}>보낸 적 없어요</ActionButton>
-          <ActionButton variant="secondary" onClick={() => answer(ANSWERS.WILL_CALL)}>
-            지금 {parent.title}께 전화할게요
-          </ActionButton>
-          <ActionButton variant="secondary" onClick={() => setConfirmSent(true)}>제가 보냈어요</ActionButton>
-        </div>
-      ) : (
-        <section className="confirm-box" aria-live="polite">
-          <p className="screen-body">
-            보냈다고 답해도 {parent.title} 화면의 판정은 바뀌지 않아요. 꼭 목소리로 통화해 주세요.
-          </p>
+      {/* F5-3: 요청 유형에 따라 보호자 버튼 분기 */}
+      {isLinkCheck ? (
+        <>
+          <h1 className="screen-title">어떻게 할까요?</h1>
           <div className="screen-actions">
-            <ActionButton variant="primary" onClick={() => answer(ANSWERS.SENT)}>보냈어요</ActionButton>
-            <ActionButton variant="secondary" onClick={() => setConfirmSent(false)}>취소</ActionButton>
+            <ActionButton variant="primary" onClick={() => answer(ANSWERS_LINK.DONT_PRESS)}>
+              누르지 마세요
+            </ActionButton>
+            <ActionButton variant="secondary" onClick={() => answer(ANSWERS_LINK.WILL_CALL)}>
+              제가 전화할게요
+            </ActionButton>
+            <ActionButton variant="secondary" onClick={() => answer(ANSWERS_LINK.WAIT)}>
+              잠깐 기다려 주세요
+            </ActionButton>
           </div>
-        </section>
+        </>
+      ) : (
+        <>
+          <h1 className="screen-title">이 문자를 보냈나요?</h1>
+          {!confirmSent ? (
+            <div className="screen-actions">
+              <ActionButton variant="primary" onClick={() => answer(ANSWERS.NOT_SENT)}>보낸 적 없어요</ActionButton>
+              <ActionButton variant="secondary" onClick={() => answer(ANSWERS.WILL_CALL)}>
+                지금 {parent.title}께 전화할게요
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={() => setConfirmSent(true)}>제가 보냈어요</ActionButton>
+            </div>
+          ) : (
+            <section className="confirm-box" aria-live="polite">
+              <p className="screen-body">
+                보냈다고 답해도 {parent.title} 화면의 판정은 바뀌지 않아요. 꼭 목소리로 통화해 주세요.
+              </p>
+              <div className="screen-actions">
+                <ActionButton variant="primary" onClick={() => answer(ANSWERS.SENT)}>보냈어요</ActionButton>
+                <ActionButton variant="secondary" onClick={() => setConfirmSent(false)}>취소</ActionButton>
+              </div>
+            </section>
+          )}
+        </>
       )}
       <NoLinkFooter />
     </main>
@@ -94,9 +114,14 @@ function RequestScreen() {
 }
 
 const DONE_TEXT = {
+  // 가족 사칭 답변
   [ANSWERS.NOT_SENT]: (t) => `${t} 화면에 '보낸 적 없음'이 표시됐어요. ${t}께 전화해서 괜찮은지 확인해 주세요.`,
   [ANSWERS.WILL_CALL]: (t) => `지금 ${t}께 전화해 주세요. ${t} 화면에는 '곧 전화가 온다'고 표시돼요.`,
   [ANSWERS.SENT]: (t) => `${t}께 목소리로 통화해서 직접 설명해 주세요.`,
+  // F5-3: 링크·일반 문자 답변
+  [ANSWERS_LINK.DONT_PRESS]: (t) => `${t} 화면에 '누르지 마세요'가 표시됐어요. ${t}께 전화해서 확인해 주세요.`,
+  [ANSWERS_LINK.WILL_CALL]: (t) => `지금 ${t}께 전화해 주세요. ${t} 화면에는 '곧 전화가 온다'고 표시돼요.`,
+  [ANSWERS_LINK.WAIT]: (t) => `${t} 화면에 '잠깐 기다려 주세요'가 표시됐어요. 곧 ${t}께 직접 전화해 주세요.`,
 }
 
 function DoneScreen() {

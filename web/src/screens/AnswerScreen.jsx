@@ -14,7 +14,7 @@ import CallButton from '../components/CallButton.jsx'
 import Warning112 from '../components/Warning112.jsx'
 import LimitNotice from '../components/LimitNotice.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { ANSWERS, applyFamilyAnswer, confirmStore, DEV_FAMILY } from '../data/confirm.js'
+import { ANSWERS, ANSWERS_LINK, applyFamilyAnswer, confirmStore, DEV_FAMILY, REQUEST_TYPES } from '../data/confirm.js'
 import { levelKey } from '../data/result.js'
 import { loadCurrentRequestId, loadCurrentResult, saveCurrentResult } from '../data/session.js'
 
@@ -39,6 +39,7 @@ export default function AnswerScreen({ fallbackResult }) {
 
   const result = applyFamilyAnswer(base, req.answer)
   const key = levelKey(result.level)
+  const isLinkCheck = req.requestType === REQUEST_TYPES.LINK_CHECK
   const done = () => {
     saveCurrentResult(result)
     navigate('/')
@@ -48,7 +49,38 @@ export default function AnswerScreen({ fallbackResult }) {
     <main className="mode-parent">
       <VerdictBanner level={key} />
 
-      {req.answer === ANSWERS.NOT_SENT && (
+      {/* F5-3: 링크·일반 문자 확인 답변 */}
+      {isLinkCheck && req.answer === ANSWERS_LINK.DONT_PRESS && (
+        <>
+          <h1 className="screen-title">{who}가 <strong>누르지 말라고 했어요.</strong></h1>
+          <p className="screen-body">링크를 누르지 마세요. {who}가 곧 직접 전화할 거예요.</p>
+          <Warning112 />
+          <div className="screen-actions">
+            <ActionButton variant="primary" onClick={done}>확인했어요</ActionButton>
+            <ActionButton variant="secondary" onClick={() => navigate('/help')}>이미 눌렀거나 보냈어요</ActionButton>
+          </div>
+        </>
+      )}
+      {isLinkCheck && req.answer === ANSWERS_LINK.WILL_CALL && (
+        <>
+          <h1 className="screen-title">{who}가 곧 전화할 거예요.</h1>
+          <p className="screen-body">전화를 받기 전까지 아무것도 하지 마세요.</p>
+          <div className="screen-actions">
+            <ActionButton variant="primary" onClick={done}>확인했어요</ActionButton>
+          </div>
+        </>
+      )}
+      {isLinkCheck && req.answer === ANSWERS_LINK.WAIT && (
+        <>
+          <h1 className="screen-title">{who}가 <strong>잠깐 기다려 달라고 했어요.</strong></h1>
+          <p className="screen-body">아무것도 누르지 말고 기다리세요. 곧 {who}가 직접 전화할 거예요.</p>
+          <div className="screen-actions">
+            <ActionButton variant="primary" onClick={done}>확인했어요</ActionButton>
+          </div>
+        </>
+      )}
+
+      {!isLinkCheck && req.answer === ANSWERS.NOT_SENT && (
         <>
           <h1 className="screen-title">{who}가 보낸 문자가 <strong>아니에요</strong>.</h1>
           <p className="screen-body">{who}가 직접 확인해 줬어요.</p>
@@ -61,7 +93,7 @@ export default function AnswerScreen({ fallbackResult }) {
         </>
       )}
 
-      {req.answer === ANSWERS.SENT && (
+      {!isLinkCheck && req.answer === ANSWERS.SENT && (
         <>
           <h1 className="screen-title">{who}가 <strong>보냈다고 답했어요.</strong></h1>
           <p className="screen-body">
@@ -78,7 +110,7 @@ export default function AnswerScreen({ fallbackResult }) {
         </>
       )}
 
-      {req.answer === ANSWERS.WILL_CALL && (
+      {!isLinkCheck && req.answer === ANSWERS.WILL_CALL && (
         <>
           <h1 className="screen-title">{who}가 곧 전화할 거예요.</h1>
           <p className="screen-body">전화를 받기 전까지 아무것도 하지 마세요.</p>
