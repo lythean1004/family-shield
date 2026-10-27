@@ -25,7 +25,10 @@ export default function MisjudgeLink({ result }) {
               <button
                 type="button"
                 className="misjudge__choice"
-                onClick={() => { recordMisjudge(result, r.id); setStep('done') }}
+                onClick={async () => { 
+                  await recordMisjudge(result, r.id)
+                  setStep('done')
+                }}
               >
                 {r.label}
               </button>

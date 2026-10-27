@@ -15,11 +15,16 @@ import { loadFamilyConsent, saveFamilyConsent } from '../data/consent.js'
 
 export default function SettingsScreen() {
   const navigate = useNavigate()
-  const [consent, setConsent] = useState(loadFamilyConsent)
+  const [consent, setConsent] = useState(false)
 
-  const toggle = () => {
+  // 초기 로드
+  useEffect(() => {
+    loadFamilyConsent().then(setConsent)
+  }, [])
+
+  const toggle = async () => {
     const next = !consent
-    saveFamilyConsent(next)
+    await saveFamilyConsent(next)
     setConsent(next)
   }
 

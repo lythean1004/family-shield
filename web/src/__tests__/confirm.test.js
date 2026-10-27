@@ -161,9 +161,9 @@ describe('오판 신고 (F4-13)', () => {
     assert.throws(() => toMisjudgeRecord(SC1, 'whatever'))
   })
 
-  it('기기에 최대 50건', () => {
+  it('기기에 최대 50건', async () => {
     const storage = memoryStorage()
-    for (let i = 0; i < 55; i++) recordMisjudge(SC1, 'other', storage)
+    for (let i = 0; i < 55; i++) await recordMisjudge(SC1, 'other', storage)
     assert.equal(JSON.parse(storage.getItem('fs.misjudge')).length, 50)
   })
 })

@@ -21,13 +21,19 @@ import { REQUEST_TYPES } from '../data/confirm.js'
 export default function ResultScreen({ fallbackResult, familyName, hasFamilyConsent: consentProp }) {
   const navigate = useNavigate()
   // F5-9: 동의 ②가 없으면 가족 확인 버튼 대신 공식 번호. prop이 오면 그것을 우선(테스트·데모용).
-  const [hasFamilyConsent] = useState(() => consentProp ?? loadFamilyConsent())
+  const [hasFamilyConsent, setHasFamilyConsent] = useState(consentProp ?? false)
   const [params, setParams] = useSearchParams()
   const token = params.get('t')
   const [state, setState] = useState(() =>
     token ? { status: 'loading' } : { status: 'ok', result: loadCurrentResult() ?? fallbackResult },
   )
   const fetched = useRef(false)
+
+  // 동의 상태 로드
+  useEffect(() => {
+    if (consentProp !== undefined) return // prop이 있으면 사용
+    loadFamilyConsent().then(setHasFamilyConsent)
+  }, [consentProp])
 
   useEffect(() => {
     if (!token || fetched.current) return // StrictMode 이중 실행에서 1회용 토큰을 두 번 쓰지 않도록
