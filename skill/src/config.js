@@ -7,7 +7,8 @@
  * 필수: SKILL_HEADER_TOKEN, AI_API_KEY
  * 선택: AI_BASE_URL, AI_MODEL, AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, SKILL_PORT, SKILL_HOST,
  *       WEB_BASE_URL, PHONE_HMAC_SECRET, PROMPT_VERSION, MAX_CONCURRENT,
- *       SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS
+ *       SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS,
+ *       SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
 const DEFAULTS = {
@@ -53,6 +54,11 @@ export function loadConfig(env = process.env) {
       // 번호 HMAC 키. 없으면 HMAC을 만들지 않는다(마스킹 자체는 동작).
       hmacKey: get("PHONE_HMAC_SECRET") || null,
       maxConcurrent: Number(get("MAX_CONCURRENT")),
+      // Supabase 클라우드 연결 (선택, 없으면 1회용 토큰·checks 저장 불가)
+      supabase: {
+        url: get("SUPABASE_URL") || null,
+        serviceRoleKey: get("SUPABASE_SERVICE_ROLE_KEY") || null,
+      },
     },
   };
 }
