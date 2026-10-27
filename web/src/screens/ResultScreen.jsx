@@ -43,13 +43,13 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
     })
   }, [token, setParams])
 
-  const askFamily = () => {
+  const askFamily = async () => {
     saveCurrentResult(state.result)
     // F5-3: 가족 사칭이면 IMPERSONATION, 그 외(링크·일반)는 LINK_CHECK
     const requestType = state.result?.impersonation_type === 'family'
       ? REQUEST_TYPES.IMPERSONATION
       : REQUEST_TYPES.LINK_CHECK
-    const req = confirmStore.create(state.result, { requestType })
+    const req = await confirmStore.create(state.result, { requestType })
     saveCurrentRequestId(req.id)
     navigate('/check/wait')
   }

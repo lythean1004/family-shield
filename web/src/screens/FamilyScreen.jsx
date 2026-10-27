@@ -7,7 +7,7 @@
  * "제가 보냈어요"는 맨 아래, 누르면 한 번 더 묻는다.
  * 응답은 한 번만(F5-4). 로그인·대상자 확인은 4주차(Supabase Auth + RLS C4 정책).
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import VerdictBanner from '../components/VerdictBanner.jsx'
 import SignalList from '../components/SignalList.jsx'
@@ -41,13 +41,19 @@ function RequestScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [confirmSent, setConfirmSent] = useState(false)
-  const req = confirmStore.get(id)
+  const [req, setReq] = useState(null)
   const { parent } = DEV_FAMILY
+
+  // 초기 로드
+  useEffect(() => {
+    if (!id) return
+    confirmStore.get(id).then(setReq)
+  }, [id])
 
   if (!req) return <NoRequest />
 
-  const answer = (a) => {
-    confirmStore.respond(id, a)
+  const answer = async (a) => {
+    await confirmStore.respond(id, a)
     navigate(`/family/req/${id}/done`, { replace: true })
   }
 
@@ -126,8 +132,14 @@ const DONE_TEXT = {
 
 function DoneScreen() {
   const { id } = useParams()
-  const req = confirmStore.get(id)
+  const [req, setReq] = useState(null)
   const { parent } = DEV_FAMILY
+
+  // 초기 로드
+  useEffect(() => {
+    if (!id) return
+    confirmStore.get(id).then(setReq)
+  }, [id])
 
   if (!req) return <NoRequest />
   if (req.state !== 'responded') {

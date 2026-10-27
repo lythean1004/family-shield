@@ -7,6 +7,7 @@
  *
  * "제가 보냈어요"에도 초록색·체크 표시를 쓰지 않는다(U6).
  */
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import VerdictBanner from '../components/VerdictBanner.jsx'
 import ActionButton from '../components/ActionButton.jsx'
@@ -21,9 +22,15 @@ import { loadCurrentRequestId, loadCurrentResult, saveCurrentResult } from '../d
 export default function AnswerScreen({ fallbackResult }) {
   const navigate = useNavigate()
   const id = loadCurrentRequestId()
-  const req = id ? confirmStore.get(id) : null
+  const [req, setReq] = useState(null)
   const base = loadCurrentResult() ?? fallbackResult
   const who = DEV_FAMILY.guardian.callName
+
+  // 초기 로드
+  useEffect(() => {
+    if (!id) return
+    confirmStore.get(id).then(setReq)
+  }, [id])
 
   if (!req || req.state !== 'responded') {
     return (

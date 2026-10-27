@@ -14,6 +14,8 @@ function memoryStorage() {
     getItem: (k) => (m.has(k) ? m.get(k) : null),
     setItem: (k, v) => m.set(k, String(v)),
     removeItem: (k) => m.delete(k),
+    get length() { return m.size },
+    key: (i) => [...m.keys()][i] || null,
     dump: () => [...m.values()].join('\n'),
   }
 }
@@ -26,18 +28,18 @@ const CAUTION = {
 }
 
 describe('확인 요청 저장소 (F5)', () => {
-  it('만들면 pending, 보낸 시각이 있다', () => {
-    const store = createConfirmStore({ storage: memoryStorage(), clock: () => 1000 })
-    const req = store.create(SC1)
+  it('만들면 pending, 보낸 시각이 있다', async () => {
+    const store = createConfirmStore({ fallbackStorage: memoryStorage(), clock: () => 1000 })
+    const req = await store.create(SC1)
     assert.equal(req.state, 'pending')
     assert.equal(req.sentAt, 1000)
-    assert.deepEqual(store.get(req.id), req)
+    assert.deepEqual(await store.get(req.id), req)
   })
 
-  it('보호자에게는 F5-8 범위만 넘긴다(설명·사칭 유형·규칙 없음)', () => {
+  it('보호자에게는 F5-8 범위만 넘긴다(설명·사칭 유형·규칙 없음)', async () => {
     const storage = memoryStorage()
-    const store = createConfirmStore({ storage })
-    const req = store.create(CAUTION, { senderLast4: '1234' })
+    const store = createConfirmStore({ fallbackStorage: storage })
+    const req = await store.create(CAUTION, { senderLast4: '1234' })
     assert.deepEqual(Object.keys(req.summary).sort(), ['impersonated_relation', 'level', 'sender_last4', 'signals_final'])
     assert.ok(!storage.dump().includes('원문 일부'), '저장소에 AI 설명이 없다')
   })
@@ -48,31 +50,31 @@ describe('확인 요청 저장소 (F5)', () => {
     assert.equal(toGuardianSummary(SC1, '5678').sender_last4, '5678')
   })
 
-  it('응답은 한 번만(F5-4)', () => {
-    const store = createConfirmStore({ storage: memoryStorage(), clock: () => 5 })
-    const req = store.create(SC1)
-    const first = store.respond(req.id, ANSWERS.NOT_SENT)
+  it('응답은 한 번만(F5-4)', async () => {
+    const store = createConfirmStore({ fallbackStorage: memoryStorage(), clock: () => 5 })
+    const req = await store.create(SC1)
+    const first = await store.respond(req.id, ANSWERS.NOT_SENT)
     assert.equal(first.state, 'responded')
     assert.equal(first.respondedAt, 5)
-    const second = store.respond(req.id, ANSWERS.SENT)
+    const second = await store.respond(req.id, ANSWERS.SENT)
     assert.equal(second.answer, ANSWERS.NOT_SENT)
   })
 
-  it('모르는 답은 거부', () => {
-    const store = createConfirmStore({ storage: memoryStorage() })
-    const req = store.create(SC1)
-    assert.throws(() => store.respond(req.id, 'maybe'))
+  it('모르는 답은 거부', async () => {
+    const store = createConfirmStore({ fallbackStorage: memoryStorage() })
+    const req = await store.create(SC1)
+    await assert.rejects(() => store.respond(req.id, 'maybe'))
   })
 
-  it('감염 의심 표시(F6-3)', () => {
-    const store = createConfirmStore({ storage: memoryStorage() })
-    const req = store.create(SC1)
-    store.markDeviceSuspect(req.id)
-    assert.equal(store.get(req.id).deviceSuspect, true)
+  it('감염 의심 표시(F6-3)', async () => {
+    const store = createConfirmStore({ fallbackStorage: memoryStorage() })
+    const req = await store.create(SC1)
+    await store.markDeviceSuspect(req.id)
+    assert.equal((await store.get(req.id)).deviceSuspect, true)
   })
 
-  it('없는 요청은 null', () => {
-    assert.equal(createConfirmStore({ storage: memoryStorage() }).get('nope'), null)
+  it('없는 요청은 null', async () => {
+    assert.equal(await createConfirmStore({ fallbackStorage: memoryStorage() }).get('nope'), null)
   })
 })
 

@@ -28,7 +28,10 @@ export default function FamilyDashboardScreen() {
   const [requests, setRequests] = useState([])
 
   useEffect(() => {
-    const load = () => setRequests(confirmStore.listRecent(WINDOW_MS))
+    const load = async () => {
+      const list = await confirmStore.listRecent(WINDOW_MS)
+      setRequests(list)
+    }
     load()
     const timer = setInterval(load, 10_000)
     window.addEventListener('storage', load)

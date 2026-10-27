@@ -24,16 +24,16 @@ function memoryStorage() {
 const SC1 = DEMO_SCENARIOS[0].result
 
 describe('링크 확인 요청 (F5-3)', () => {
-  it('requestType 기본값은 가족 사칭', () => {
-    const store = createConfirmStore({ storage: memoryStorage() })
-    assert.equal(store.create(SC1).requestType, REQUEST_TYPES.IMPERSONATION)
+  it('requestType 기본값은 가족 사칭', async () => {
+    const store = createConfirmStore({ fallbackStorage: memoryStorage() })
+    assert.equal((await store.create(SC1)).requestType, REQUEST_TYPES.IMPERSONATION)
   })
 
-  it('링크 확인 답 3종을 받는다', () => {
+  it('링크 확인 답 3종을 받는다', async () => {
     for (const a of Object.values(ANSWERS_LINK)) {
-      const store = createConfirmStore({ storage: memoryStorage() })
-      const req = store.create(SC1, { requestType: REQUEST_TYPES.LINK_CHECK })
-      assert.equal(store.respond(req.id, a).answer, a)
+      const store = createConfirmStore({ fallbackStorage: memoryStorage() })
+      const req = await store.create(SC1, { requestType: REQUEST_TYPES.LINK_CHECK })
+      assert.equal((await store.respond(req.id, a)).answer, a)
     }
   })
 
@@ -46,23 +46,25 @@ describe('링크 확인 요청 (F5-3)', () => {
 })
 
 describe('최근 24시간 목록 (F5-10)', () => {
-  it('24시간 지난 요청과 다른 키는 빼고, 최신순', () => {
+  it('24시간 지난 요청과 다른 키는 빼고, 최신순', async () => {
     const storage = memoryStorage()
     let now = 0
-    const store = createConfirmStore({ storage, clock: () => now })
-    const old = store.create(SC1)
+    const store = createConfirmStore({ fallbackStorage: storage, clock: () => now })
+    const old = await store.create(SC1)
     now = 25 * 60 * 60 * 1000
-    const a = store.create(SC1)
+    const a = await store.create(SC1)
     now += 1000
-    const b = store.create(SC1)
+    const b = await store.create(SC1)
     storage.setItem('fs.consent.family', 'true')
-    const ids = store.listRecent().map((r) => r.id)
+    const list = await store.listRecent()
+    const ids = list.map((r) => r.id)
     assert.deepEqual(ids, [b.id, a.id])
     assert.ok(!ids.includes(old.id))
   })
 
-  it('저장소가 없으면 빈 배열', () => {
-    assert.deepEqual(createConfirmStore({ storage: null }).listRecent(), [])
+  it('저장소가 없으면 빈 배열', async () => {
+    const result = await createConfirmStore({ fallbackStorage: null }).listRecent()
+    assert.deepEqual(result, [])
   })
 })
 

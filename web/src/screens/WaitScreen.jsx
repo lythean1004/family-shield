@@ -19,14 +19,21 @@ import { loadCurrentRequestId } from '../data/session.js'
 export default function WaitScreen() {
   const navigate = useNavigate()
   const id = loadCurrentRequestId()
-  const [req, setReq] = useState(() => (id ? confirmStore.get(id) : null))
+  const [req, setReq] = useState(null)
   const [now, setNow] = useState(Date.now())
   const who = DEV_FAMILY.guardian.callName
 
+  // 초기 로드
+  useEffect(() => {
+    if (!id) return
+    confirmStore.get(id).then(setReq)
+  }, [id])
+
   useEffect(() => {
     if (!id) return undefined
-    const check = () => {
-      setReq(confirmStore.get(id))
+    const check = async () => {
+      const updated = await confirmStore.get(id)
+      setReq(updated)
       setNow(Date.now())
     }
     const timer = setInterval(check, POLL_MS)
