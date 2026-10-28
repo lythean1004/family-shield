@@ -1,0 +1,16 @@
+[Unit]
+Description=Family Shield: delete expired rows (24h checks, 10min tokens, 90d logs)
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=fsops
+Group=fsops
+EnvironmentFile=/etc/family-shield/skill.env
+# purge_expired() is SECURITY DEFINER; fs_app may run it only after switching to service_role
+ExecStart=/usr/bin/bash -c 'PGPASSWORD="$DATABASE_PASSWORD" /usr/bin/psql -X -q -A -t -v ON_ERROR_STOP=1 -h "$DATABASE_HOST" -p "$DATABASE_PORT" -U "$DATABASE_USER" -d "$DATABASE_NAME" -c "begin; set local role service_role; select table_name || \x27=\x27 || deleted from private.purge_expired(); commit;"'
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

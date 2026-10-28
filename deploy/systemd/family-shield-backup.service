@@ -1,0 +1,17 @@
+[Unit]
+Description=Family Shield: nightly DB backup (pg_dump, 7 days kept)
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=fsops
+Group=fsops
+EnvironmentFile=/etc/family-shield/skill.env
+# custom format, owner-only file. Expired rows are purged first so backups hold at most 24h of checks.
+ExecStartPre=/usr/bin/systemctl start family-shield-purge.service
+ExecStart=/usr/bin/bash -c 'umask 077; d=/srv/family-shield/backup; f="$d/familyshield-$(date +%%Y%%m%%d-%%H%%M).dump"; PGPASSWORD="$DATABASE_PASSWORD" /usr/bin/pg_dump -Fc -h "$DATABASE_HOST" -p "$DATABASE_PORT" -U "$DATABASE_USER" -d "$DATABASE_NAME" -f "$f" && find "$d" -name "familyshield-*.dump" -mtime +7 -delete && ls -l "$f"'
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/family-shield/backup

@@ -1,0 +1,10 @@
+[Unit]
+Description=Family Shield: purge expired rows every 10 minutes (PRD D1: max 24h 10min)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
