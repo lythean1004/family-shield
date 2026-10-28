@@ -291,7 +291,7 @@ export function makeHandler(config) {
         const { status, body } = await handleAnalyze(
           { text, parentInputs },
           // F4-6: 웹 채널은 카카오 5초 제한이 없으므로 webTimeoutMs(기본 8초)로 덮어 쓴다.
-          { ai: { ...config.ai, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation },
+          { ai: { ...config.ai, model:config.ai.webModel || config.ai.model, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation },
         );
         if (body.ok && receipts) body.result.receipt = receipts.issue(body.result,req.auth.userId);
         return send(status, body, { "cache-control": "no-store" });

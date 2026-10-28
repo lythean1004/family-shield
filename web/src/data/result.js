@@ -21,7 +21,7 @@ export function verdictDescription(level, impersonationType) {
 // AI 실패·시간 초과(F4-6) 때 이유 칸 문구
 export const AI_FALLBACK_TEXT = '자세한 설명을 만들지 못했어요. 판정은 그대로예요.'
 
-// 개발용 가짜 결과(SC1). Supabase·토큰(D34) 연결 전까지 /check/result에서 쓴다.
+// 개발용 가짜 결과(SC1). VM API·토큰(D34) 연결 전까지 /check/result에서 쓴다.
 export const DEV_RESULT = {
   level: '위험',
   fired_rules: ['R3', 'R4', 'R7'],

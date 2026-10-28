@@ -2,7 +2,7 @@
  * F5-10. 보호자 대시보드 /family/dashboard
  *
  * 최근 24시간의 확인 요청·알림과 응답 상태를 보여 준다.
- * 로컬 저장소 전용(Supabase 연결 전). 요청 항목을 누르면 해당 C2 화면으로 이동.
+ * VM API에서 3초마다 조회한다. 요청 항목을 누르면 해당 C2 화면으로 이동.
  */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'

@@ -64,6 +64,7 @@ describe("설정 로드", () => {
     const r = loadConfig({ SKILL_HEADER_TOKEN: "t", AI_API_KEY: "k" });
     assert.equal(r.ok, true);
     assert.equal(r.config.ai.model, "gemini-3.1-flash-lite");
+    assert.equal(r.config.ai.webModel, "claude-sonnet-5-5");
     assert.equal(r.config.port, 3000);
   });
   it("필수값 없으면 ok:false와 missing 목록", () => {
@@ -412,6 +413,26 @@ describe("HTTP 서버 - /api/analyze", () => {
       },
     };
   }
+
+  it("웹은 지정된 웹 모델, 카카오는 스킬 모델로 호출한다", async () => {
+    const models = [];
+    const config = makeTestConfig();
+    config.ai.webModel = "fake-web";
+    config.ai.fetchImpl = async (url, options) => {
+      models.push(JSON.parse(options.body).model);
+      return fakeGateway([])(url, options);
+    };
+    const server = createServer(makeHandler(config));
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const web = await fetch(`${base}/api/analyze`, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({text:"합성 시험 문자입니다"})});
+      assert.equal(web.status, 200);
+      const kakao = await fetch(`${base}/api/kakao-skill`, {method:"POST", headers:{"content-type":"application/json","x-skill-token":"h"}, body:JSON.stringify({userRequest:{utterance:"합성 시험 문자입니다"}})});
+      assert.equal(kakao.status, 200);
+      assert.deepEqual(models, ["fake-web", "fake"]);
+    } finally { server.close(); }
+  });
 
   it("정상 응답 200 + cache-control: no-store", async () => {
     const server = createServer(makeHandler(makeTestConfig()));

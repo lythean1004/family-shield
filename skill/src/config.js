@@ -5,16 +5,17 @@
  * (`/etc/family-shield/skill.env`, 600)이 넣어 준다. 저장소에는 값이 없다.
  *
  * 필수: SKILL_HEADER_TOKEN, AI_API_KEY
- * 선택: AI_BASE_URL, AI_MODEL, AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, SKILL_PORT, SKILL_HOST,
+ * 선택: AI_BASE_URL, AI_MODEL, AI_WEB_MODEL, AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, SKILL_PORT, SKILL_HOST,
  *       WEB_BASE_URL, PHONE_HMAC_SECRET, PROMPT_VERSION, MAX_CONCURRENT,
  *       SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS,
- *       SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *       DATABASE_HOST/PORT/NAME/USER/PASSWORD, VAPID_PUBLIC_KEY/PRIVATE_KEY/SUBJECT
  */
 
 const DEFAULTS = {
   SKILL_PORT: "3000",
   SKILL_HOST: "127.0.0.1",
   AI_MODEL: "gemini-3.1-flash-lite",
+  AI_WEB_MODEL: "claude-sonnet-5-5",
   AI_TIMEOUT_MS: "3000",
   AI_WEB_TIMEOUT_MS: "8000",
   PROMPT_VERSION: "v1",
@@ -40,6 +41,7 @@ export function loadConfig(env = process.env) {
       headerToken: get("SKILL_HEADER_TOKEN"),
       ai: {
         model: get("AI_MODEL"),
+        webModel: get("AI_WEB_MODEL"),
         apiKey: get("AI_API_KEY"),
         baseUrl: get("AI_BASE_URL") || undefined, // 없으면 ai-client.js 기본값
         timeoutMs: Number(get("AI_TIMEOUT_MS")),
@@ -64,11 +66,6 @@ export function loadConfig(env = process.env) {
       push: {
         publicKey:get('VAPID_PUBLIC_KEY'),privateKey:get('VAPID_PRIVATE_KEY'),
         subject:get('VAPID_SUBJECT'),
-      },
-      // Supabase 클라우드 연결 (선택, 없으면 1회용 토큰·checks 저장 불가)
-      supabase: {
-        url: get("SUPABASE_URL") || null,
-        serviceRoleKey: get("SUPABASE_SERVICE_ROLE_KEY") || null,
       },
     },
   };

@@ -77,7 +77,7 @@ export default function InputScreen() {
     <main id="main" className="mode-parent">
       <h1 className="screen-title">의심 문자 붙여넣기</h1>
       <p className="screen-body">
-        받은 문자를 그대로 복사해 붙여 넣으세요. 판별한 뒤 결과 화면으로 안내해요.
+        시연 기간에는 가상 문자만 붙여 넣어 주세요. 실제 개인정보는 입력하지 마세요. 판별한 뒤 결과 화면으로 안내해요.
       </p>
 
       <label className="input-textarea-label" htmlFor="fs-input-text">문자 내용</label>

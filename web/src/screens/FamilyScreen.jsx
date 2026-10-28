@@ -5,7 +5,7 @@
  * 보여 주는 것은 F5-8 범위만: 받은 시각, 문장 틀 요약(9-9), 사칭된 관계, 끝 4자리(입력했을 때만).
  * 원문·AI 설명은 보여 주지 않는다(U8).
  * "제가 보냈어요"는 맨 아래, 누르면 한 번 더 묻는다.
- * 응답은 한 번만(F5-4). 로그인·대상자 확인은 4주차(Supabase Auth + RLS C4 정책).
+ * 응답은 한 번만(F5-4). 쿠키 세션·요청 대상자·RLS를 서버에서 매번 확인한다.
  */
 import { useEffect, useState } from 'react'
 import { Route, Routes, useNavigate, useParams } from 'react-router-dom'

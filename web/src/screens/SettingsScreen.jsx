@@ -1,11 +1,10 @@
 /**
- * S1(간소). 설정 /settings — Supabase Auth 전 로컬 전용
+ * 설정 /settings — VM 쿠키 세션·서버 동의 기록·웹 푸시
  *
- * 1차: 가족 확인 동의(②) 하나만. 나머지(S2~S6 가족 초대, 번호 등록, 탈퇴)는
- * Supabase circle_members / phone_auth 연결 뒤(4주차)에 추가한다.
+ * 가족 초대와 동의 ①②③은 /setup. 시연 계정은 현재 로그인으로 동의를 변경(D37).
  *
  * 동의를 끄면 ResultView의 "가족에게 물어보기" 버튼이 사라진다(F5-9).
- * storage 이벤트로 같은 기기의 다른 탭에도 즉시 반영된다.
+ * 서버 응답이 성공한 뒤에만 화면 상태를 바꾼다.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
