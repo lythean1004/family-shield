@@ -1,6 +1,6 @@
 // 라우팅 뼈대 (docs/frontend-structure.md 2장: 앱 하나, 화면은 역할별)
 // 화면은 디자인 토큰 + React 컴포넌트로 직접 구현한다(코드가 디자인 산출물, D31).
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import './App.css'
 
 import HomeScreen       from './screens/HomeScreen.jsx'
@@ -17,6 +17,7 @@ import InputScreen      from './screens/InputScreen.jsx'
 import WhoScreen        from './screens/WhoScreen.jsx'
 import CallResultScreen from './screens/CallResultScreen.jsx'
 import NoLinkFooter     from './components/NoLinkFooter.jsx'
+import TopNav           from './components/TopNav.jsx'
 import { DEV_RESULT } from './data/result.js'
 import SettingsScreen   from './screens/SettingsScreen.jsx'
 import ShareScreen       from './screens/ShareScreen.jsx'
@@ -30,7 +31,7 @@ function NotFound() {
       <h1 className="screen-title">찾는 화면이 없어요</h1>
       <p className="screen-body">주소가 바뀌었거나 잘못 들어왔어요. 아래 버튼을 누르면 처음 화면으로 갑니다.</p>
       <div className="screen-actions">
-        <a className="action-btn action-btn--primary" href="/">처음으로</a>
+        <Link className="action-btn action-btn--primary" to="/">처음으로</Link>
       </div>
       <NoLinkFooter />
     </main>
@@ -42,6 +43,8 @@ export default function App() {
     <BrowserRouter>
       {/* B10: 키보드·화면 읽기 사용자가 본문으로 바로 가는 링크. 초점을 받을 때만 보인다 */}
       <a className="skip-link" href="#main">본문으로 바로가기</a>
+      {/* 전체 메뉴: 어느 화면에서든 처음으로 돌아갈 수 있게 맨 위에 고정 (보호자 화면 제외) */}
+      <TopNav />
       <Routes>
         <Route path="/"               element={<HomeScreen />} />
         <Route path="/contacts"       element={<ContactsScreen />} />

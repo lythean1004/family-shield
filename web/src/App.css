@@ -546,3 +546,97 @@
   padding: var(--sp-4);
 }
 
+
+/* ── 전체 메뉴 (TopNav) ─────────────────────────────
+   부모님 화면 글자(150%)를 그대로 쓴다. 맨 위에 고정, 바탕은 불투명(겹친 글자가 비치지 않게).
+   버튼 2개만: 왼쪽 처음으로, 오른쪽 메뉴. 둘 다 높이 64px.
+──────────────────────────────────────────────────── */
+/* 링크(<a>)로 만든 큰 버튼도 버튼과 똑같이 보이게 */
+a.action-btn { text-decoration: none; }
+
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--c-bg);
+  border-bottom: 2px solid var(--c-border);
+}
+.top-nav__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: var(--sp-2) var(--sp-4);
+}
+.top-nav__home,
+.top-nav__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--btn-min);
+  padding: var(--sp-2) var(--sp-4);
+  border: 2px solid var(--c-action);
+  border-radius: var(--radius-btn);
+  background: var(--c-bg);
+  color: var(--c-action);
+  font-family: inherit;
+  font-size: var(--fs-small);
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-base) var(--ease-out);
+}
+/* 홈에서는 '가족방패' 이름표: 누를 일이 없으니 테두리 없이 */
+.top-nav__home[aria-current="page"] { border-color: transparent; color: var(--c-text); padding-left: 0; }
+.top-nav__home:active,
+.top-nav__toggle:active { transform: scale(0.98); }
+.top-nav__home:not([aria-current="page"]):hover,
+.top-nav__toggle:hover { background: var(--c-check-bg); }
+.top-nav--open .top-nav__toggle { background: var(--c-action); color: var(--c-action-text); }
+
+/* 줄 세 개 아이콘. 열리면 X로 바뀐다 (B6·B7: 바뀌는 모양을 움직임으로) */
+.top-nav__icon { display: inline-flex; flex-direction: column; justify-content: center; gap: 4px; width: 1em; height: 1em; }
+.top-nav__icon i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+.top-nav--open .top-nav__icon i:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.top-nav--open .top-nav__icon i:nth-child(2) { opacity: 0; }
+.top-nav--open .top-nav__icon i:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* 펼친 메뉴: 화면 아래까지, 큰 버튼 목록 */
+.top-nav__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(17, 20, 24, 0.55);
+}
+.top-nav__panel {
+  max-width: 32rem;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  margin: 0 auto;
+  padding: var(--sp-4);
+  background: var(--c-bg);
+  border-bottom: 2px solid var(--c-border);
+}
+.top-nav__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+/* 지금 보고 있는 화면: 색만이 아니라 굵은 테두리 + 표시 글자로 */
+.top-nav__link[aria-current="page"] { border-width: 4px; }
+.top-nav__link[aria-current="page"]::after { content: ' (지금 화면)'; font-weight: 400; }
+@media (prefers-reduced-motion: no-preference) {
+  .top-nav__panel { animation: top-nav-in var(--dur-base) var(--ease-out); }
+}
+@keyframes top-nav-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+/* 고정 메뉴에 가려지지 않게: 바로가기 링크·앵커 이동 시 위 여백 */
+#main { scroll-margin-top: 96px; }
+@media print { .top-nav { display: none; } }
+

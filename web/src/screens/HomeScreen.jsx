@@ -32,6 +32,7 @@ export default function HomeScreen() {
           오늘의 퀴즈 (연습)
         </ActionButton>
       </div>
+      {/* 설정은 맨 위 [메뉴]에도 있다 */}
       <p className="screen-body home-settings">
         <button type="button" className="text-link" onClick={() => navigate('/settings')}>설정</button>
       </p>
