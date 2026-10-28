@@ -54,6 +54,13 @@ export function loadConfig(env = process.env) {
       // 번호 HMAC 키. 없으면 HMAC을 만들지 않는다(마스킹 자체는 동작).
       hmacKey: get("PHONE_HMAC_SECRET") || null,
       maxConcurrent: Number(get("MAX_CONCURRENT")),
+      database: get('DATABASE_NAME') ? {
+        host: get('DATABASE_HOST') || '127.0.0.1',
+        port: Number(get('DATABASE_PORT') || 5432),
+        database: get('DATABASE_NAME'),
+        user: get('DATABASE_USER') || 'fs_app',
+        password: get('DATABASE_PASSWORD') || undefined,
+      } : null,
       // Supabase 클라우드 연결 (선택, 없으면 1회용 토큰·checks 저장 불가)
       supabase: {
         url: get("SUPABASE_URL") || null,

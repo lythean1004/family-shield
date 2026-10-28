@@ -23,6 +23,7 @@ import SettingsScreen   from './screens/SettingsScreen.jsx'
 import ShareScreen       from './screens/ShareScreen.jsx'
 import QuizScreen        from './screens/QuizScreen.jsx'
 import FamilyDashboardScreen from './screens/FamilyDashboardScreen.jsx'
+import SetupScreen from './screens/SetupScreen.jsx'
 
 // 없는 주소(B10 404). 부모님이 길을 잃지 않도록 큰 글씨 + 처음으로 버튼 하나.
 function NotFound() {
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/demo"           element={<DemoScreen />} />
         <Route path="/help"           element={<HelpScreen />} />
         <Route path="/settings"       element={<SettingsScreen />} />
+        <Route path="/setup"          element={<SetupScreen />} />
 
         {/* 부모님 판별 흐름. 결과는 ?t= 1회용 토큰(D34) → 이 탭 sessionStorage → 없으면 개발용 가짜 결과 */}
         <Route path="/check/hangup"      element={<HangupScreen />} />

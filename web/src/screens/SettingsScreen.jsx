@@ -16,6 +16,7 @@ import { loadFamilyConsent, saveFamilyConsent } from '../data/consent.js'
 export default function SettingsScreen() {
   const navigate = useNavigate()
   const [consent, setConsent] = useState(false)
+  const [error,setError] = useState('')
 
   // 초기 로드
   useEffect(() => {
@@ -24,8 +25,9 @@ export default function SettingsScreen() {
 
   const toggle = async () => {
     const next = !consent
-    await saveFamilyConsent(next)
-    setConsent(next)
+    setError('')
+    try { await saveFamilyConsent(next); setConsent(next) }
+    catch(e) { setError(e.message) }
   }
 
   // 다른 탭에서 바꾼 경우 동기화
@@ -40,6 +42,10 @@ export default function SettingsScreen() {
   return (
     <main id="main" className="mode-parent">
       <h1 className="screen-title">설정</h1>
+      {error && <p role="alert" className="screen-body">{error}</p>}
+      <div className="screen-actions">
+        <ActionButton onClick={() => navigate('/setup')}>가족 연결과 동의 설정</ActionButton>
+      </div>
 
       <section className="settings-section" aria-label="가족 확인 동의">
         <p className="settings-section__title">가족 확인 요청</p>
@@ -66,7 +72,7 @@ export default function SettingsScreen() {
 
         {consent && (
           <p className="screen-body settings-note">
-            가족 초대와 번호 등록은 다음 업데이트에서 추가돼요.
+            연결된 가족에게 확인 요청을 보낼 수 있어요. 시연 계정의 동의 변경은 현재 로그인으로 확인해요.
           </p>
         )}
       </section>

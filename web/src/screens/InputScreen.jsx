@@ -22,7 +22,8 @@ const MIN_CHARS = 2
 function analyzeText(text, { fetchImpl = fetch, base = '' } = {}) {
   return fetchImpl(`${base}/api/analyze`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json; charset=utf-8', accept: 'application/json' },
+    headers: { 'content-type': 'application/json; charset=utf-8', accept: 'application/json', 'x-fs-request': '1' },
+    credentials: 'same-origin',
     body: JSON.stringify({ text }),
     cache: 'no-store',
   }).then(async (res) => {
@@ -52,7 +53,9 @@ export default function InputScreen() {
         navigate('/check/result')
         return
       }
-      if (http === 429) {
+      if (http === 401) {
+        setError('먼저 설정에서 가족 연결을 시작해 주세요.')
+      } else if (http === 429) {
         setError('조금 전에 여러 번 물어보셨어요. 1분 뒤에 다시 시도해 주세요.')
       } else if (http === 400 && body?.reason === 'too_long') {
         setError('글이 너무 길어요. 2000자 이내로 줄여 주세요.')

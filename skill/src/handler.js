@@ -20,6 +20,9 @@ import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputatio
 import { readRequest, simpleText, quickReply } from "./kakao.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
+import { createDatabase } from './database.js';
+import { createAuth, checkBrowserRequest } from './auth.js';
+import { createAuthApi } from './auth-api.js';
 
 const HEADER_TOKEN_KEY = "x-skill-token";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -202,6 +205,9 @@ export async function handleAnalyze(params, cfg) {
  * @param {object} config  loadConfig()의 config 객체
  */
 export function makeHandler(config) {
+  const db = config.database ? createDatabase(config.database) : null;
+  const auth = db ? createAuth(db, config) : null;
+  const authApi = auth ? createAuthApi(auth, config) : null;
   // Supabase(result_tokens) 연결 전까지는 프로세스 메모리에 10분만 둔다(PRD 13-4 ③ 이전 단계).
   const resultStore = config.webBaseUrl ? createMemoryResultStore() : null;
   // 평판 조회기: 캐시를 프로세스 동안 공유한다. 키가 없으면 null(조회 안 함).
@@ -220,15 +226,17 @@ export function makeHandler(config) {
     const started = Date.now();
 
     function send(status, body, extraHeaders = {}) {
-      res.writeHead(status, { "content-type": "application/json; charset=utf-8", ...extraHeaders });
+      res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extraHeaders });
       res.end(JSON.stringify(body));
       // 원문 없이 상태 코드·경과시간만 기록 (PRD 13-3). 토큰 값은 가린다(13-4).
-      console.log(`${new Date().toISOString()} ${req.method} ${redactToken(req.url)} ${status} ${Date.now() - started}ms`);
+      console.log(`${new Date().toISOString()} ${req.method} ${new URL(req.url, 'http://local').pathname} ${status} ${Date.now() - started}ms`);
     }
 
     if (req.method === "GET" && req.url === "/health") {
       return send(200, { ok: true, model: config.ai.model });
     }
+
+    if (authApi && await authApi(req, send, readBody)) return;
 
     if (req.method === "GET" && req.url?.startsWith("/api/result")) {
       const token = new URL(req.url, "http://local").searchParams.get("t");
@@ -238,6 +246,15 @@ export function makeHandler(config) {
 
     // 웹 직접 입력(PRD F4-1). 토큰 헤더 없음. 한도·동시성만 건다.
     if (req.method === "POST" && req.url?.startsWith("/api/analyze")) {
+      if (auth) {
+        try {
+          checkBrowserRequest(req, config.webBaseUrl);
+          req.auth = await auth.authenticate(req);
+          if (!req.auth) return send(401, {ok:false,reason:'login_required'});
+        } catch (error) {
+          return send(error.status || 503, {ok:false,reason:error.reason || 'unavailable'});
+        }
+      }
       const key = clientKey(req);
       const limit = rateLimiter.check(key);
       if (!limit.ok) {
