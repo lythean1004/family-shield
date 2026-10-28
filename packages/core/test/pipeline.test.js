@@ -78,7 +78,8 @@ describe("파이프라인 - 대체(fallback)", () => {
     const r = await analyze({ text: "[검찰청] 확인하세요 http://x.invalid/a", ai: null });
     assert.equal(r.fallback_used, true);
     assert.equal(r.fallback_reason, "AI 꺼짐");
-    assert.equal(r.level, "주의"); // SIG_LINK → R7
+    assert.equal(r.level, "위험"); // 기관 발신 주장 + 링크 → R6, AI 실패에도 유지
+    assert.ok(r.fired_rules.includes('R6'));
     assert.deepEqual(r.signals_ai, []);
   });
 

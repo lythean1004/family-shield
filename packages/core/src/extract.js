@@ -15,7 +15,7 @@
  */
 import {
   SIG_LINK, SIG_SHORT_URL, SIG_APP_INSTALL, SIG_MONEY,
-  SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER,
+  SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
 
@@ -24,13 +24,27 @@ const gap = (n) => `[^.!?\\n]{0,${n}}`;
 
 // 요구 어미: 해 줘 / 해주세요 / 하세요 / 해라 / 부탁 / 바랍니다 / 좀
 const ASK = "(?:해\\s*(?:줘|줄래|주세요|주실|주라|줄\\s*수)|하세요|해라|해\\s*달라|부탁|바랍니다|좀\\s*해)";
+const AGENCY = '(?:검찰(?:청)?|경찰(?:청|서)?|지검|금융감독원|금감원|법원|수사관|수사팀|검사)';
+const NOT_PROHIBITION = '(?!\\s*(?:주)?(?:하)?지\\s*(?:마|않))';
 
 const PATTERNS = {
+  [SIG_AGENCY_IMPERSONATION]: [
+    // A sender claim, not proof the sender is the real institution.
+    new RegExp(`${AGENCY}${gap(12)}(?:입니다|소속|담당|발신|통보)`),
+    new RegExp(`\\[${AGENCY}\\]`),
+    new RegExp(`${AGENCY}에서\\s*(?:보낸|연락|알려|안내)`),
+    /(?:귀하|본인|당신|고객님).{0,25}(?:사건\s*번호|계좌\s*동결|명의\s*도용)/,
+  ],
+  [SIG_CALL_THIS_NUMBER]: [
+    new RegExp(`(?:아래|위|이|해당|담당자)\\s*(?:전화\\s*)?(?:번호|연락처)${gap(20)}(?:전화|연락|회신)(?:해|하|주|\\s*바랍|\\s*부탁)`),
+  ],
   [SIG_MONEY]: [
     // 송금해 줘, 입금 부탁, 이체하세요, 결제해 주세요
     new RegExp(`(?:송금|입금|이체|결제|계좌\\s*이체)\\s*(?:좀\\s*)?${ASK}`),
     // 돈 좀 보내 줘, 50만 원만 빌려줘, 돈 부쳐 줘
     new RegExp(`(?:돈|만\\s*원|천\\s*원|원만|금액)${gap(10)}(?:보내|부쳐|빌려|넣어)\\s*(?:줘|주세요|주라|줄래|줄\\s*수|달)`),
+    new RegExp(`(?:송금|입금|이체|납부|결제)(?:을|를)?\\s*(?:진행|처리)?\\s*(?:해\\s*(?:주시|주셔|주십|주세요)|하시기|하십시오|하셔야|해야)`),
+    new RegExp(`(?:돈|현금|금액|보증금|수수료|인증금)${gap(15)}(?:보내|옮겨|넣어|빌려)\\s*(?:주십시오|주시기|주세요|줘)`),
   ],
   [SIG_GIFTCARD]: [
     // 상품권 사서 사진 찍어 보내, 구글 기프트카드 구매해 줘
@@ -41,9 +55,10 @@ const PATTERNS = {
   [SIG_PERSONAL_INFO]: [
     new RegExp(
       `(?:인증\\s*번호|비밀\\s*번호|비번|주민\\s*(?:등록\\s*)?번호|신분증|보안\\s*카드|OTP|카드\\s*번호|계좌\\s*번호)` +
-      `${gap(15)}(?:알려|보내|입력\\s*(?:해|하세요|부탁)|찍어|불러|말해)`,
+      `${gap(15)}(?:알려|보내|입력\\s*(?:해|하세요|부탁)|찍어|불러|말해)${NOT_PROHIBITION}`,
       "i",
     ),
+    new RegExp(`(?:인증\\s*번호|비밀\\s*번호|주민등록증|신분증|보안\\s*카드|OTP|카드\\s*번호|계좌\\s*번호)${gap(20)}(?:제출|전송|회신|기재|등록)${NOT_PROHIBITION}`, 'i'),
   ],
   [SIG_APP_INSTALL]: [
     new RegExp(

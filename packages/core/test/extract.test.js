@@ -6,6 +6,25 @@ import { findLinks, toDomain, isShortener } from "../src/links.js";
 // 모든 예시는 합성 문장. 번호는 010-0000-XXXX, 링크는 .invalid (PRD 15-1 작성 원칙)
 const sig = (text, opts) => extractCodeSignals(text, opts).signals;
 
+describe('기관 발신 주장과 다양한 요구 표현 (새 합성 문장)', () => {
+  for (const text of ['중앙지검 수사팀입니다. 사건 확인을 위해 아래 번호로 전화 바랍니다.', '[금융감독원] 명의 도용 조사 안내입니다.', '법원에서 보낸 사건번호 안내입니다.']) {
+    it('기관 발신 주장을 코드로 남긴다: '+text,()=>assert.ok(sig(text).includes('SIG_AGENCY_IMPERSONATION')))
+  }
+  for (const text of ['경찰 사칭 문자를 조심하세요. 예방 소식 https://news.invalid', '오늘 법원 근처에서 만나자', '금융감독원 사칭에 속지 마세요.']) {
+    it('기관을 언급한 경고·일상 대화는 발신 주장으로 보지 않는다: '+text,()=>assert.ok(!sig(text).includes('SIG_AGENCY_IMPERSONATION')))
+  }
+  for (const text of ['처리 비용을 입금하시기 바랍니다.', '보증금을 보내 주십시오.', '이체를 진행해 주세요.', '돈을 옮겨 주세요.']) {
+    it('돈 요구의 높임말·조사 표현: '+text,()=>assert.ok(sig(text).includes('SIG_MONEY')))
+  }
+  for (const text of ['본인 확인용 신분증 사본을 제출 바랍니다.', '계좌 비밀번호를 기재해 주세요.', '주민등록증 사진을 전송해 주세요.']) {
+    it('개인정보 제출·기재 요구: '+text,()=>assert.ok(sig(text).includes('SIG_PERSONAL_INFO')))
+  }
+  for (const text of ['비밀번호를 알려주지 마세요.', '인증번호를 입력하지 마세요.', '신분증을 보내지 마세요.']) {
+    it('개인정보 제공 금지 안내는 요구로 보지 않는다: '+text,()=>assert.ok(!sig(text).includes('SIG_PERSONAL_INFO')))
+  }
+  it('본문 속 번호로 연락하라는 요구',()=>assert.ok(sig('아래 번호로 전화해 주시기 바랍니다.').includes('SIG_CALL_THIS_NUMBER')))
+})
+
 describe("링크 찾기", () => {
   it("스킴 있는 주소와 스킴 없는 주소를 모두 찾는다", () => {
     const links = findLinks("https://a.invalid/x 그리고 bit.ly/abc 확인");
