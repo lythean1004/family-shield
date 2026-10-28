@@ -5,7 +5,7 @@
  *   node db/test.mjs                 supabase/tests/*.test.sql 전부
  *
  * 테스트 파일은 Supabase CLI(pgTAP)용 그대로 쓴다. 차이만 여기서 맞춘다.
- *   - pgtap 확장이 없으므로 db/test/tap.sql(같은 이름의 최소 함수, pg_temp)을 먼저 실행
+ *   - pgtap 확장이 없으므로 db/test/tap.sql(같은 이름의 최소 함수, tap 스키마)을 같은 트랜잭션에서 먼저 실행
  *   - `create extension ... pgtap` 줄은 건너뜀
  *   - 파일 안의 `reset role`은 접속 계정(fs_app)으로 돌아간다. 테스트의 "postgres로 실행" 단계(픽스처 삽입,
  *     purge_expired 실행)는 Supabase에서 superuser였지만 여기서는 service_role로 바꿔 실행한다.
@@ -59,8 +59,8 @@ for (const f of files) {
     if (/^create extension .*pgtap/.test(low)) continue;
     if (low === "begin") {
       await client.query("begin");
-      // tap.sql runs as fs_app (temp objects); errors here are a harness bug, not a test failure
-      try { await client.query(tap); } catch (e) { console.error(`tap.sql failed: ${e.message}`); process.exit(2); }
+      // tap.sql runs as fs_app (owner, can create the schema); errors here are a harness bug, not a test failure
+      try { await client.query("reset role"); await client.query(tap); } catch (e) { console.error(`tap.sql failed: ${e.message}`); process.exit(2); }
       await client.query("set local role service_role");
       continue;
     }
@@ -72,7 +72,7 @@ for (const f of files) {
       let res;
       try {
         await client.query("savepoint s");
-        await client.query("set local search_path = pg_temp, public, extensions");
+        await client.query("set local search_path = tap, public, extensions");
         res = await client.query(s);
         await client.query("release savepoint s");
       } catch (e) {
