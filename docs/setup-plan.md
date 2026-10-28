@@ -6,7 +6,9 @@
 
 > **2026-10-26 업데이트(D29):** 배포처를 Vercel에서 **배정받은 NCP VM(Rocky 8.10, 101.79.8.126)**으로 바꿨다. 3-3장은 NCP VM 체크리스트로 교체했고, 3-6장 비밀값 위치를 고쳤다. 상세 근거는 docs/ncp-kakao-skill-review.md.
 
-도구 구성: Claude Code(구현) · Supabase(DB·인증·삭제 Cron) · NCP VM(PWA 정적 호스팅·카카오 스킬 서버). Figma는 쓰지 않음(D31, 화면은 코드로 직접)
+현재 도구 구성(D36): Claude Code·Codex(구현) · NCP VM(PostgreSQL·인증·삭제·백업·PWA·Node API). Figma는 쓰지 않음(D31, 화면은 코드로 직접).
+
+> **아래는 사전 준비 시점의 계획 보관본이다.** Supabase·Vercel·Send SMS Hook 구성은 현재 사용하지 않는다. 현재 상태는 `docs/handoff.md`, 서버 반영은 `docs/deployment-review-2026-10-28.md`, 운영 명령은 `docs/operations.md`가 기준이다. 휴대폰 인증·SC1 리허설은 중간과제 이후로 미뤘다.
 
 ---
 

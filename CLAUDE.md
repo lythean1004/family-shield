@@ -49,8 +49,8 @@ private/ 폴더(개인정보가 든 문서)는 커밋하지 않는다.
 
 ## 기술 스택
 - 프론트엔드: Vite + React + React Router + PWA 플러그인(D28, docs/frontend-structure.md 2장). 서버 렌더링 없이 정적 배포.
-- 백엔드: Supabase. 개발 중에는 로컬(CLI + Docker), 클라우드 프로젝트는 4주차(11/10경) 생성.
+- 백엔드: NCP VM의 PostgreSQL 16 + Node API(D36). 쿠키 세션·요청별 RLS, DB는 127.0.0.1만. 로컬 시험은 PostgreSQL 16 컨테이너.
 - AI: 카카오 스킬(5초 제한)은 `gemini-3.1-flash-lite`, 웹 상세 화면은 `claude-sonnet-5-5`. 둘 다 aitestbed.kr 중계 서버, 도구 호출 방식(D30). 3주차 비교 측정 후 decisions.md에 최종 기록(D4).
-- 배포: 배정받은 NCP VM(Rocky Linux 8.10, 101.79.8.126). Nginx가 PWA 정적 파일과 HTTPS를 맡고, 카카오 스킬 서버(Node)는 127.0.0.1:3000에서 systemd로 실행(D29, docs/ncp-kakao-skill-review.md). DB·인증은 Supabase. Vercel은 쓰지 않음.
+- 배포: 배정받은 NCP VM(Rocky Linux 8.10, 101.79.8.126). Nginx가 PWA 정적 파일과 HTTPS를 맡고, Node는 127.0.0.1:3000에서 systemd로 실행. DB·인증·삭제·백업도 같은 VM(D36). Vercel은 쓰지 않음.
 - 서버 작업: 설치·설정 변경·재시작 같은 서버 상태 변경은 실행 전에 확인받는다. 비밀값은 저장소가 아니라 서버의 권한 600 환경 파일에만 둔다.
 - 자세한 근거는 docs/decisions.md, docs/prd.md 13장.

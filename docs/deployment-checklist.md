@@ -1,5 +1,7 @@
 # 배포 체크리스트 (2026-10-27)
 
+> **이 문서는 이전 설계의 보관본이다. 실행 절차로 사용하지 않는다.** 2026-10-28 D36으로 DB·인증·백업을 VM으로 이전했다. 현재 상태는 `docs/handoff.md`, 이번 반영 순서는 `docs/deployment-review-2026-10-28.md`, 평상시 운영은 `docs/operations.md`를 따른다. 아래 Supabase 연결·환경 변수·Auth 단계는 폐기되었다.
+
 작성일: 2026-10-27
 상태: 진행 중
 목표: NCP VM + Supabase Cloud + 카카오 스킬 서버 연동

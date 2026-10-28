@@ -18,15 +18,22 @@
                                                  │ pg (127.0.0.1:5432, 외부 포트 없음)
                                                  ▼
                                             PostgreSQL 16
-                                              - 기존 마이그레이션 10개
+                                              - 기존 10개 + 새 5개(로컬 검증, VM 반영 대기)
                                               - auth.uid() = 요청마다 서버가 넣는 사용자 id
-                                              - RLS 정책 27개 그대로
-systemd timer: 1시간마다 purge_expired(), 매일 pg_dump 백업(7일)
+                                              - 기존 RLS 유지 + 새 API 권한 보완
+systemd timer: 10분마다 purge_expired(), 매일 03:30 pg_dump 백업(7일)
 ```
 
 권한 정책을 살리는 방법: 서버가 요청마다 트랜잭션을 열고 `SET LOCAL ROLE authenticated` + `set_config('request.jwt.claim.sub', <user id>, true)`를 넣는다. VM DB의 `auth.uid()`는 이 값을 읽는다. Supabase와 같은 방식이라 pgTAP 38개를 그대로 돌릴 수 있다.
 
-## 일정
+## 2026-10-28 구현 상태
+
+- 로그인·초대·동의(D37), 가족 확인 왕복·별도 기록 동의(D38), DB 1회용 토큰, 웹 푸시 API·시험 클릭 확인을 구현했다.
+- PostgreSQL 16 로컬 통합 시험과 서로 다른 브라우저 세션의 요청 → 응답 → 부모님 반영을 확인했다. 실기기 시험은 별도다.
+- 웹·서버 실행 코드와 CSP의 Supabase 참조는 0건. 기존 SQL 이력·권한 시험 경로만 보존한다.
+- **운영 VM 반영은 사용자 확인 대기.** 서버 설정과 스키마를 아직 바꾸지 않았다. 순서는 `docs/deployment-review-2026-10-28.md`.
+
+## 최초 일정(실기기 확인·운영 반영은 별도)
 
 | 단계 | 기간 | 할 일 | 끝 조건 |
 |---|---|---|---|
