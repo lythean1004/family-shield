@@ -1,6 +1,6 @@
 // The server is the source of truth. Failed writes never look like saved consent.
 import { api, getSession } from './api.js'
-export const CONSENT_VERSION = 'demo-2026-10-28-v1'
+export const CONSENT_VERSION = 'demo-2026-10-28-v2'
 export async function loadFamilyConsent() {
   try {
     const session = await getSession()

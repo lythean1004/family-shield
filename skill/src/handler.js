@@ -23,7 +23,7 @@ import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-lim
 import { createDatabase } from './database.js';
 import { createAuth, checkBrowserRequest } from './auth.js';
 import { createAuthApi } from './auth-api.js';
-import { createDbResultStore, createReceipts } from './results.js';
+import { createDbResultStore, createReceipts, createCheckRecorder } from './results.js';
 import { createConfirmService } from './confirm.js';
 import { createFamilyApi } from './family-api.js';
 import { createPushService, createPushApi } from './push.js';
@@ -218,9 +218,10 @@ export function makeHandler(config) {
   const auth = db ? createAuth(db, config) : null;
   const authApi = auth ? createAuthApi(auth, config) : null;
   const receipts = db ? createReceipts(config.hmacKey) : null;
+  const recordCheck = db ? createCheckRecorder(db,receipts) : null;
   const push = db ? createPushService(db,config.push) : null;
   const pushApi = push ? createPushApi(auth,push,config) : null;
-  const familyApi = db ? createFamilyApi(auth,createConfirmService(db,receipts),config,{notify:push.notify}) : null;
+  const familyApi = db ? createFamilyApi(auth,createConfirmService(db,receipts),config,{notify:push.notify,recordCheck}) : null;
   const resultStore = config.resultStore || (db && config.webBaseUrl ? createDbResultStore(db) : null);
   // 평판 조회기: 캐시를 프로세스 동안 공유한다. 키가 없으면 null(조회 안 함).
   const urlReputation = createSafeBrowsingChecker({
@@ -293,7 +294,10 @@ export function makeHandler(config) {
           // F4-6: 웹 채널은 카카오 5초 제한이 없으므로 webTimeoutMs(기본 8초)로 덮어 쓴다.
           { ai: { ...config.ai, model:config.ai.webModel || config.ai.model, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation },
         );
-        if (body.ok && receipts) body.result.receipt = receipts.issue(body.result,req.auth.userId);
+        if (body.ok && receipts) {
+          body.result.receipt = receipts.issue(body.result,req.auth.userId);
+          await recordCheck(req.auth.userId,body.result.receipt);
+        }
         return send(status, body, { "cache-control": "no-store" });
       } finally {
         concurrency.release();

@@ -4,9 +4,9 @@ import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
 import { api, getSession } from '../data/api.js'
 
-export const CONSENT_VERSION = 'demo-2026-10-28-v1'
+export const CONSENT_VERSION = 'demo-2026-10-28-v2'
 const STEPS = [
-  {item:'family_alert',title:'① 가족에게 알려드릴까요?',text:'위험한 문자로 판단되면 연결한 가족에게 위험 단계와 정해진 요약을 알려드려요. 문자 원문은 보내지 않아요. AI 제공사가 가려진 내용을 국외에서 일정 기간 보관할 수 있어요.'},
+  {item:'family_alert',title:'① 가족에게 알려드릴까요?',text:'이번 시연에서는 내가 가족에게 물어보기를 누를 때 연결한 가족이 위험 단계와 정해진 요약을 볼 수 있어요. 알림에는 내용이 표시되지 않아요. 문자 원문은 보내지 않아요. AI 제공사가 가려진 내용을 국외에서 일정 기간 보관할 수 있어요.'},
   {item:'impersonation_check',title:'② 가족에게 물어볼까요?',text:'가족이 보낸 문자인지 직접 물어보고 답을 받을 수 있어요. 가족 알림에 동의한 경우에만 사용할 수 있어요.'},
   {item:'check_log',title:'③ 확인 기록을 남길까요?',text:'위험 단계와 신호 등 확인 기록을 24시간 보관해요. 삭제 작업은 10분마다 실행돼요. 문자 원문은 저장하지 않아요. 백업에는 삭제 후 최대 7일 남을 수 있어요.'},
 ]

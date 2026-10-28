@@ -1,8 +1,10 @@
 import {test,describe,after} from 'node:test'
 import assert from 'node:assert/strict'
+import {createServer} from 'node:http'
+import {makeHandler} from '../src/handler.js'
 import {createDatabase} from '../src/database.js'
 import {createAuth,hashCode,hashToken,newCode,CONSENT_VERSION} from '../src/auth.js'
-import {createReceipts,createDbResultStore} from '../src/results.js'
+import {createReceipts,createDbResultStore,createCheckRecorder} from '../src/results.js'
 import {createConfirmService,PROCESSING_VERSION} from '../src/confirm.js'
 
 const result={level:'주의',signals_final:['SIG_LINK'],fired_rules:['R7'],impersonation_type:'none',
@@ -44,7 +46,7 @@ describe('PostgreSQL family round trip',{skip:process.env.FS_DB_TEST!=='1'},()=>
     const circleId=(await auth.profile(p.userId)).circles[0].id
     for(const item of ['family_alert','impersonation_check'])await auth.consent(p.userId,{circleId,item,granted:true,textVersion:CONSENT_VERSION})
     const body={receipt:receipts.issue(result,p.userId),requestType:'link_check',processingConsent:true,processingVersion:PROCESSING_VERSION}
-    return {p:p.userId,g:g.userId,circleId,body}
+    return {p:p.userId,g:g.userId,circleId,body,token:p.token}
   }
   test('no storage without record consent; per-request consent and retries are recorded once',async()=>{
     const f=await family()
@@ -56,6 +58,50 @@ describe('PostgreSQL family round trip',{skip:process.env.FS_DB_TEST!=='1'},()=>
     assert.equal(stored.processing_consent_version,PROCESSING_VERSION)
     assert.ok(!JSON.stringify(stored).includes('Never persist'))
     assert.equal((await auth.profile(f.p)).consents.find(c=>c.item==='check_log'),undefined)
+  })
+  test('analysis records require current check-log consent and are stored once without free text',async()=>{
+    const f=await family(),record=createCheckRecorder(db,receipts)
+    assert.equal(await record(f.p,f.body.receipt),null)
+    await auth.consent(f.p,{circleId:f.circleId,item:'check_log',granted:true,textVersion:CONSENT_VERSION})
+    const id=await record(f.p,f.body.receipt)
+    assert.ok(id)
+    assert.equal(await record(f.p,f.body.receipt),id)
+    const {rows:[row]}=await db.service(tx=>tx.query('select * from public.checks where id=$1',[id]))
+    assert.ok(!JSON.stringify(row).includes('Never persist')&&!JSON.stringify(row).includes('RAW INPUT'))
+    assert.ok(new Date(row.purge_at)-new Date(row.created_at)<=86400100)
+    const {request}=await service.create(f.p,{...f.body,processingConsent:false})
+    assert.equal(request.checkId,id)
+    await auth.consent(f.p,{circleId:f.circleId,item:'check_log',granted:false,textVersion:CONSENT_VERSION})
+    assert.equal(await record(f.p,receipts.issue(result,f.p)),null)
+    const count=await db.service(tx=>tx.query('select count(*)::int as n from public.checks where circle_id=$1',[f.circleId]))
+    assert.equal(count.rows[0].n,1)
+  })
+  test('HTTP analysis and context honor record consent and reuse the stored check for a request',async()=>{
+    const f=await family()
+    const handler=makeHandler({database:{host:'127.0.0.1',port:55432,database:'familyshield',user:'fs_app'},hmacKey:key,
+      ai:{model:'',webModel:'',apiKey:'unused'},webBaseUrl:'http://127.0.0.1:5173'})
+    const server=createServer(handler)
+    await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
+    const post=async(path,body)=>{
+      const response=await fetch(`http://127.0.0.1:${server.address().port}/api/${path}`,{method:'POST',
+        headers:{'content-type':'application/json','x-fs-request':'1',origin:'http://127.0.0.1:5173',cookie:`fs_session=${f.token}`},body:JSON.stringify(body)})
+      assert.equal(response.status,200)
+      return response.json()
+    }
+    const count=async()=>(await db.service(tx=>tx.query('select count(*)::int as n from public.checks where circle_id=$1',[f.circleId]))).rows[0].n
+    try {
+      await post('analyze',{text:'합성 안내 https://example.invalid/check'})
+      assert.equal(await count(),0)
+      await auth.consent(f.p,{circleId:f.circleId,item:'check_log',granted:true,textVersion:CONSENT_VERSION})
+      const analyzed=await post('analyze',{text:'합성 안내 https://example.invalid/check'})
+      assert.equal(await count(),1)
+      const updated=await post('result/context',{receipt:analyzed.result.receipt,calledBefore:true})
+      assert.equal(updated.result.level,'위험')
+      assert.equal(await count(),2)
+      const requested=await post('confirm',{receipt:updated.result.receipt,requestType:'link_check'})
+      assert.ok(requested.request.id)
+      assert.equal(await count(),2)
+    }finally{await new Promise(resolve=>server.close(resolve));await handler.close()}
   })
   test('only the target can respond, and two simultaneous replies have one winner',async()=>{
     const f=await family(),other=await family()

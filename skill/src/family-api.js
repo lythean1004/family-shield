@@ -1,6 +1,6 @@
 import { checkBrowserRequest, fail } from './auth.js'
 
-export function createFamilyApi(auth,confirm,config,{notify=async()=>{}}={}) {
+export function createFamilyApi(auth,confirm,config,{notify=async()=>{},recordCheck=async()=>{}}={}) {
   return async(req,send,readBody)=>{
     const url=new URL(req.url,'http://local')
     const path=url.pathname
@@ -19,7 +19,11 @@ export function createFamilyApi(auth,confirm,config,{notify=async()=>{}}={}) {
       let body
       try{body=JSON.parse(await readBody(req))}catch{fail(400,'json')}
       if(!body||typeof body!=='object') fail(400,'json')
-      if(path==='/api/result/context')send(200,await confirm.context(session.userId,body))
+      if(path==='/api/result/context'){
+        const updated=await confirm.context(session.userId,body)
+        await recordCheck(session.userId,updated.result.receipt)
+        send(200,updated)
+      }
       else if(path==='/api/confirm') {
         await auth.checkLimit(`confirm:${session.userId}`)
         const result=await confirm.create(session.userId,body)

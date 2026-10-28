@@ -60,9 +60,13 @@ export function createConfirmService(db,receipts) {
       if(!target) fail(409,'family_missing')
       // Only a signed server result is stored. Free text and client-supplied levels are ignored.
       // RLS authorized the parent/circle/consents above. Only the server may insert a verdict.
-      await tx.query('set local role service_role')
-      const checkId=await insertCheck(tx,result,{userId,circleId:circle.id,receiptHash})
-      await tx.query('set local role authenticated')
+      const {rows:[record]}=await tx.query('select id from public.checks where receipt_hash=$1 and created_by=$2 and purge_at>now()',[receiptHash,userId])
+      let checkId=record?.id
+      if(!checkId){
+        await tx.query('set local role service_role')
+        checkId=await insertCheck(tx,result,{userId,circleId:circle.id,receiptHash})
+        await tx.query('set local role authenticated')
+      }
       const {rows:[row]}=await tx.query(`insert into public.confirm_requests(check_id,target_member_id,kind,sent_at,
         processing_consent_version,processing_consent_at) values($1,$2,$3,now(),$4,now()) returning id`,
         [checkId,target.user_id,TYPES[body.requestType],granted('check_log')?'check_log':PROCESSING_VERSION])

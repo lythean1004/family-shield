@@ -53,6 +53,26 @@ export async function insertCheck(tx,result,{userId=null,circleId=null,channel='
       userId?'24 hours':'10 minutes',receiptHash])
   return row.id
 }
+// Called only with server-issued results. Consent and storage share the circle lock
+// with consent changes, so a concurrent withdrawal cannot race a new record.
+export function createCheckRecorder(db,receipts) {
+  return async (userId,receipt) => {
+    const result=receipts.read(receipt,userId),receiptHash=hashToken(receipt)
+    return db.user(userId,async tx=>{
+      const {rows:[circle]}=await tx.query('select id from public.circles where protected_user_id=$1',[userId])
+      if(!circle)return null
+      await tx.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[circle.id])
+      const {rows:[consent]}=await tx.query("select granted from public.consents where circle_id=$1 and item='check_log' order by created_at desc,id desc limit 1",[circle.id])
+      if(!consent?.granted)return null
+      const {rows:[existing]}=await tx.query('select id from public.checks where receipt_hash=$1 and created_by=$2',[receiptHash,userId])
+      if(existing)return existing.id
+      await tx.query('set local role service_role')
+      const id=await insertCheck(tx,result,{userId,circleId:circle.id,receiptHash})
+      await tx.query('set local role authenticated')
+      return id
+    })
+  }
+}
 export function createDbResultStore(db) {
   return {
     async put(result) {
