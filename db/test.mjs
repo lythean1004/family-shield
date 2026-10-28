@@ -57,20 +57,42 @@ for (const f of files) {
   for (const s of stmts) {
     const low = s.toLowerCase();
     if (/^create extension .*pgtap/.test(low)) continue;
-    if (low === "begin") { await client.query("begin"); await client.query(tap); await client.query("set local role service_role"); continue; }
+    if (low === "begin") {
+      await client.query("begin");
+      // tap.sql runs as fs_app (temp objects); errors here are a harness bug, not a test failure
+      try { await client.query(tap); } catch (e) { console.error(`tap.sql failed: ${e.message}`); process.exit(2); }
+      await client.query("set local role service_role");
+      continue;
+    }
     if (low === "rollback") { await client.query("rollback"); continue; }
     if (low === "reset role") { await client.query("reset role"); await client.query("set local role service_role"); asSuper = true; continue; }
     if (/^set local role /.test(low)) { asSuper = false; await client.query("reset role"); await client.query(s); continue; }
     // pgTAP 함수는 pg_temp에 있다. 테스트 문장의 이름을 그대로 찾도록 search_path에 pg_temp를 앞에 둔다.
     if (/^select /.test(low) && /\b(plan|is|ok|throws_ok|lives_ok|finish)\s*\(/.test(low)) {
-      const r = await client.query(`set local search_path = pg_temp, public, extensions; ${s}`).catch((e) => ({ error: e }));
-      const res = Array.isArray(r) ? r.at(-1) : r;
-      if (res.error) { lines.push(`not ok - statement error: ${res.error.message}`); continue; }
+      let res;
+      try {
+        await client.query("savepoint s");
+        await client.query("set local search_path = pg_temp, public, extensions");
+        res = await client.query(s);
+        await client.query("release savepoint s");
+      } catch (e) {
+        await client.query("rollback to savepoint s").catch(() => {});
+        lines.push(`not ok - statement error: ${e.message} :: ${s.slice(0, 80)}`);
+        continue;
+      }
       for (const row of res.rows) for (const v of Object.values(row)) if (v != null) lines.push(String(v));
       continue;
     }
-    try { await client.query(s); }
-    catch (e) { lines.push(`not ok - setup failed (${asSuper ? "service_role" : "role"}): ${e.message} :: ${s.slice(0, 80)}`); }
+    try {
+      // savepoint so one failing setup line does not abort the whole test transaction
+      await client.query("savepoint s");
+      await client.query(s);
+      await client.query("release savepoint s");
+    }
+    catch (e) {
+      await client.query("rollback to savepoint s").catch(() => {});
+      lines.push(`not ok - setup failed (${asSuper ? "service_role" : "role"}): ${e.message} :: ${s.slice(0, 80)}`);
+    }
   }
   await client.end();
 
