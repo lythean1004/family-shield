@@ -640,7 +640,7 @@ a.action-btn { text-decoration: none; }
 #main { scroll-margin-top: 96px; }
 @media print { .top-nav { display: none; } }
 
-.setup-form { display: grid; gap: var(--sp-4); margin-block: var(--sp-4); }
+.setup-form { display: grid; gap: var(--sp-4); margin-block: var(--sp-4); font-size: var(--fs-body); }
 .setup-form label { display: grid; gap: var(--sp-2); }
 .setup-form input, .setup-form select { font: inherit; color: var(--c-text); background: var(--c-surface, #fff); border: 2px solid #667085; border-radius: 8px; padding: 12px; min-height: 48px; width: 100%; box-sizing: border-box; }
 .setup-form .setup-check { display: flex; align-items: center; gap: 16px; }

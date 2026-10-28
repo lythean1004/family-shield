@@ -42,32 +42,38 @@ function RequestScreen() {
   const navigate = useNavigate()
   const [confirmSent, setConfirmSent] = useState(false)
   const [req, setReq] = useState(null)
-  const { parent } = DEV_FAMILY
+  const parent = {title:'부모님'}
+  const [error,setError] = useState('')
+  const [sending,setSending] = useState(false)
 
   // 초기 로드
   useEffect(() => {
     if (!id) return
-    confirmStore.get(id).then(setReq)
+    confirmStore.get(id).then(setReq).catch(e=>setError(e.message))
   }, [id])
 
-  if (!req) return <NoRequest />
+  if (!req) return error ? <main id="main" className="mode-guardian"><p role="alert">{error}</p><ActionButton onClick={()=>navigate('/setup')}>로그인 확인</ActionButton></main> : <NoRequest />
 
   const answer = async (a) => {
-    await confirmStore.respond(id, a)
-    navigate(`/family/req/${id}/done`, { replace: true })
+    if(sending)return
+    setSending(true);setError('')
+    try{await confirmStore.respond(id, a);navigate(`/family/req/${id}/done`, { replace: true })}
+    catch(e){setError(e.message);confirmStore.get(id).then(setReq).catch(()=>{})}finally{setSending(false)}
   }
 
   if (req.state === 'responded') {
     return <DoneScreen />
   }
+  if(req.state!=='pending'||!req.canRespond) return <NoRequest/>
 
   const isLinkCheck = req.requestType === REQUEST_TYPES.LINK_CHECK
   const s = req.summary
   return (
     <main id="main" className="mode-guardian">
       <p className="guardian-head">
-        {parent.title}({parent.name})가 확인을 요청했어요 · <span className="tabular">{formatTime(req.sentAt)}</span>
+        {parent.title}이 확인을 요청했어요 · <span className="tabular">{formatTime(req.sentAt)}</span>
       </p>
+      {error && <p role="alert">{error}</p>}
       <VerdictBanner level={levelKey(s.level)} />
       <SignalList signals={s.signals_final} impersonatedRelation={s.impersonated_relation} />
       {s.sender_last4 && (
@@ -133,12 +139,12 @@ const DONE_TEXT = {
 function DoneScreen() {
   const { id } = useParams()
   const [req, setReq] = useState(null)
-  const { parent } = DEV_FAMILY
+  const parent = {title:'부모님'}
 
   // 초기 로드
   useEffect(() => {
     if (!id) return
-    confirmStore.get(id).then(setReq)
+    confirmStore.get(id).then(setReq).catch(()=>setReq(null))
   }, [id])
 
   if (!req) return <NoRequest />
@@ -161,7 +167,7 @@ function DoneScreen() {
             {parent.title} 휴대폰 말고 집 전화나 다른 방법으로 연락해 보세요.
           </p>
         ) : (
-          <CallButton name={`${parent.title}께 전화`} number={parent.phone} source="등록된 번호" />
+          <p className="screen-body">휴대폰 연락처에서 원래 알던 부모님 번호로 전화해 주세요.</p>
         )}
       </div>
       <NoLinkFooter />

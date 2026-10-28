@@ -1,10 +1,5 @@
-// 가족 확인 요청 (F5, screen-spec P6·P8·C2·C3) — Supabase 연결
-//
-// confirm_requests 테이블에 저장한다. RLS 정책으로 권한을 제어한다.
-// 저장하는 것은 F5-8 범위뿐: 판정·신호·사칭 관계·끝 4자리·보낸 시각. 원문·AI 설명은 넣지 않는다(U8).
-//
-// 로그인 전에는 localStorage 폴백으로 개발·데모 가능.
-import { supabase } from '../lib/supabase.js'
+import { api } from './api.js'
+import { createDemoConfirmStore } from './demo-confirm.js'
 import { decide } from '../../../packages/core/src/rule-engine.js'
 
 // F5-1: 가족 사칭 확인 답변 3종
@@ -34,162 +29,29 @@ export const DEV_FAMILY = {
   guardian: { callName: '지은이', relation: '딸', phone: '010-0000-1234' },
 }
 
-const KEY = 'fs.confirm.' // localStorage 폴백용
 const LEVEL_RANK = { 확인필요: 0, 주의: 1, 위험: 2 }
-
-/** 보호자에게 넘길 범위만 남긴다(F5-8) */
 export function toGuardianSummary(result, senderLast4 = null) {
+  return { level:result.level, signals_final:[...(result.signals_final ?? [])],
+    impersonated_relation:result.impersonated_relation ?? null,
+    sender_last4:senderLast4 && /^\d{4}$/.test(senderLast4) ? senderLast4 : null }
+}
+// Explicit fixture storage is for isolated demos/tests only. Production always uses the API.
+export function createConfirmStore(options = {}) {
+  if (Object.hasOwn(options,'fallbackStorage')) return createDemoConfirmStore(options)
   return {
-    level: result.level,
-    signals_final: [...(result.signals_final ?? [])],
-    impersonated_relation: result.impersonated_relation ?? null,
-    sender_last4: senderLast4 && /^\d{4}$/.test(senderLast4) ? senderLast4 : null,
+    async create(result,{requestType=REQUEST_TYPES.IMPERSONATION,processingConsent=false,targetId}={}) {
+      return (await api('/confirm',{receipt:result.receipt,requestType,processingConsent,targetId,
+        processingVersion:'confirm-processing-2026-10-28-v1'})).request
+    },
+    async get(id) { if(!id)return null; try{return (await api(`/confirm/${encodeURIComponent(id)}`)).request}
+      catch(error){if(error.status===404)return null;throw error} },
+    async respond(id,answer){return (await api(`/confirm/${encodeURIComponent(id)}/respond`,{answer})).request},
+    async markDeviceSuspect(id){if(id)await api(`/confirm/${encodeURIComponent(id)}/suspect`,{})},
+    async listRecent(){return (await api('/confirm')).requests},
   }
 }
+export const confirmStore = createConfirmStore()
 
-/**
- * Supabase 기반 확인 요청 저장소
- * 로그인 전에는 localStorage 폴백 (개발·데모용)
- * 
- * 주의: 현재 DB 스키마는 check_id 필수이지만, 로그인 전에는 checks 테이블 사용 안 함.
- * 간단한 확인 요청만 localStorage로 시연 가능.
- */
-export function createConfirmStore({ fallbackStorage = null, clock = Date.now } = {}) {
-  // localStorage 폴백 헬퍼
-  const fbRead = (id) => {
-    if (!fallbackStorage) return null
-    const raw = fallbackStorage.getItem(KEY + id)
-    try { return raw ? JSON.parse(raw) : null } catch { return null }
-  }
-  const fbWrite = (req) => fallbackStorage?.setItem(KEY + req.id, JSON.stringify(req))
-  const fbNewId = () => {
-    const c = globalThis.crypto
-    if (c?.randomUUID) return `fb_${c.randomUUID()}`
-    return `fb_${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
-  }
-
-  return {
-    /**
-     * 확인 요청 생성 (부모님이 보호자에게)
-     * 로그인 후: confirm_requests 테이블 insert (현재 스키마는 check_id 필수)
-     * 로그인 전: localStorage 폴백
-     */
-    async create(result, { senderLast4 = null, requestType = REQUEST_TYPES.IMPERSONATION, checkId = null } = {}) {
-      const summary = toGuardianSummary(result, senderLast4)
-
-      // 로그인 상태 확인
-      const { data: { user } } = await supabase.auth.getUser()
-
-      // localStorage 폴백 (로그인 전 또는 checkId 없을 때)
-      if (!user || !checkId) {
-        const fbReq = {
-          id: fbNewId(),
-          state: 'pending',
-          sentAt: clock(),
-          requestType,
-          summary,
-          answer: null,
-          respondedAt: null,
-          deviceSuspect: false,
-        }
-        fbWrite(fbReq)
-        return fbReq
-      }
-
-      // Supabase에 저장 (현재는 스키마 맞지 않아 스킵, Auth 구현 후 활성화)
-      // TODO: checks 테이블과 연동 후 활성화
-      console.warn('Supabase confirm_requests insert는 Auth 구현 후 활성화 예정')
-      
-      // 임시로 localStorage 폴백
-      const fbReq = {
-        id: fbNewId(),
-        state: 'pending',
-        sentAt: clock(),
-        requestType,
-        summary,
-        answer: null,
-        respondedAt: null,
-        deviceSuspect: false,
-      }
-      fbWrite(fbReq)
-      return fbReq
-    },
-    get: async (id) => {
-      if (!id) return null
-      // localStorage 폴백
-      if (id.startsWith('fb_')) return fbRead(id)
-      
-      // Supabase 조회 (Auth 구현 후 활성화)
-      return fbRead(id)
-    },
-    
-    /** 응답은 한 번만(F5-4). 이미 응답했으면 바꾸지 않는다. */
-    async respond(id, answer) {
-      if (!id) return null
-
-      // localStorage 폴백
-      if (id.startsWith('fb_')) {
-        const req = fbRead(id)
-        if (!req || req.state !== 'pending') return req
-        const allAnswers = [...Object.values(ANSWERS), ...Object.values(ANSWERS_LINK)]
-        if (!allAnswers.includes(answer)) throw new Error('unknown answer')
-        const next = { ...req, state: 'responded', answer, respondedAt: clock() }
-        fbWrite(next)
-        return next
-      }
-
-      // Supabase 업데이트 (Auth 구현 후 활성화)
-      return fbRead(id)
-    },
-    
-    /** E1에서 링크·앱을 골랐으면 보호자 화면에 "다른 방법으로 연락"을 띄운다(F6-3) */
-    async markDeviceSuspect(id) {
-      if (!id) return
-      
-      if (id.startsWith('fb_')) {
-        const req = fbRead(id)
-        if (req) fbWrite({ ...req, deviceSuspect: true })
-        return
-      }
-
-      // Supabase 업데이트 (Auth 구현 후 활성화)
-    },
-    /** F5-10: 최근 windowMs 이내 요청 목록 (localStorage 전체 스캔) */
-    async listRecent(windowMs = 24 * 60 * 60 * 1000) {
-      // 로그인 상태 확인
-      const { data: { user } } = await supabase.auth.getUser()
-
-      // localStorage 폴백 (로그인 전)
-      if (!user || !fallbackStorage) {
-        if (!fallbackStorage) return []
-        const cutoff = clock() - windowMs
-        const result = []
-        for (let i = 0; i < fallbackStorage.length; i++) {
-          const k = fallbackStorage.key(i)
-          if (!k?.startsWith(KEY)) continue
-          const id = k.slice(KEY.length)
-          const req = fbRead(id)
-          if (req && req.sentAt >= cutoff) result.push(req)
-        }
-        return result.sort((a, b) => b.sentAt - a.sentAt)
-      }
-
-      // Supabase 조회 (Auth 구현 후 활성화)
-      console.warn('Supabase confirm_requests list는 Auth 구현 후 활성화 예정')
-      return []
-    },
-  }
-}
-
-export const confirmStore = createConfirmStore({
-  fallbackStorage: typeof localStorage === 'undefined' ? null : localStorage,
-})
-
-/**
- * 가족 답을 판정에 반영한다(P8). 판정은 올라가기만 한다(원칙 2).
- *   보낸 적 없어요 → family_denied로 규칙 엔진 재실행(R5 → 위험)
- *   그 밖의 답 → 판정 그대로(F5-5)
- */
 export function applyFamilyAnswer(result, answer) {
   if (answer !== ANSWERS.NOT_SENT) return result
   const { level, fired_rules } = decide({ signals_final: result.signals_final ?? [], family_denied: true })

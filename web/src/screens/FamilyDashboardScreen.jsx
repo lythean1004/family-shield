@@ -26,14 +26,15 @@ export default function FamilyDashboardScreen() {
   const navigate = useNavigate()
   const { parent } = DEV_FAMILY
   const [requests, setRequests] = useState([])
+  const [error,setError] = useState('')
 
   useEffect(() => {
     const load = async () => {
-      const list = await confirmStore.listRecent(WINDOW_MS)
-      setRequests(list)
+      try{const list = await confirmStore.listRecent(WINDOW_MS);setRequests(list);setError('')}
+      catch(e){setError(e.message)}
     }
     load()
-    const timer = setInterval(load, 10_000)
+    const timer = setInterval(load, 3000)
     window.addEventListener('storage', load)
     return () => { clearInterval(timer); window.removeEventListener('storage', load) }
   }, [])
@@ -42,8 +43,9 @@ export default function FamilyDashboardScreen() {
     <main id="main" className="mode-guardian">
       <h1 className="screen-title">가족 확인 요청 내역</h1>
       <p className="screen-body">
-        {parent.title}({parent.name})의 최근 24시간 요청이에요.
+        연결된 가족에게서 온 최근 24시간 요청이에요.
       </p>
+      {error && <p role="alert" className="screen-body">{error}</p>}
 
       {requests.length === 0 ? (
         <p className="screen-body dashboard-empty">최근 24시간 안에 온 요청이 없어요.</p>
@@ -63,11 +65,11 @@ export default function FamilyDashboardScreen() {
                 <p className="dashboard-card__answer">
                   ✓ {ANSWER_LABEL[req.answer] ?? req.answer}
                 </p>
-              ) : (
+              ) : req.state==='pending' ? (
                 <Link to={`/family/req/${req.id}`} className="dashboard-card__pending">
                   미응답 — 여기를 눌러 답하기
                 </Link>
-              )}
+              ) : <p>{req.state==='cancelled'?'취소된 요청':'시간이 지난 요청'}</p>}
             </li>
           ))}
         </ul>

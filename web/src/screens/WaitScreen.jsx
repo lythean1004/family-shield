@@ -21,25 +21,25 @@ export default function WaitScreen() {
   const id = loadCurrentRequestId()
   const [req, setReq] = useState(null)
   const [now, setNow] = useState(Date.now())
-  const who = DEV_FAMILY.guardian.callName
+  const who = req?.guardianName || '가족'
+  const [error,setError] = useState('')
 
   // 초기 로드
   useEffect(() => {
     if (!id) return
-    confirmStore.get(id).then(setReq)
+    confirmStore.get(id).then(setReq).catch(e=>setError(e.message))
   }, [id])
 
   useEffect(() => {
-    if (!id) return undefined
+    if (!id || (req && req.state!=='pending')) return undefined
     const check = async () => {
-      const updated = await confirmStore.get(id)
-      setReq(updated)
-      setNow(Date.now())
+      try{const updated = await confirmStore.get(id);setReq(updated);setNow(Date.now());setError('')}
+      catch(e){setError(e.message)}
     }
     const timer = setInterval(check, POLL_MS)
     window.addEventListener('storage', check)
     return () => { clearInterval(timer); window.removeEventListener('storage', check) }
-  }, [id])
+  }, [id,req?.state])
 
   useEffect(() => {
     if (req?.state === 'responded') navigate('/check/answer', { replace: true })
@@ -49,7 +49,7 @@ export default function WaitScreen() {
     return (
       <main id="main" className="mode-parent">
         <h1 className="screen-title">물어본 내용이 없어요.</h1>
-        <p className="screen-body">결과 화면에서 다시 가족에게 물어보세요.</p>
+        <p className="screen-body" role={error?'alert':undefined}>{error || '결과 화면에서 다시 가족에게 물어보세요.'}</p>
         <div className="screen-actions">
           <ActionButton variant="primary" onClick={() => navigate('/check/result')}>결과 화면으로</ActionButton>
         </div>
@@ -66,16 +66,13 @@ export default function WaitScreen() {
         답이 올 때까지 링크를 누르거나 돈을 보내지 마세요.
       </p>
       <h1 className="screen-title">{who}에게 물어봤어요.</h1>
+      {error && <p role="alert" className="screen-body">{error}</p>}
       <p className="screen-body wait-status" aria-live="polite">
-        보낸 시각 {formatTime(req.sentAt)} · {slow ? '답이 늦어요. 원래 번호로 전화해 보세요.' : '아직 답이 없어요'}
+        보낸 시각 {formatTime(req.sentAt)} · {req.state==='cancelled'?'동의를 꺼서 요청이 취소됐어요.':req.state==='expired'?'요청 시간이 지났어요. 가족에게 직접 전화해 주세요.':slow ? '답이 늦어요. 원래 번호로 전화해 보세요.' : '아직 답이 없어요'}
         {!slow && <span className="wait-dots" aria-hidden="true"><i /><i /><i /></span>}
       </p>
       <div className="screen-actions">
-        <CallButton
-          name={`${who} 원래 번호로 전화`}
-          number={DEV_FAMILY.guardian.phone}
-          source="가족이 등록한 번호"
-        />
+        <p className="screen-body">휴대폰 연락처에서 원래 알던 가족 번호로 전화해 주세요.</p>
         <ActionButton variant="secondary" onClick={() => navigate('/contacts')}>공식 번호 보기</ActionButton>
       </div>
       {import.meta.env.DEV && (

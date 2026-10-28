@@ -23,6 +23,9 @@ import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-lim
 import { createDatabase } from './database.js';
 import { createAuth, checkBrowserRequest } from './auth.js';
 import { createAuthApi } from './auth-api.js';
+import { createDbResultStore, createReceipts } from './results.js';
+import { createConfirmService } from './confirm.js';
+import { createFamilyApi } from './family-api.js';
 
 const HEADER_TOKEN_KEY = "x-skill-token";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -72,14 +75,16 @@ function buildReplyText(result) {
  * D25: 가족방패는 먼저 링크를 보내지 않으므로 webLink는 사용자 요청 버튼만 허용.
  * D34: [자세히 보기]는 1회용 토큰 주소(/check/result?t=…). 저장소가 없으면 버튼을 만들지 않는다.
  */
-function buildQuickReplies(result, webBaseUrl, resultStore) {
+async function buildQuickReplies(result, webBaseUrl, resultStore) {
   const replies = [];
   if (result.level === "위험" || result.level === "주의") {
     replies.push(quickReply.message("이미 당했어요", "이미 당했어요"));
   }
   if (webBaseUrl && resultStore) {
-    const token = resultStore.put(result);
-    replies.push(quickReply.webLink("자세히 보기", `${webBaseUrl}/check/result?t=${token}`));
+    try {
+      const token = await resultStore.put(result);
+      replies.push(quickReply.webLink("자세히 보기", `${webBaseUrl}/check/result?t=${token}`));
+    } catch { /* The already computed verdict remains available if DB storage fails. */ }
   }
   replies.push(quickReply.message("처음으로", "처음으로"));
   return replies;
@@ -138,12 +143,12 @@ export async function handleRequest(params, cfg) {
       urlReputation: cfg.urlReputation ?? null,
     });
   } catch (err) {
-    console.error(`pipeline error: ${err.message}`);
+    console.error('pipeline error');
     return { status: 200, body: simpleText(FIXED.ERROR) };
   }
 
   const text = buildReplyText(result);
-  const replies = buildQuickReplies(result, cfg.webBaseUrl, cfg.resultStore ?? null);
+  const replies = await buildQuickReplies(result, cfg.webBaseUrl, cfg.resultStore ?? null);
   return { status: 200, body: simpleText(text, replies) };
 }
 
@@ -155,6 +160,9 @@ export async function handleRequest(params, cfg) {
 export function handleResultLookup(token, resultStore) {
   if (!resultStore) return { status: 410, body: { ok: false, reason: "missing" } };
   const r = resultStore.redeem(token);
+  if (r?.then) return r.then(value => value.ok
+    ? {status:200,body:{ok:true,result:value.result}}
+    : {status:410,body:{ok:false,reason:value.reason}});
   return r.ok
     ? { status: 200, body: { ok: true, result: r.result } }
     : { status: 410, body: { ok: false, reason: r.reason } };
@@ -194,7 +202,7 @@ export async function handleAnalyze(params, cfg) {
       urlReputation: cfg.urlReputation ?? null,
     });
   } catch (err) {
-    console.error(`pipeline error: ${err.message}`);
+    console.error('pipeline error');
     return { status: 500, body: { ok: false, reason: "pipeline_error" } };
   }
   return { status: 200, body: { ok: true, result: toResultView(result) } };
@@ -208,8 +216,9 @@ export function makeHandler(config) {
   const db = config.database ? createDatabase(config.database) : null;
   const auth = db ? createAuth(db, config) : null;
   const authApi = auth ? createAuthApi(auth, config) : null;
-  // Supabase(result_tokens) 연결 전까지는 프로세스 메모리에 10분만 둔다(PRD 13-4 ③ 이전 단계).
-  const resultStore = config.webBaseUrl ? createMemoryResultStore() : null;
+  const receipts = db ? createReceipts(config.hmacKey) : null;
+  const familyApi = db ? createFamilyApi(auth,createConfirmService(db,receipts),config) : null;
+  const resultStore = config.resultStore || (db && config.webBaseUrl ? createDbResultStore(db) : null);
   // 평판 조회기: 캐시를 프로세스 동안 공유한다. 키가 없으면 null(조회 안 함).
   const urlReputation = createSafeBrowsingChecker({
     apiKey: config.safeBrowsingKey,
@@ -222,7 +231,7 @@ export function makeHandler(config) {
   });
   const concurrency = createConcurrencyLimit({ max: config.maxConcurrent || 8 });
 
-  return async function handler(req, res) {
+  const handler = async function(req, res) {
     const started = Date.now();
 
     function send(status, body, extraHeaders = {}) {
@@ -237,10 +246,15 @@ export function makeHandler(config) {
     }
 
     if (authApi && await authApi(req, send, readBody)) return;
+    if (familyApi && await familyApi(req, send, readBody)) return;
 
     if (req.method === "GET" && req.url?.startsWith("/api/result")) {
       const token = new URL(req.url, "http://local").searchParams.get("t");
-      const { status, body } = handleResultLookup(token, resultStore);
+      const { status, body } = await handleResultLookup(token, resultStore);
+      if (body.ok && receipts) {
+        const session = await auth.authenticate(req);
+        body.result.receipt = receipts.issue(body.result,session?.userId || null);
+      }
       return send(status, body, { "cache-control": "no-store" });
     }
 
@@ -255,7 +269,7 @@ export function makeHandler(config) {
           return send(error.status || 503, {ok:false,reason:error.reason || 'unavailable'});
         }
       }
-      const key = clientKey(req);
+      const key = req.auth?.userId || clientKey(req);
       const limit = rateLimiter.check(key);
       if (!limit.ok) {
         return send(429, { ok: false, reason: "rate_limited", retryAfterMs: limit.retryAfterMs },
@@ -275,6 +289,7 @@ export function makeHandler(config) {
           // F4-6: 웹 채널은 카카오 5초 제한이 없으므로 webTimeoutMs(기본 8초)로 덮어 쓴다.
           { ai: { ...config.ai, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation },
         );
+        if (body.ok && receipts) body.result.receipt = receipts.issue(body.result,req.auth.userId);
         return send(status, body, { "cache-control": "no-store" });
       } finally {
         concurrency.release();
@@ -322,4 +337,10 @@ export function makeHandler(config) {
       concurrency.release();
     }
   };
+  const safeHandler = (req,res) => handler(req,res).catch(() => {
+    if (!res.headersSent) res.writeHead(503, {'content-type':'application/json','cache-control':'no-store'});
+    res.end(JSON.stringify({ok:false,reason:'unavailable'}));
+  });
+  safeHandler.close = () => db?.close();
+  return safeHandler;
 }

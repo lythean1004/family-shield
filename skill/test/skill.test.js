@@ -219,7 +219,7 @@ describe("HTTP 서버 - 결과 조회 경로", () => {
       ai: { model: "fake", apiKey: "k", timeoutMs: 1000, promptVersion: "v1",
             fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") },
     };
-    const server = createServer(makeHandler(config));
+    const server = createServer(makeHandler({...config,resultStore:createMemoryResultStore()}));
     await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
     const base = `http://127.0.0.1:${server.address().port}`;
     const logs = [];

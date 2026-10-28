@@ -33,17 +33,19 @@ const INFECTED_STEPS = [
 export default function HelpScreen() {
   const navigate = useNavigate()
   const [choice, setChoice] = useState(null)
+  const [error,setError] = useState('')
   const picked = CHOICES.find((c) => c.id === choice)
 
   const pick = (c) => {
     setChoice(c.id)
     // 링크·앱이면 진행 중인 가족 확인 요청에 표시 → 보호자 화면이 "다른 방법으로 연락"(F6-3, C3)
     const reqId = loadCurrentRequestId()
-    if (c.infected && reqId) confirmStore.markDeviceSuspect(reqId)
+    if (c.infected && reqId) confirmStore.markDeviceSuspect(reqId).catch(()=>setError('가족에게 알리지 못했어요. 다른 기기로 직접 연락해 주세요.'))
   }
 
   return (
     <main id="main" className="mode-parent">
+      {error && <p role="alert" className="screen-body">{error}</p>}
       {!picked && (
         <>
           <h1 className="screen-title">무엇을 했나요?</h1>

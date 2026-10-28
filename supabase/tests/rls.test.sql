@@ -72,7 +72,7 @@ select is((select count(*) from public.checks)::int, 0, 'F2: 제거된 보호자
 -- G. service_role(스킬 서버·Cron)
 reset role;
 set local role service_role;
-select is((select count(*) from public.checks)::int, 2, 'G1: service_role은 RLS를 우회한다');
+select is((select count(*) from public.checks where id in ('00000000-0000-0000-0002-000000000001','00000000-0000-0000-0002-000000000002'))::int, 2, 'G1: service_role은 서로 다른 가족의 픽스처 2건 모두 읽는다');
 
 reset role;
 select * from finish();

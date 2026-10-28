@@ -5,6 +5,10 @@ const MESSAGES = {
   rate_limited:'여러 번 시도하셨어요. 잠시 뒤 다시 해 주세요.',
   already_logged_in:'이미 로그인되어 있어요. 설정에서 현재 계정을 확인해 주세요.',
   alert_consent_required:'먼저 가족 알림에 동의해 주세요.',
+  consent_required:'가족 알림과 사칭 확인 동의를 설정에서 확인해 주세요.',
+  result_expired:'결과를 보관할 수 있는 시간이 지났어요. 문자를 다시 확인해 주세요.',
+  family_missing:'연결된 가족이 없어요. 설정에서 가족을 연결해 주세요.',
+  already_answered:'이미 답했거나 요청이 끝났어요. 요청 내역을 다시 확인해 주세요.',
 }
 export async function api(path, body, { fetchImpl = fetch } = {}) {
   let res

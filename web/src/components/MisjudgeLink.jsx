@@ -10,6 +10,9 @@ import { recordMisjudge, MISJUDGE_REASONS } from '../data/misjudge.js'
 
 export default function MisjudgeLink({ result }) {
   const [step, setStep] = useState('closed') // closed → choose → done
+  const [consent,setConsent] = useState(false)
+  const [error,setError] = useState('')
+  const [busy,setBusy] = useState(false)
 
   if (step === 'done') {
     return <p className="misjudge__done" role="status">알려 주셔서 고마워요. 판정을 고치는 데 쓸게요.</p>
@@ -19,15 +22,19 @@ export default function MisjudgeLink({ result }) {
     return (
       <section className="misjudge" aria-label="이 판정이 이상해요">
         <p className="misjudge__q">어떤 점이 이상한가요?</p>
+        <label className="setup-check"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>판정·신호·신고 이유를 개선용으로 90일 보관하는 데 동의해요. 문자 원문은 보내지 않아요.</label>
+        {error && <p role="alert">{error}</p>}
         <ul className="misjudge__list">
           {MISJUDGE_REASONS.map((r) => (
             <li key={r.id}>
               <button
                 type="button"
                 className="misjudge__choice"
+                disabled={!consent||busy}
                 onClick={async () => { 
-                  await recordMisjudge(result, r.id)
-                  setStep('done')
+                  setBusy(true);setError('')
+                  try{await recordMisjudge(result, r.id);setStep('done')}
+                  catch(e){setError(e.message)}finally{setBusy(false)}
                 }}
               >
                 {r.label}

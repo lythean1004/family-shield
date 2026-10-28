@@ -17,6 +17,7 @@ import {
 import { confirmStore } from '../data/confirm.js'
 import { loadFamilyConsent } from '../data/consent.js'
 import { REQUEST_TYPES } from '../data/confirm.js'
+import ActionButton from '../components/ActionButton.jsx'
 
 export default function ResultScreen({ fallbackResult, familyName, hasFamilyConsent: consentProp }) {
   const navigate = useNavigate()
@@ -28,6 +29,9 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
     token ? { status: 'loading' } : { status: 'ok', result: loadCurrentResult() ?? fallbackResult },
   )
   const fetched = useRef(false)
+  const [error,setError] = useState('')
+  const [needsProcessingConsent,setNeedsProcessingConsent] = useState(false)
+  const [sending,setSending] = useState(false)
 
   // 동의 상태 로드
   useEffect(() => {
@@ -49,20 +53,34 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
     })
   }, [token, setParams])
 
-  const askFamily = async () => {
+  const askFamily = async (processingConsent = false) => {
+    if(sending) return
+    setSending(true);setError('')
     saveCurrentResult(state.result)
     // F5-3: 가족 사칭이면 IMPERSONATION, 그 외(링크·일반)는 LINK_CHECK
     const requestType = state.result?.impersonation_type === 'family'
       ? REQUEST_TYPES.IMPERSONATION
       : REQUEST_TYPES.LINK_CHECK
-    const req = await confirmStore.create(state.result, { requestType })
-    saveCurrentRequestId(req.id)
-    navigate('/check/wait')
+    try {
+      const req = await confirmStore.create(state.result, { requestType,processingConsent:processingConsent===true })
+      saveCurrentRequestId(req.id)
+      navigate('/check/wait')
+    } catch(e) {
+      if(e.reason==='processing_consent_required')setNeedsProcessingConsent(true)
+      else setError(e.message)
+    } finally {setSending(false)}
   }
 
   return (
     <main id="main" className="mode-parent">
       <h1 className="visually-hidden">판별 결과</h1>
+      {error && <p role="alert" className="screen-body">{error}</p>}
+      {needsProcessingConsent && <section className="confirm-box" aria-label="확인 요청 기록 동의">
+        <h2 className="screen-title">이번 요청의 기록을 남길까요?</h2>
+        <p className="screen-body">가족의 답을 받기 위해 위험 단계·신호·요청과 응답을 24시간 보관해요. 삭제 작업은 10분마다 실행되며 백업에는 최대 7일 남을 수 있어요. 문자 원문은 남기지 않아요. 이번 요청에만 동의하며 설정의 ③은 바뀌지 않아요.</p>
+        <div className="screen-actions"><ActionButton disabled={sending} onClick={()=>askFamily(true)}>동의하고 가족에게 물어보기</ActionButton>
+        <ActionButton variant="secondary" onClick={()=>setNeedsProcessingConsent(false)}>보내지 않기</ActionButton></div>
+      </section>}
       {state.status === 'loading' && <ResultSkeleton />}
       {state.status === 'gone' && <TokenExpiredView reason={state.reason} />}
       {state.status === 'ok' && (
