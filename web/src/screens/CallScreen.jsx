@@ -7,23 +7,25 @@
  * 판정은 올라가기만 한다. 되돌리기 버튼 없음(원칙 2).
  */
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { applyCallContext } from '../data/confirm.js'
-import { loadCurrentResult, saveCurrentResult } from '../data/session.js'
+import { loadCurrentResult, saveCurrentResult, updateResultContext } from '../data/session.js'
 
 export default function CallScreen({ fallbackResult }) {
   const navigate = useNavigate()
+  const [error,setError]=useState('')
 
-  const answered = (calledBefore) => {
+  const answered = async (calledBefore) => {
     const current = loadCurrentResult() ?? fallbackResult
-    saveCurrentResult(applyCallContext(current, { calledBefore }))
-    navigate('/check/result')
+    try{saveCurrentResult(await updateResultContext(current,{calledBefore}));navigate('/check/result')}
+    catch(e){setError(e.message)}
   }
 
   return (
     <main id="main" className="mode-parent">
       <h1 className="screen-title">이 문자 받기 전에 전화가 왔나요?</h1>
+      {error&&<p role="alert" className="screen-body">{error}</p>}
       <div className="screen-actions">
         <ActionButton variant="danger" onClick={() => navigate('/check/hangup')}>
           지금 통화 중이에요

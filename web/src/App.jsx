@@ -1,6 +1,6 @@
 // 라우팅 뼈대 (docs/frontend-structure.md 2장: 앱 하나, 화면은 역할별)
 // 화면은 디자인 토큰 + React 컴포넌트로 직접 구현한다(코드가 디자인 산출물, D31).
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom'
 import './App.css'
 
 import HomeScreen       from './screens/HomeScreen.jsx'
@@ -18,7 +18,7 @@ import WhoScreen        from './screens/WhoScreen.jsx'
 import CallResultScreen from './screens/CallResultScreen.jsx'
 import NoLinkFooter     from './components/NoLinkFooter.jsx'
 import TopNav           from './components/TopNav.jsx'
-import { DEV_RESULT } from './data/result.js'
+import { loadCurrentResult } from './data/session.js'
 import SettingsScreen   from './screens/SettingsScreen.jsx'
 import ShareScreen       from './screens/ShareScreen.jsx'
 import QuizScreen        from './screens/QuizScreen.jsx'
@@ -38,6 +38,9 @@ function NotFound() {
     </main>
   )
 }
+function ResultRequired({children}) {
+  return loadCurrentResult() ? children : <Navigate to="/check/input" replace />
+}
 
 export default function App() {
   return (
@@ -54,20 +57,20 @@ export default function App() {
         <Route path="/settings"       element={<SettingsScreen />} />
         <Route path="/setup"          element={<SetupScreen />} />
 
-        {/* 부모님 판별 흐름. 결과는 ?t= 1회용 토큰(D34) → 이 탭 sessionStorage → 없으면 개발용 가짜 결과 */}
+        {/* 부모님 판별 흐름. 결과는 ?t= 1회용 토큰(D34) 또는 이 탭 sessionStorage. 없으면 입력 안내 */}
         <Route path="/check/hangup"      element={<HangupScreen />} />
-        {/* 가족 확인 버튼은 동의 ②가 있을 때만(F5-9). ResultScreen이 화면을 열 때 기기 동의를 읽는다. */}
-        <Route path="/check/result"      element={<ResultScreen fallbackResult={DEV_RESULT} />} />
-        <Route path="/check/call"        element={<CallScreen fallbackResult={DEV_RESULT} />} />
+        {/* 가족 확인 버튼은 동의 ①②가 있을 때만(F5-9). 서버가 최신 동의를 다시 확인한다. */}
+        <Route path="/check/result"      element={<ResultScreen />} />
+        <Route path="/check/call"        element={<ResultRequired><CallScreen /></ResultRequired>} />
         <Route path="/check/wait"        element={<WaitScreen />} />
-        <Route path="/check/answer"      element={<AnswerScreen fallbackResult={DEV_RESULT} />} />
+        <Route path="/check/answer"      element={<ResultRequired><AnswerScreen /></ResultRequired>} />
         <Route path="/check/input"       element={<InputScreen />} />
-        <Route path="/check/who"         element={<WhoScreen fallbackResult={DEV_RESULT} />} />
-        <Route path="/check/callresult"  element={<CallResultScreen fallbackResult={DEV_RESULT} />} />
+        <Route path="/check/who"         element={<ResultRequired><WhoScreen /></ResultRequired>} />
+        <Route path="/check/callresult"  element={<ResultRequired><CallResultScreen /></ResultRequired>} />
 
         {/* F5-10: 보호자 대시보드 — /family/* 앞에 두어 순서도 명시적으로 보장 */}
         <Route path="/family/dashboard" element={<FamilyDashboardScreen />} />
-        {/* 보호자 화면 C2·C3. 로그인·대상자 확인은 4주차(Supabase Auth) */}
+        {/* 보호자 화면 C2·C3. 서버가 쿠키 세션·요청 대상·RLS를 매번 확인 */}
         <Route path="/family/*"       element={<FamilyScreen />} />
 
         {/* F4-2: 안드로이드 공유 수신 */}

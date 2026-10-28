@@ -16,6 +16,14 @@ test('result receipts reject tampering and other accounts and omit free text',()
   const data=Buffer.from(receipt.split('.')[0],'base64url').toString()
   assert.ok(!data.includes('Never persist')&&!data.includes('RAW INPUT'))
 })
+test('parent context is re-signed by the server and cannot lower a verdict',async()=>{
+  const receipts=createReceipts(key),service=createConfirmService(null,receipts)
+  const first=await service.context('parent',{receipt:receipts.issue(result,'parent'),calledBefore:true,level:'확인필요'})
+  assert.equal(first.result.level,'위험')
+  assert.ok(first.result.fired_rules.includes('R2'))
+  const again=await service.context('parent',{receipt:first.result.receipt,calledBefore:false})
+  assert.equal(receipts.read(again.result.receipt,'parent').level,'위험')
+})
 
 describe('PostgreSQL family round trip',{skip:process.env.FS_DB_TEST!=='1'},()=>{
   const db=createDatabase({host:'127.0.0.1',port:55432,database:'familyshield',user:'fs_app'})

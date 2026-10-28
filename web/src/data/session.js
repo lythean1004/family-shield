@@ -4,6 +4,10 @@
 // 탭을 닫으면 사라진다. 원문은 처음부터 없다(스킬 서버가 화면용 필드만 보냄).
 const KEY_RESULT = 'fs.current.result'
 const KEY_REQUEST = 'fs.current.request'
+import { api } from './api.js'
+export async function updateResultContext(result,context) {
+  return (await api('/result/context',{receipt:result?.receipt,...context})).result
+}
 
 function ss() {
   return typeof sessionStorage === 'undefined' ? null : sessionStorage

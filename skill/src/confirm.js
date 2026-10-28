@@ -1,6 +1,7 @@
 import { fail, hashToken } from './auth.js'
-import { insertCheck, LEVEL_FROM_DB, rowResult } from './results.js'
+import { insertCheck, LEVEL_FROM_DB } from './results.js'
 import { decide } from '../../packages/core/src/rule-engine.js'
+import { ALLOWED_RELATIONS } from '../../packages/core/src/signals.js'
 
 export const PROCESSING_VERSION='confirm-processing-2026-10-28-v1'
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -22,6 +23,20 @@ function requestView(row,userId) {
   }
 }
 export function createConfirmService(db,receipts) {
+  async function context(userId,body) {
+    const result=receipts.read(body.receipt,userId)
+    const next={...result}
+    const calculated=decide({signals_final:result.signals_final,called_before:body.calledBefore===true,family_denied:body.familyDenied===true})
+    const rank={확인필요:0,주의:1,위험:2}
+    if(rank[calculated.level]>rank[result.level]){
+      next.level=calculated.level
+      next.fired_rules=[...new Set([...result.fired_rules,...calculated.fired_rules])].filter(r=>r!=='R8')
+    }
+    if(ALLOWED_RELATIONS.has(body.relation)&&['family','unknown'].includes(result.impersonation_type)){
+      next.impersonated_relation=body.relation;next.impersonation_type='family'
+    }
+    return {ok:true,result:{...next,receipt:receipts.issue(next,userId)}}
+  }
   async function create(userId,body) {
     const result=receipts.read(body.receipt,userId)
     if(!TYPES[body.requestType]) fail(400,'request_type')
@@ -101,5 +116,5 @@ export function createConfirmService(db,receipts) {
       return {ok:true,id:row.id}
     })
   }
-  return {create,get,list,respond,suspect,report}
+  return {create,get,list,respond,suspect,report,context}
 }

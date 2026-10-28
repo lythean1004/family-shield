@@ -4,7 +4,7 @@
  * ?t=토큰 이 있으면(챗봇 [자세히 보기], D34) 스킬 서버에서 한 번 조회하고 주소에서 지운다.
  *   - 만료·사용됨·없음 → TokenExpiredView(PRD 13-4)
  *   - 받은 결과는 이 탭 sessionStorage에만(P6·P8·새로고침용)
- * 토큰이 없으면 이 탭의 현재 결과, 그것도 없으면 개발용 가짜 결과.
+ * 토큰이 없으면 이 탭의 현재 결과. 없으면 입력·고정 예시로 안내한다.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -26,7 +26,8 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
   const [params, setParams] = useSearchParams()
   const token = params.get('t')
   const [state, setState] = useState(() =>
-    token ? { status: 'loading' } : { status: 'ok', result: loadCurrentResult() ?? fallbackResult },
+    token ? { status: 'loading' } : loadCurrentResult() || fallbackResult
+      ? { status: 'ok', result: loadCurrentResult() ?? fallbackResult } : {status:'empty'},
   )
   const fetched = useRef(false)
   const [error,setError] = useState('')
@@ -83,6 +84,7 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
       </section>}
       {state.status === 'loading' && <ResultSkeleton />}
       {state.status === 'gone' && <TokenExpiredView reason={state.reason} />}
+      {state.status === 'empty' && <section><h1 className="screen-title">확인한 문자가 없어요</h1><p className="screen-body">문자를 확인하거나 고정 예시를 먼저 살펴보세요.</p><div className="screen-actions"><ActionButton onClick={()=>navigate('/check/input')}>문자 확인하기</ActionButton><ActionButton variant="secondary" onClick={()=>navigate('/demo')}>예시 보기</ActionButton></div></section>}
       {state.status === 'ok' && (
         <ResultView
           result={state.result}

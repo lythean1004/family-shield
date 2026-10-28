@@ -7,29 +7,27 @@
  * 신호로 처리 했으므로 여기서는 화면용 필드만 보충한다.
  */
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { loadCurrentResult, saveCurrentResult } from '../data/session.js'
+import { loadCurrentResult, saveCurrentResult, updateResultContext } from '../data/session.js'
 
 const RELATIONS = ['아들', '딸', '남편', '아내', '엄마', '아빠', '형', '오빠', '누나', '언니', '동생']
 
 export default function WhoScreen({ fallbackResult }) {
   const navigate = useNavigate()
+  const [error,setError]=useState('')
 
-  const pick = (relation) => {
+  const pick = async (relation) => {
     const current = loadCurrentResult() ?? fallbackResult
-    const next = {
-      ...current,
-      impersonation_type: 'family',
-      impersonated_relation: relation,
-    }
-    saveCurrentResult(next)
-    navigate('/check/result')
+    try{saveCurrentResult(await updateResultContext(current,{relation}));navigate('/check/result')}
+    catch(e){setError(e.message)}
   }
 
   return (
     <main id="main" className="mode-parent">
       <h1 className="screen-title">누가 보낸 척했나요?</h1>
+      {error&&<p role="alert" className="screen-body">{error}</p>}
       <p className="screen-body">문자에서 가족인 척했지만 누구인지 못 찾았어요. 가장 비슷한 관계를 골라 주세요.</p>
 
       <ul className="action-choice-list" role="radiogroup" aria-label="가족 관계">
