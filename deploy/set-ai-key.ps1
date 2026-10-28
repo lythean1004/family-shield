@@ -12,7 +12,7 @@ finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
 
 if ([string]::IsNullOrWhiteSpace($key)) { Write-Host 'Key is empty. Nothing changed.'; exit 1 }
 
-"$key`n$Model`n" | ssh -o BatchMode=yes fs-ncp 'bash /srv/family-shield/repo/deploy/remote/05-set-ai-key.sh' 2>&1 |
+"$key`n$Model`n" | ssh -o BatchMode=yes fs-ncp "tr -d '\r' | bash /srv/family-shield/repo/deploy/remote/05-set-ai-key.sh" 2>&1 |
   ForEach-Object { "$_" }
 $code = $LASTEXITCODE
 $key = $null

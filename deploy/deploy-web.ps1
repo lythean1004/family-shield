@@ -29,7 +29,7 @@ test -f $B/web.new/index.html
 rm -rf $B/web.old; mv $B/web $B/web.old; mv $B/web.new $B/web
 echo "published: $(ls $B/web/assets | tr '\n' ' ')"
 '@
-$remote -replace "`r", '' | ssh -o BatchMode=yes fs-ncp 'bash -s'
+$remote | ssh -o BatchMode=yes fs-ncp "tr -d '\r' | bash -s"
 if ($LASTEXITCODE -ne 0) { Write-Host 'Publish failed. The previous version is still live.'; exit 1 }
 
 $code = (Invoke-WebRequest -Uri 'https://familyshield.kr/' -UseBasicParsing -TimeoutSec 15).StatusCode

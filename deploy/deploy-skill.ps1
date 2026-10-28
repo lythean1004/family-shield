@@ -7,7 +7,8 @@ $repo = Split-Path -Parent $PSScriptRoot
 $script = Join-Path $repo 'deploy/remote/01-fetch-and-test.sh'
 
 Write-Host '== pull + tests on the VM'
-(Get-Content -Raw $script) -replace "`r", '' | ssh -o BatchMode=yes fs-ncp 'bash -s'
+# tr on the VM side: PowerShell pipes add CRLF, bash chokes on \r
+Get-Content -Raw $script | ssh -o BatchMode=yes fs-ncp "tr -d '\r' | bash -s"
 if ($LASTEXITCODE -ne 0) { Write-Host 'Tests failed on the VM. The running server was NOT restarted.'; exit 1 }
 
 Write-Host '== restart'
