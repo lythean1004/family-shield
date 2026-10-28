@@ -38,7 +38,7 @@ export default function SettingsScreen() {
   }, [])
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <h1 className="screen-title">설정</h1>
 
       <section className="settings-section" aria-label="가족 확인 동의">

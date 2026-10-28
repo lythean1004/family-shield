@@ -29,7 +29,7 @@ export default function FamilyScreen() {
 
 function NoRequest() {
   return (
-    <main className="mode-guardian">
+    <main id="main" className="mode-guardian">
       <h1 className="screen-title">확인 요청을 찾을 수 없어요.</h1>
       <p className="screen-body">요청이 지워졌거나(24시간 보관) 주소가 잘못됐어요. 부모님께 직접 전화해 보세요.</p>
       <NoLinkFooter />
@@ -64,7 +64,7 @@ function RequestScreen() {
   const isLinkCheck = req.requestType === REQUEST_TYPES.LINK_CHECK
   const s = req.summary
   return (
-    <main className="mode-guardian">
+    <main id="main" className="mode-guardian">
       <p className="guardian-head">
         {parent.title}({parent.name})가 확인을 요청했어요 · <span className="tabular">{formatTime(req.sentAt)}</span>
       </p>
@@ -144,7 +144,7 @@ function DoneScreen() {
   if (!req) return <NoRequest />
   if (req.state !== 'responded') {
     return (
-      <main className="mode-guardian">
+      <main id="main" className="mode-guardian">
         <h1 className="screen-title">아직 답하지 않았어요.</h1>
         <NoLinkFooter />
       </main>
@@ -152,7 +152,7 @@ function DoneScreen() {
   }
 
   return (
-    <main className="mode-guardian">
+    <main id="main" className="mode-guardian">
       <h1 className="screen-title">답을 보냈어요.</h1>
       <p className="screen-body">{DONE_TEXT[req.answer](parent.title)}</p>
       <div className="screen-actions">

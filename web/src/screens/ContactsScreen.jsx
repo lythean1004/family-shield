@@ -10,7 +10,7 @@ import { OFFICIAL_CONTACTS, sourceText } from '../data/contacts.js'
 
 export default function ContactsScreen() {
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <OfflineBanner />
       <h1 className="screen-title">공식 번호</h1>
       <p className="screen-body">문자에 적힌 번호 말고, 여기 있는 번호로 직접 거세요.</p>

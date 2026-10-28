@@ -28,7 +28,7 @@ export default function WhoScreen({ fallbackResult }) {
   }
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <h1 className="screen-title">누가 보낸 척했나요?</h1>
       <p className="screen-body">문자에서 가족인 척했지만 누구인지 못 찾았어요. 가장 비슷한 관계를 골라 주세요.</p>
 

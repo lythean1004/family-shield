@@ -13,7 +13,7 @@ import { POLICE, sourceText } from '../data/contacts.js'
 export default function HangupScreen() {
   const navigate = useNavigate()
   return (
-    <main className="mode-parent screen--danger">
+    <main id="main" className="mode-parent screen--danger">
       <VerdictBanner level="danger" />
       <h1 className="screen-title">지금 바로 전화를 끊으세요.</h1>
       <p className="screen-body">상대가 뭐라고 해도 괜찮아요. 끊는 게 먼저예요.</p>

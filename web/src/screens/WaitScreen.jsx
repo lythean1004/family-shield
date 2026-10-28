@@ -47,7 +47,7 @@ export default function WaitScreen() {
 
   if (!req) {
     return (
-      <main className="mode-parent">
+      <main id="main" className="mode-parent">
         <h1 className="screen-title">물어본 내용이 없어요.</h1>
         <p className="screen-body">결과 화면에서 다시 가족에게 물어보세요.</p>
         <div className="screen-actions">
@@ -61,7 +61,7 @@ export default function WaitScreen() {
   const slow = now - req.sentAt >= SLOW_ANSWER_MS
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <p className="wait-warning" role="alert">
         답이 올 때까지 링크를 누르거나 돈을 보내지 마세요.
       </p>

@@ -5,9 +5,12 @@
 :root {
   --c-bg:          #ffffff;
   --c-surface:     #f5f6f8;
-  --c-border:      #d0d4da;
+  --c-bg-raised:   #eef1f5; /* 눌림·hover 배경 */
+  /* 테두리는 비텍스트 대비 3:1 이상 (WCAG 1.4.11). 이전 #d0d4da는 1.5:1 */
+  --c-border:      #7b8490;
+  --c-border-soft: #c4c9d0; /* 장식용 구분선만 */
   --c-text:        #111418;
-  --c-text-sub:    #4a525c;
+  --c-text-sub:    #3f4650;
   --c-action:      #1a56db;
   --c-action-text: #ffffff;
 
@@ -22,16 +25,31 @@
   --c-focus:       #1a56db;
 
   /* ── 간격 토큰 ─────────────────────────────────── */
+  /* 참조: elayadesign landing-page-design B2 간격 표. 이 값들만 쓴다 */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
   --sp-6: 24px;
   --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
 
   /* ── 모양 ──────────────────────────────────────── */
   --radius-btn:  12px;
   --radius-card: 16px;
+  /* 카드(16px) 안 12px 간격 요소: 16 - 12 = 4px (B3 중첩 반지름 공식) */
+  --radius-inner: 4px;
+
+  /* ── 움직임 (B7): 감속 곡선, 200ms 이상. 위치·크기 대신 transform·opacity만 ── */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 200ms;
+  --dur-base: 300ms;
+
+  /* ── 터치 영역 [임시] screen-spec U10 ── */
+  --touch-min: 48px;
+  --btn-min:   64px;
 
   /* ── 기본(보호자/공개) 글자 토큰 ── [임시] 일반 크기 */
   --fs-body:    1.0625rem; /* 17px */
@@ -68,6 +86,12 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 
+/* 외톨이 단어 방지 (B1): 제목은 균형, 본문은 자연스럽게 */
+h1, h2, h3, .screen-title, .verdict-banner__label, .wait-warning { text-wrap: balance; }
+p, li { text-wrap: pretty; }
+/* 한글은 단어 중간에서 끊지 않는다 */
+body { word-break: keep-all; overflow-wrap: anywhere; }
+
 /* ── 공통 레이아웃 ─────────────────────────────────── */
 main {
   max-width: 32rem;
@@ -79,6 +103,42 @@ main {
 :focus-visible {
   outline: 3px solid var(--c-focus);
   outline-offset: 2px;
+}
+
+/* 본문으로 바로가기 (B10). 초점을 받을 때만 보인다 */
+.skip-link {
+  position: absolute;
+  left: var(--sp-2);
+  top: -100px;
+  z-index: 10;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-text);
+  color: var(--c-bg);
+  font-weight: 700;
+  border-radius: var(--radius-btn);
+  text-decoration: none;
+}
+.skip-link:focus { top: var(--sp-2); }
+
+/* 고대비 모드: OS 설정(Windows 고대비, 대비 높이기)을 따른다 */
+@media (prefers-contrast: more) {
+  :root {
+    --c-border:   #111418;
+    --c-text-sub: #111418;
+    --c-surface:  #ffffff;
+  }
+}
+@media (forced-colors: active) {
+  .action-btn, .call-btn, .quiz-choice, .misjudge__choice, .demo-list__btn { border: 2px solid ButtonText; }
+}
+
+/* 움직임 줄이기: 이동 대신 즉시 변경 (B7) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 /* ── 번호 정렬 ─────────────────────────────────────── */

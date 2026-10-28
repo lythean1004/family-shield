@@ -23,11 +23,15 @@ import ShareScreen       from './screens/ShareScreen.jsx'
 import QuizScreen        from './screens/QuizScreen.jsx'
 import FamilyDashboardScreen from './screens/FamilyDashboardScreen.jsx'
 
-function Placeholder({ title }) {
+// 없는 주소(B10 404). 부모님이 길을 잃지 않도록 큰 글씨 + 처음으로 버튼 하나.
+function NotFound() {
   return (
-    <main>
-      <h1 className="screen-title">{title}</h1>
-      <p className="screen-body">준비 중입니다.</p>
+    <main id="main" className="mode-parent">
+      <h1 className="screen-title">찾는 화면이 없어요</h1>
+      <p className="screen-body">주소가 바뀌었거나 잘못 들어왔어요. 아래 버튼을 누르면 처음 화면으로 갑니다.</p>
+      <div className="screen-actions">
+        <a className="action-btn action-btn--primary" href="/">처음으로</a>
+      </div>
       <NoLinkFooter />
     </main>
   )
@@ -36,6 +40,8 @@ function Placeholder({ title }) {
 export default function App() {
   return (
     <BrowserRouter>
+      {/* B10: 키보드·화면 읽기 사용자가 본문으로 바로 가는 링크. 초점을 받을 때만 보인다 */}
+      <a className="skip-link" href="#main">본문으로 바로가기</a>
       <Routes>
         <Route path="/"               element={<HomeScreen />} />
         <Route path="/contacts"       element={<ContactsScreen />} />
@@ -64,7 +70,7 @@ export default function App() {
         {/* F7: 연습 모드 퀴즈 */}
         <Route path="/quiz"           element={<QuizScreen />} />
 
-        <Route path="*"               element={<Placeholder title="페이지를 찾을 수 없어요" />} />
+        <Route path="*"               element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   )

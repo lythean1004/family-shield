@@ -18,7 +18,7 @@ export default function DemoScreen() {
   const sc = DEMO_SCENARIOS.find((s) => s.id === selectedId)
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <p className="demo-badge" role="note">예시</p>
 
       {!sc && (

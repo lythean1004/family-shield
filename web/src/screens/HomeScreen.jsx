@@ -9,7 +9,7 @@ import NoLinkFooter from '../components/NoLinkFooter.jsx'
 export default function HomeScreen() {
   const navigate = useNavigate()
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <h1 className="screen-title">가족방패</h1>
       <p className="screen-body">
         의심 문자를 받으면 카카오톡 '가족방패' 채널에 붙여 넣으세요.

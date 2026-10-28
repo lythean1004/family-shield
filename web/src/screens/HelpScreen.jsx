@@ -43,7 +43,7 @@ export default function HelpScreen() {
   }
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       {!picked && (
         <>
           <h1 className="screen-title">무엇을 했나요?</h1>

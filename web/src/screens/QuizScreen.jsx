@@ -50,7 +50,7 @@ export default function QuizScreen() {
 
   if (done) {
     return (
-      <main className="mode-parent">
+      <main id="main" className="mode-parent">
         {/* F7-1: 연습 표시 상시 노출 */}
         <PracticeBadge />
         <h1 className="screen-title">연습 완료</h1>
@@ -78,7 +78,7 @@ export default function QuizScreen() {
   }
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <PracticeBadge />
       <p className="quiz-progress" aria-label={`${total}문제 중 ${idx + 1}번째`}>
         {idx + 1} / {total}

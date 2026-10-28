@@ -61,7 +61,7 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
   }
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <h1 className="visually-hidden">판별 결과</h1>
       {state.status === 'loading' && <ResultSkeleton />}
       {state.status === 'gone' && <TokenExpiredView reason={state.reason} />}

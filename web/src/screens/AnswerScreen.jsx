@@ -34,7 +34,7 @@ export default function AnswerScreen({ fallbackResult }) {
 
   if (!req || req.state !== 'responded') {
     return (
-      <main className="mode-parent">
+      <main id="main" className="mode-parent">
         <h1 className="screen-title">아직 가족 답이 없어요.</h1>
         <div className="screen-actions">
           <ActionButton variant="primary" onClick={() => navigate('/check/wait')}>기다리는 화면으로</ActionButton>
@@ -53,7 +53,7 @@ export default function AnswerScreen({ fallbackResult }) {
   }
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <VerdictBanner level={key} />
 
       {/* F5-3: 링크·일반 문자 확인 답변 */}

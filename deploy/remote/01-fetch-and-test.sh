@@ -15,8 +15,19 @@ fi
 echo "commit: $(git -C "$DEST" log --oneline -1)"
 echo "node: $(node -v)"
 
-echo "== core tests"
-(cd "$DEST/packages/core" && node --test test/*.test.js 2>&1 | grep -E '^# (tests|pass|fail)|^. (tests|pass|fail) ' || true)
-
-echo "== skill tests"
-(cd "$DEST/skill" && node --test test/*.test.js 2>&1 | grep -E '^# (tests|pass|fail)|^. (tests|pass|fail) ' || true)
+LOG="$(mktemp)"
+trap 'rm -f "$LOG"' EXIT
+run_tests() {
+  local name="$1" dir="$2"
+  echo "== $name tests"
+  if (cd "$dir" && node --test test/*.test.js >"$LOG" 2>&1); then
+    grep -E '^. (tests|pass|fail) ' "$LOG" || true
+  else
+    grep -E '^. (tests|pass|fail) ' "$LOG" || true
+    echo "FAIL: $name tests failed, last lines:"
+    tail -n 30 "$LOG"
+    exit 1
+  fi
+}
+run_tests core "$DEST/packages/core"
+run_tests skill "$DEST/skill"

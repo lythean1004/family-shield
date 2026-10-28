@@ -39,16 +39,25 @@
   font-size: var(--fs-body);
   font-weight: 700;
   text-align: center;
+  font-family: inherit;
+  line-height: 1.3;
   cursor: pointer;
-  transition: opacity 0.12s ease;
+  transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-base) var(--ease-out);
 }
 .action-btn + .action-btn { margin-top: var(--sp-3); }
 .action-btn--primary  { background: var(--c-action); color: var(--c-action-text); border-color: var(--c-action); }
-.action-btn--secondary { background: transparent; color: var(--c-action); border-color: var(--c-action); }
+.action-btn--secondary { background: var(--c-bg); color: var(--c-action); border-color: var(--c-action); }
 .action-btn--danger   { background: var(--c-danger); color: #fff; border-color: var(--c-danger); }
-.action-btn:hover:not(:disabled) { opacity: 0.88; }
-.action-btn:active:not(:disabled) { opacity: 0.75; }
-.action-btn:disabled  { opacity: 0.45; cursor: not-allowed; }
+.action-btn:hover:not(:disabled) { opacity: 0.9; }
+/* 누를 때 살짝 들어가는 느낌 (B9 active) */
+.action-btn:active:not(:disabled) { transform: scale(0.98); }
+/* 흐리게 하면 어르신이 못 읽는다: 대비는 유지하고 줄무늬 테두리로 구분 */
+.action-btn:disabled {
+  background: var(--c-surface);
+  color: var(--c-text-sub);
+  border: 2px dashed var(--c-border);
+  cursor: not-allowed;
+}
 
 /* ── CallButton ──────────────────────────────────── */
 .call-btn {
@@ -68,7 +77,9 @@
 .call-btn__name   { font-size: var(--fs-small); color: var(--c-text-sub); }
 .call-btn__number { font-size: var(--fs-title); font-weight: 700; color: var(--c-action); }
 .call-btn__source { font-size: var(--fs-small); color: var(--c-text-sub); }
+.call-btn { transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-base) var(--ease-out); }
 .call-btn:hover { background: var(--c-check-bg); }
+.call-btn:active { transform: scale(0.98); }
 
 /* ── SignalList ──────────────────────────────────── */
 .signal-list {
@@ -164,10 +175,14 @@
   border: 1px solid var(--c-border);
   border-radius: var(--radius-card);
   font-size: var(--fs-body);
+  font-family: inherit;
+  color: var(--c-text);
   text-align: left;
   cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-base) var(--ease-out);
 }
 .demo-list__btn:hover { background: var(--c-check-bg); border-color: var(--c-check); }
+.demo-list__btn:active { transform: scale(0.98); }
 .demo-list__badge {
   display: block;
   font-size: var(--fs-small);
@@ -240,30 +255,7 @@
 .demo-message__context { font-size: var(--fs-small); color: var(--c-text-sub); margin: 0 0 var(--sp-2); }
 .demo-message__text    { font-size: var(--fs-body); margin: 0; }
 
-/* ── 화면 읽기 프로그램에만 보이는 글 ──────────────── */
-.visually-hidden {
-  position: absolute;
-  width: 1px; height: 1px;
-  margin: -1px; padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-
-/* ── 글자 링크 (오판 신고, 닫기) ─────────────────── */
-.text-link {
-  display: inline-block;
-  min-height: 48px; /* U10 터치 영역 */
-  padding: var(--sp-3) 0;
-  background: none;
-  border: 0;
-  font-size: var(--fs-small);
-  color: var(--c-action);
-  text-decoration: underline;
-  cursor: pointer;
-}
+/* .visually-hidden, .text-link 정의는 아래 '접근성 유틸'에 하나로 모았다 */
 
 /* ── 오판 신고 (F4-13) ───────────────────────────── */
 .misjudge {
@@ -282,9 +274,13 @@
   border: 1px solid var(--c-border);
   border-radius: var(--radius-btn);
   font-size: var(--fs-small);
+  font-family: inherit;
+  color: var(--c-text);
   text-align: left;
   cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out);
 }
+.misjudge__choice:active { transform: scale(0.98); }
 .misjudge__done { font-size: var(--fs-small); color: var(--c-text-sub); margin: var(--sp-4) 0; }
 
 /* ── P4 로딩 뼈대 (U9) ───────────────────────────── */
@@ -315,7 +311,7 @@
   width: 0.35em; height: 0.35em;
   border-radius: 50%;
   background: currentColor;
-  animation: wait-dot 1.2s infinite ease-in-out;
+  animation: wait-dot 1.2s infinite var(--ease-out);
 }
 .wait-dots i:nth-child(2) { animation-delay: 0.2s; }
 .wait-dots i:nth-child(3) { animation-delay: 0.4s; }
@@ -347,8 +343,9 @@
   background: transparent;
   color: var(--c-text-sub);
   font-size: var(--fs-small);
+  font-family: inherit;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background-color var(--dur-base) var(--ease-out);
 }
 .speak-btn:hover { background: var(--c-bg-raised); }
 .speak-btn:focus-visible { outline: 3px solid var(--c-action); outline-offset: 2px; }
@@ -372,10 +369,13 @@
   resize: vertical;
   background: var(--c-bg);
   color: var(--c-text);
-  transition: border-color 0.12s ease;
+  transition: border-color var(--dur-fast) var(--ease-out);
 }
-.input-textarea:focus { outline: none; border-color: var(--c-action); }
-.input-textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+/* 테두리 색만 바꾸면 놓치기 쉬워서 초점 고리를 그대로 둔다 */
+.input-textarea:focus { border-color: var(--c-action); }
+.input-textarea:focus-visible { outline: 3px solid var(--c-focus); outline-offset: 2px; }
+/* 분석 중에는 잠그되 글자는 그대로 읽히게 한다 */
+.input-textarea:disabled { background: var(--c-surface); border-style: dashed; color: var(--c-text); cursor: not-allowed; }
 .input-count {
   font-size: var(--fs-small);
   color: var(--c-text-sub);
@@ -393,17 +393,22 @@
   white-space: nowrap;
   border: 0;
 }
-/* 텍스트 링크(작은 글자, 밑줄) */
+/* 글자 링크 (오판 신고, 닫기, 설정). 작은 글자라도 터치 영역은 48px (U10) */
 .text-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: var(--sp-2) 0;
   background: none;
-  border: none;
-  padding: 0;
-  color: var(--c-action);
+  border: 0;
+  font-family: inherit;
   font-size: var(--fs-small);
+  color: var(--c-action);
   text-decoration: underline;
+  text-underline-offset: 0.2em;
   cursor: pointer;
 }
-.text-link:hover { opacity: 0.8; }
+.text-link:hover { text-decoration-thickness: 2px; }
 .home-settings { text-align: right; margin-top: var(--sp-4); }
 
 /* ── 설정 /settings (F5-9) ───────────────────────── */
@@ -432,7 +437,7 @@
   width: 36px; height: 36px;
   border-radius: 50%;
   background: var(--c-text-sub);
-  transition: transform 0.15s ease;
+  transition: transform var(--dur-fast) var(--ease-out);
 }
 .settings-toggle--on { background: var(--c-action); border-color: var(--c-action); }
 .settings-toggle--on .settings-toggle__thumb { transform: translateX(40px); background: var(--c-action-text); }
@@ -455,7 +460,9 @@
 .normal-note-card {
   margin: 0;
   padding: var(--sp-3);
-  border-left: 4px solid var(--c-border);
+  /* B4: 한쪽 테두리 대신 사방 테두리 */
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-btn);
   background: var(--c-surface);
   font-size: var(--fs-small);
   line-height: 1.6;
@@ -499,7 +506,8 @@
 .quiz-message {
   margin: 0 0 var(--sp-4);
   padding: var(--sp-4);
-  border-left: 4px solid var(--c-border);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card);
   background: var(--c-surface);
   font-size: var(--fs-body);
   line-height: 1.6;
@@ -517,9 +525,13 @@
   font-family: inherit;
   text-align: left;
   cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out);
 }
+.quiz-choice + .quiz-choice { margin-top: var(--sp-3); }
+.quiz-choice:active { transform: scale(0.98); }
 .quiz-choice:focus-visible { outline: 3px solid var(--c-focus); outline-offset: 2px; }
-.quiz-choice--selected { border-color: var(--c-action); font-weight: 700; }
+/* 선택 표시를 색 하나에 맡기지 않는다: 굵은 테두리 + 굵은 글자 + 배경 */
+.quiz-choice--selected { border: 3px solid var(--c-action); background: var(--c-check-bg); font-weight: 700; }
 .quiz-result-label { font-size: var(--fs-body); font-weight: 700; margin: var(--sp-3) 0; }
 .quiz-result-label--correct { color: var(--c-action); }
 .quiz-result-label--wrong { color: var(--c-danger); }

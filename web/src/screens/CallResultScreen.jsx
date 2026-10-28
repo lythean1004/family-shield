@@ -32,7 +32,7 @@ export default function CallResultScreen({ fallbackResult }) {
   const key = levelKey(current.level)
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <h1 className="screen-title">원래 번호로 전화했어요.</h1>
       <p className="screen-body">가족이 뭐라고 했나요?</p>
 

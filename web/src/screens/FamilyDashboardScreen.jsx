@@ -39,7 +39,7 @@ export default function FamilyDashboardScreen() {
   }, [])
 
   return (
-    <main className="mode-guardian">
+    <main id="main" className="mode-guardian">
       <h1 className="screen-title">가족 확인 요청 내역</h1>
       <p className="screen-body">
         {parent.title}({parent.name})의 최근 24시간 요청이에요.

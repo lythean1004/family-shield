@@ -22,7 +22,7 @@ export default function CallScreen({ fallbackResult }) {
   }
 
   return (
-    <main className="mode-parent">
+    <main id="main" className="mode-parent">
       <h1 className="screen-title">이 문자 받기 전에 전화가 왔나요?</h1>
       <div className="screen-actions">
         <ActionButton variant="danger" onClick={() => navigate('/check/hangup')}>
