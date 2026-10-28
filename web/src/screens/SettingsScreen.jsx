@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
 import { loadFamilyConsent, saveFamilyConsent } from '../data/consent.js'
+import PushSettings from '../components/PushSettings.jsx'
 
 export default function SettingsScreen() {
   const navigate = useNavigate()
@@ -42,6 +43,7 @@ export default function SettingsScreen() {
   return (
     <main id="main" className="mode-parent">
       <h1 className="screen-title">설정</h1>
+      <PushSettings />
       {error && <p role="alert" className="screen-body">{error}</p>}
       <div className="screen-actions">
         <ActionButton onClick={() => navigate('/setup')}>가족 연결과 동의 설정</ActionButton>

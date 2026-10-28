@@ -26,6 +26,7 @@ import { createAuthApi } from './auth-api.js';
 import { createDbResultStore, createReceipts } from './results.js';
 import { createConfirmService } from './confirm.js';
 import { createFamilyApi } from './family-api.js';
+import { createPushService, createPushApi } from './push.js';
 
 const HEADER_TOKEN_KEY = "x-skill-token";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -217,7 +218,9 @@ export function makeHandler(config) {
   const auth = db ? createAuth(db, config) : null;
   const authApi = auth ? createAuthApi(auth, config) : null;
   const receipts = db ? createReceipts(config.hmacKey) : null;
-  const familyApi = db ? createFamilyApi(auth,createConfirmService(db,receipts),config) : null;
+  const push = db ? createPushService(db,config.push) : null;
+  const pushApi = push ? createPushApi(auth,push,config) : null;
+  const familyApi = db ? createFamilyApi(auth,createConfirmService(db,receipts),config,{notify:push.notify}) : null;
   const resultStore = config.resultStore || (db && config.webBaseUrl ? createDbResultStore(db) : null);
   // 평판 조회기: 캐시를 프로세스 동안 공유한다. 키가 없으면 null(조회 안 함).
   const urlReputation = createSafeBrowsingChecker({
@@ -246,6 +249,7 @@ export function makeHandler(config) {
     }
 
     if (authApi && await authApi(req, send, readBody)) return;
+    if (pushApi && await pushApi(req, send, readBody)) return;
     if (familyApi && await familyApi(req, send, readBody)) return;
 
     if (req.method === "GET" && req.url?.startsWith("/api/result")) {

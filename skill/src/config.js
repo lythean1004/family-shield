@@ -61,6 +61,10 @@ export function loadConfig(env = process.env) {
         user: get('DATABASE_USER') || 'fs_app',
         password: get('DATABASE_PASSWORD') || undefined,
       } : null,
+      push: {
+        publicKey:get('VAPID_PUBLIC_KEY'),privateKey:get('VAPID_PRIVATE_KEY'),
+        subject:get('VAPID_SUBJECT'),
+      },
       // Supabase 클라우드 연결 (선택, 없으면 1회용 토큰·checks 저장 불가)
       supabase: {
         url: get("SUPABASE_URL") || null,

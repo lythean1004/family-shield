@@ -9,6 +9,9 @@ const MESSAGES = {
   result_expired:'결과를 보관할 수 있는 시간이 지났어요. 문자를 다시 확인해 주세요.',
   family_missing:'연결된 가족이 없어요. 설정에서 가족을 연결해 주세요.',
   already_answered:'이미 답했거나 요청이 끝났어요. 요청 내역을 다시 확인해 주세요.',
+  push_failed:'알림을 보내지 못했어요. 알림 권한을 확인한 뒤 다시 켜 주세요.',
+  push_unconfigured:'서버 알림 설정을 준비하고 있어요.',
+  subscription:'이 기기의 알림 정보를 확인하지 못했어요. 알림을 다시 켜 주세요.',
 }
 export async function api(path, body, { fetchImpl = fetch } = {}) {
   let res
