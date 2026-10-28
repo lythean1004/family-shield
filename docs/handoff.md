@@ -2,7 +2,7 @@
 
 다음 작업자(Codex 등)가 이 문서 하나로 이어받을 수 있게 정리했다. 먼저 `CLAUDE.md`(작업 규칙), `docs/prd.md`(v0.8), `docs/decisions.md`(D1~D39), `docs/vm-migration-plan.md`를 읽는다.
 
-**이어서 할 일:** 사용자가 서버 반영·성능 평가를 승인했고, **5180658을 VM에 배포 완료**했다. HTTPS 합성 가족 왕복·VM 권한 시험·아이폰 푸시 클릭 확인까지 통과했다. AI 3초/3.5초 비교는 완료. 이후 사용자 요청으로 기관·전화 유도 표현을 더 보완한 **6a71c5a는 별도 폴더 검증 완료, 추가 서버 반영 확인 대기**다. 후보의 AI 3초·200건 1회 놓침률은 21.5%(목표 5% 미달), 오경보 1.7%. 세부 수치는 `docs/eval-2026-10-28.md`를 따른다. 로컬 작업 폴더는 `D:\Claude Code\gongmojeon\family-shield`, GitHub `lythean1004/family-shield`의 main이다.
+**현재 상태:** 사용자 승인으로 VM 통합을 배포했고, 추가 보완 **코드 6a71c5a를 포함한 86ffd15까지 VM에 반영 완료**했다. HTTPS 합성 가족 왕복·VM 권한 시험·아이폰 푸시 클릭 확인까지 통과했다. AI 3초/3.5초 비교와 기관·전화 유도 표현 추가 검증 완료. 최신 코드의 AI 3초·200건 1회 놓침률은 **21.5%(목표 5% 미달)**, 오경보 1.7%다. 세부 수치는 `docs/eval-2026-10-28.md`를 따른다. 다음 과제는 정확도 추가 개선·독립 평가, 기존 Supabase 프로젝트의 사용자 직접 삭제, 이후로 미룬 휴대폰 인증·SC1 리허설이다. 로컬 작업 폴더는 `D:\Claude Code\gongmojeon\family-shield`, GitHub `lythean1004/family-shield`의 main이다.
 
 ## 1. 작업 규칙 (꼭 지킬 것)
 
@@ -28,7 +28,7 @@
 | 웹 푸시 | VAPID 설정·배포 완료. **사용자 아이폰에서 알림 수신·클릭 확인**, 서버 확인 시간 2026-10-28 22:08:57 KST |
 | Supabase | 실행 참조·의존성·로컬 설정·CSP 제거 및 VM 배포 완료. 대시보드 프로젝트 삭제는 사용자가 직접, 아직 삭제 안 함 |
 
-`skill.env` 키 이름(값은 서버에만): `SKILL_HEADER_TOKEN, AI_API_KEY, AI_MODEL, AI_BASE_URL, AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, PROMPT_VERSION, SKILL_HOST, SKILL_PORT, MAX_CONCURRENT, PHONE_HMAC_SECRET, WEB_BASE_URL, SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS, DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD`
+`skill.env` 키 이름(값은 서버에만): `SKILL_HEADER_TOKEN, AI_API_KEY, AI_MODEL, AI_BASE_URL, AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, PROMPT_VERSION, SKILL_HOST, SKILL_PORT, MAX_CONCURRENT, PHONE_HMAC_SECRET, WEB_BASE_URL, SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS, DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT`. 선택 키 `AI_WEB_MODEL`의 코드 기본값은 `claude-sonnet-5-5`.
 
 ## 3. 테스트용 API 키 (남겨 둠)
 
@@ -53,7 +53,7 @@
 4. **웹 푸시 — 배포·아이폰 실기기 확인 완료**: VAPID 설정 도구, 본문 없는 알림, 구독 소유권 검사, 시험 알림 클릭 확인. 22:08:51 전송·22:08:57 클릭 ACK 모두 HTTP 200, DB `test_confirmed_at` 기록과 사용자 화면 확인. 전송 업체 접수만으로 “시험 완료”라 하지 않는다.
    - D39: 이번 시연은 부모님이 직접 확인 요청을 보낼 때만 알림. 자동 위험 알림 제외. 동의 ① 문구 v2에 반영.
 5. **Supabase 코드 제거 — 완료**: 두 클라이언트·웹 의존성·로컬 환경 변수·CSP 참조 삭제. `git grep -i supabase -- web/src skill/src deploy/nginx` 0건. 기존 SQL 이력과 시험 경로는 체크섬 보존을 위해 유지. 프로젝트 삭제는 VM 반영·확인 뒤 사용자가 직접 한다.
-6. **문서 갱신**: PRD v0.8, D37~D39, 운영 명령·VM 이전 계획·배포 검토서에 실제 검증 결과 반영. AI 비교 평가 수치는 완료 후 추가.
+6. **문서 갱신 완료**: PRD v0.8, D37~D39, 운영 명령·VM 이전 계획·배포 검토서·AI 평가에 실제 결과와 미달 항목 반영. 최종 VM core 201·skill 56(합계 257) 시험 통과, 배포 후 API 왕복·AI 키 보존·알림 확인 기록 유지 검증.
 7. 휴대폰 인증(SENS/솔라피)과 SC1 시연 리허설: **나중에**(사용자 결정)
 
 병행 과제:
