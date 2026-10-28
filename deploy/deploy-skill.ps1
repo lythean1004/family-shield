@@ -14,4 +14,4 @@ if ($LASTEXITCODE -ne 0) { Write-Host 'Tests failed on the VM. The running serve
 Write-Host '== restart'
 ssh -o BatchMode=yes fs-ncp 'sudo systemctl restart family-shield-skill; sleep 2; echo "service: $(systemctl is-active family-shield-skill)"; echo "health:  $(curl -fsS http://127.0.0.1:3000/health)"'
 if ($LASTEXITCODE -ne 0) { exit 1 }
-Write-Host 'Note: restart clears unused [자세히 보기] links (stored in memory until result_tokens moves to Supabase).'
+Write-Host 'Sessions and unused result links persist in the VM database. AI call limits still reset on restart.'
