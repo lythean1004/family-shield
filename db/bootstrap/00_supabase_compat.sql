@@ -1,31 +1,19 @@
 -- VM 호환 계층 (D36): Supabase가 기본 제공하던 것 중 마이그레이션·RLS가 쓰는 부분만 만든다.
--- 이 파일을 먼저 적용한 뒤 supabase/migrations/*.sql 을 이름 순으로 그대로 적용한다.
+-- db/migrate.mjs 가 이 파일을 먼저 적용한 뒤 supabase/migrations/*.sql 을 이름 순으로 그대로 적용한다.
 --
---   auth.users          : 로그인 계정(이메일·비밀번호 없음. 초대 코드 방식, D36)
+--   역할 anon / authenticated / service_role : 10-install-postgres.sh 가 superuser로 만들었다(NOLOGIN).
+--     앱 접속 계정 fs_app 은 NOINHERIT 멤버라 평소엔 권한이 없고, 요청마다 SET LOCAL ROLE 로 전환한다.
+--   pgcrypto           : 설치 스크립트가 superuser로 만들었다.
+--   auth.users          : 로그인 계정(초대 코드 방식, 이메일·비밀번호 없음)
 --   auth.uid()          : 서버가 트랜잭션마다 넣는 request.jwt.claims.sub 를 읽는다(Supabase와 같은 방식)
---   역할 anon / authenticated / service_role : NOLOGIN. 앱 접속 계정(fs_app)이 SET ROLE 로 전환
---   extensions 스키마    : pgTAP 설치 위치(테스트 파일이 'with schema extensions'를 쓴다)
-
-create extension if not exists pgcrypto;          -- gen_random_uuid는 PG16 내장, digest 등은 pgcrypto
 
 create schema if not exists extensions;
 create schema if not exists auth;
 
--- ── 역할 ─────────────────────────────────────────────────────────
-do $$
-begin
-  if not exists (select 1 from pg_roles where rolname = 'anon')          then create role anon nologin; end if;
-  if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
-  -- service_role은 RLS를 우회한다(Supabase와 같음). 스킬 서버의 판별 기록·토큰·삭제 작업만 이 역할을 쓴다.
-  if not exists (select 1 from pg_roles where rolname = 'service_role')  then create role service_role nologin bypassrls; end if;
-end $$;
+grant usage on schema public, auth, extensions to anon, authenticated, service_role;
 
-grant usage on schema public to anon, authenticated, service_role;
-grant usage on schema auth   to anon, authenticated, service_role;
-grant usage on schema extensions to anon, authenticated, service_role;
-
--- Supabase처럼 앞으로 만들 public 객체에 기본 권한을 준다.
--- anon 권한은 마이그레이션 20261026000008 이 다시 회수한다.
+-- Supabase처럼 앞으로 fs_app이 만들 public 객체에 기본 권한을 준다.
+-- anon 권한은 마이그레이션 20261026000008 이 다시 회수한다. RLS가 행을 거른다.
 alter default privileges in schema public grant select, insert, update, delete on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant usage, select on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
@@ -48,8 +36,8 @@ grant select, insert, update, delete on auth.users to service_role;
 
 -- ── auth.uid() ───────────────────────────────────────────────────
 -- 서버(Node)가 요청마다 트랜잭션 안에서
---   set local role authenticated;
 --   select set_config('request.jwt.claims', '{"sub":"<user id>","role":"authenticated"}', true);
+--   set local role authenticated;
 -- 를 실행한다. 값이 없거나 형식이 틀리면 null → RLS가 모두 거부한다.
 create or replace function auth.uid()
 returns uuid
@@ -65,3 +53,4 @@ as $$
   )::uuid;
 $$;
 grant execute on function auth.uid() to anon, authenticated, service_role;
+

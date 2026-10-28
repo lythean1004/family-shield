@@ -15,6 +15,10 @@ fi
 echo "commit: $(git -C "$DEST" log --oneline -1)"
 echo "node: $(node -v)"
 
+# skill server runtime dependencies (pg, web-push), exact versions from package-lock.json
+echo "== npm ci (skill)"
+(cd "$DEST/skill" && npm ci --omit=dev --no-fund --no-audit --loglevel=error)
+
 LOG="$(mktemp)"
 trap 'rm -f "$LOG"' EXIT
 run_tests() {
