@@ -11,7 +11,7 @@ REPEAT="${2:-1}"
 TIMEOUT_MS="${3:-3000}"
 REPO=/srv/family-shield/repo
 OUT_DIR=/srv/family-shield/eval-out
-NAME="$(date +%Y-%m-%d)-test-${MODEL}-r${REPEAT}"
+NAME="$(date +%Y-%m-%d-%H%M%S)-test-${MODEL}-t${TIMEOUT_MS}-r${REPEAT}"
 mkdir -p "$OUT_DIR"
 chmod 700 "$OUT_DIR"
 

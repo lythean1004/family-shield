@@ -3,8 +3,16 @@ import assert from 'node:assert/strict'
 import {createECDH,randomBytes,randomUUID} from 'node:crypto'
 import {createDatabase} from '../src/database.js'
 import {createPushService,validateSubscription} from '../src/push.js'
+import {mergeVapidConfig} from '../src/vapid-config.js'
 const key=createECDH('prime256v1');key.generateKeys()
 const subscription={endpoint:'https://fcm.googleapis.com/fcm/send/local-test',keys:{p256dh:key.getPublicKey().toString('base64url'),auth:randomBytes(16).toString('base64url')}}
+test('VAPID setup preserves AI/DB settings and never rotates an existing pair',()=>{
+  const original='AI_API_KEY=local-fixture-unchanged\nDATABASE_PASSWORD=local-fixture-db\n'
+  const updated=mergeVapidConfig(original,()=>({publicKey:'pub',privateKey:'priv'}))
+  assert.ok(updated.startsWith(original))
+  assert.equal(mergeVapidConfig(updated,()=>{throw new Error('must not regenerate')}),updated)
+  assert.throws(()=>mergeVapidConfig(original+'VAPID_PUBLIC_KEY=pub\n'))
+})
 test('push subscriptions reject arbitrary hosts, credentials and malformed keys',()=>{
   assert.equal(validateSubscription(subscription).endpoint,subscription.endpoint)
   for(const endpoint of ['http://fcm.googleapis.com/x','https://127.0.0.1/x','https://fcm.googleapis.com.evil.invalid/x','https://user@fcm.googleapis.com/x','https://fcm.googleapis.com:8443/x'])
