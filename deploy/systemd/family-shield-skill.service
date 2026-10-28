@@ -1,0 +1,34 @@
+[Unit]
+Description=Family Shield Kakao skill server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fsops
+Group=fsops
+# handler.js imports ../../packages/core, so run from the repo checkout
+WorkingDirectory=/srv/family-shield/repo/skill
+# root:root 600. Secrets live only here, never in the repo.
+EnvironmentFile=/etc/family-shield/skill.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node src/server.mjs
+Restart=on-failure
+RestartSec=5
+
+# Hardening: the server only reads code and talks to the network
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=family-shield-skill
+
+[Install]
+WantedBy=multi-user.target
