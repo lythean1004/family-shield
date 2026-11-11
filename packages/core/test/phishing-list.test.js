@@ -127,6 +127,27 @@ describe("목록 만들기 (URL 문자열 → 키 집합)", () => {
     assert.ok(keys.has(hostKey("hzi.ujian.life")));
   });
 
+  it("인기 사이트 허용 목록(등록 도메인)에 있는 호스트는 넣지 않는다(정상 사이트 위에 올린 피싱 대비)", () => {
+    const allow = new Set(["korea.kr", "line.me", "obituary.co.kr"]);
+    const { keys, stats } = buildKeys(
+      ["https://www.korea.kr/x", "line.me/R/abc", "a.obituary.co.kr/b", "b.obituary.co.kr/c", "evil.top/a"],
+      { allow });
+    assert.deepEqual([...keys], [hostKey("evil.top")]);
+    assert.equal(stats.allowed, 4);
+  });
+
+  it("국가 도메인 아래(gen.in 등)는 상위 도메인으로 묶지 않는다(공용 접미사일 수 있음)", () => {
+    const { keys } = buildKeys(["wp-host.gen.in", "web-host.gen.in", "a.evil.kr", "b.evil.kr"]);
+    assert.ok(!keys.has(hostKey("gen.in")));
+    assert.ok(keys.has(hostKey("evil.kr")), ".kr 은 2단계 국가 도메인 목록으로 처리하므로 묶는다");
+  });
+
+  it("해외 정부 도메인도 공공기관으로 보고 넣지 않는다", () => {
+    for (const h of ["epostoffice.gov.in", "x.go.th", "service.gob.mx", "a.gouv.fr", "irs.gov"]) {
+      assert.equal(isSharedHost(h), true, h);
+    }
+  });
+
   it("키 파일(한 줄에 하나, # 주석 무시)을 읽는다", () => {
     const k = hostKey("evil-delivery.xyz");
     const keys = parseKeyFile(`# kisa v1\n${k}\n\nNOT-A-KEY\n${k}\n`);

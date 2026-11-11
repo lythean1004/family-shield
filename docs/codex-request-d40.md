@@ -38,7 +38,7 @@
 
 | ID | 기관 | 지금 공식 도메인 | 자동 확인 결과(Claude Code, 2026-11-11) |
 |---|---|---|---|
-| EV-DOM-EPOST | 우체국(우정사업본부) | epost.go.kr, koreapost.go.kr | epost 제목 ‘인터넷우체국’ / koreapost 200 응답, 제목 없음 |
+| EV-DOM-EPOST | 우체국(우정사업본부) | epost.go.kr, koreapost.go.kr | epost 제목 ‘인터넷우체국’ / koreapost 200 응답, 제목 없음. 우체국예금·보험(epostbank.go.kr 등) go.kr 도메인은 코드에서 항상 제외되므로 더하지 않아도 됨 |
 | EV-DOM-CJ | CJ대한통운 | cjlogistics.com | 응답 없음 |
 | EV-DOM-LOGEN | 로젠택배 | ilogen.com | 200 응답, 제목 없음 |
 | EV-DOM-LOTTE | 롯데택배 | lotteglogis.com | 제목 ‘롯데글로벌로지스’ |
@@ -48,6 +48,12 @@
 | EV-DOM-NTS | 국세청·홈택스 | nts.go.kr, hometax.go.kr | 둘 다 제목 확인 |
 | EV-DOM-GOV | 정부 기관 | gov.kr, go.kr | gov.kr 제목 ‘정부24’ |
 | EV-DOM-TELEGRAM | 텔레그램 | telegram.org, telegram.me, t.me | telegram.org 제목 확인 / 나머지 미확인 |
+
+### 추가 확인 대상 (2026-11-11 정상 도메인 시험에서 사칭으로 걸린 도메인)
+Tranco 인기 사이트 시험에서 아래 도메인이 사칭으로 걸렸다. **접속하지 말고**, 해당 기관 공식 누리집 안의 안내(계열사·해외 법인 목록 등)에서 공식 도메인인지 확인한다. 공식이면 그 카드의 `official_domains`에 근거와 함께 더하고, 아니면 보고서에 “공식 근거 없음”으로 적는다.
+- `cjlogistics.co.th` (CJ대한통운 태국 법인으로 보임) → EV-DOM-CJ
+- `hanjintravel.com` (한진 계열 여행사로 보임) → EV-DOM-HANJIN
+- `koreapost.com`, `tn-nhis.com`, `telegrem.store` → 사칭 의심. 공식 근거가 없으면 그대로 둔다
 
 ### 확인 방법
 1. 각 기관의 공식 누리집을 열어 기관 이름·운영 주체(누리집 아래쪽 저작권 표시, 회사 소개 등)를 확인한다.

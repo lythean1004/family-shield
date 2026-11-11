@@ -72,9 +72,18 @@ const PROTECTED_SUFFIXES = ["go.kr", "or.kr", "ac.kr", "mil.kr", "re.kr", "hs.kr
 
 const underAny = (h, list) => list.some((p) => h === p || h.endsWith(`.${p}`));
 
+/** 공공·교육기관 도메인인지(일반인이 등록할 수 없어 사칭 감지·목록에서 뺀다) */
+/** 해외 정부·군 도메인(gov.in, go.th, gob.mx, gouv.fr 등)도 일반인이 등록할 수 없다 */
+const FOREIGN_GOV_RE = /\.(?:gov|go|gob|gouv|govt|mil)\.[a-z]{2}$|^(?:gov|go|gob|gouv|govt|mil)\.[a-z]{2}$|\.(?:gov|mil)$/;
+
+export function isProtectedHost(host) {
+  const h = normalizeHost(host);
+  return underAny(h, PROTECTED_SUFFIXES) || FOREIGN_GOV_RE.test(h);
+}
+
 export function isSharedHost(host) {
   const h = normalizeHost(host);
-  return SHARED_HOSTS.has(h) || underAny(h, SHARED_PARENTS) || underAny(h, PROTECTED_SUFFIXES);
+  return SHARED_HOSTS.has(h) || underAny(h, SHARED_PARENTS) || isProtectedHost(h);
 }
 
 /** 등록 도메인: 마지막 2단계, 2단계 국가 도메인(co.kr 등)이면 3단계 */
@@ -91,14 +100,15 @@ export function registrableDomain(host) {
  * - 호스트마다 키 하나. 공용 도메인 자체는 뺀다.
  * - 경로가 minServicePaths 개 이상 다른 호스트는 단축 URL 같은 서비스로 보고 빼며, services 로 따로 돌려준다
  *   (그 서비스를 쓰는 정상 링크까지 위험으로 보지 않기 위해).
+ * - allow(등록 도메인 집합, 예: 인기 사이트 목록)에 있는 호스트는 뺀다.
  * - 같은 등록 도메인에 서로 다른 하위 주소가 2개 이상이면 사기범이 무작위 하위 주소를 붙인 것으로 보고
  *   등록 도메인도 키로 넣는다(공용·서비스 도메인은 제외).
  * @returns {{ keys: Set<string>, services: {host:string, rows:number, paths:number}[],
  *             stats: { input:number, invalid:number, shared:number, service:number,
  *                      hostKeys:number, registrableKeys:number, unique:number } }}
  */
-export function buildKeys(urls, { minServicePaths = 20 } = {}) {
-  const stats = { input: 0, invalid: 0, shared: 0, service: 0, hostKeys: 0, registrableKeys: 0, unique: 0 };
+export function buildKeys(urls, { minServicePaths = 20, allow = new Set() } = {}) {
+  const stats = { input: 0, invalid: 0, shared: 0, allowed: 0, service: 0, hostKeys: 0, registrableKeys: 0, unique: 0 };
   /** host → { rows, paths:Set } */
   const hosts = new Map();
   for (const raw of urls) {
@@ -107,6 +117,8 @@ export function buildKeys(urls, { minServicePaths = 20 } = {}) {
     const host = normalizeHost(toDomain(link));
     if (!host) { stats.invalid++; continue; }
     if (isSharedHost(host)) { stats.shared++; continue; }
+    // 인기 사이트(허용 목록): 정상 사이트 위에 올린 피싱 페이지 때문에 도메인 전체를 막지 않는다
+    if (allow.has(host) || allow.has(registrableDomain(host))) { stats.allowed++; continue; }
     const e = hosts.get(host) ?? { rows: 0, paths: new Set() };
     e.rows++;
     e.paths.add(link.replace(/^(?:https?|ftp):\/\//i, "").replace(/^[^/?#]*/, ""));
@@ -132,6 +144,9 @@ export function buildKeys(urls, { minServicePaths = 20 } = {}) {
   const serviceHosts = new Set(services.map((x) => x.host));
   for (const [reg, set] of byReg) {
     if (set.size < 2 || isSharedHost(reg) || serviceHosts.has(reg) || SECOND_LEVEL.has(reg)) continue;
+    // 국가 도메인은 공용 접미사(gen.in 등)일 수 있어 묶지 않는다. .kr 은 SECOND_LEVEL 로 처리하므로 예외
+    const tld = reg.split(".").pop();
+    if (tld.length === 2 && tld !== "kr") continue;
     const k = hostKey(reg);
     if (!keys.has(k)) { keys.add(k); stats.registrableKeys++; }
   }

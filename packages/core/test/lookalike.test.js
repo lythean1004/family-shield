@@ -27,15 +27,35 @@ describe("공식 도메인 사칭 감지 (D40 ②)", () => {
     assert.deepEqual(hit("hometax-refund.top"), ["EV-DOM-NTS"]);
     assert.deepEqual(hit("teiegram.cyou"), ["EV-DOM-TELEGRAM"]);
     assert.deepEqual(hit("web-telegrem-q.org"), ["EV-DOM-TELEGRAM"]);
-    assert.deepEqual(hit("minwon.gov.yashwan.shop"), ["EV-DOM-GOV"]);
   });
 
   it("진짜 공식 도메인과 그 하위 주소는 잡지 않는다", () => {
     for (const d of ["epost.go.kr", "service.epost.go.kr", "www.koreapost.go.kr", "cjlogistics.com",
       "www.ilogen.com", "lotteglogis.com", "hanjin.com", "www.efine.go.kr", "nhis.or.kr",
-      "hometax.go.kr", "www.gov.kr", "minwon.go.kr", "telegram.org", "t.me"]) {
+      "hometax.go.kr", "www.gov.kr", "minwon.go.kr", "telegram.org", "t.me", "gov.kr"]) {
       assert.deepEqual(hit(d), [], d);
     }
+  });
+
+  it("Tranco 오탐 시험에서 걸렸던 정상 도메인은 잡지 않는다", () => {
+    for (const d of ["www.gov.uk", "beian.gov.cn", "turkiye.gov.tr", "gov.uz", "gov.on.ca", "gov.wales",
+      "e-gov.go.jp", "slack-gov.com", "awsdns-us-gov-05.net", "gov-static.tech",
+      "telegram.com", "star-telegram.com", "telegram.im", "telegram.dog", "telegram.hr",
+      "epostbank.go.kr", "epostlife.go.kr",
+      "epost.de", "epost.ch", "eposten.se", "epostersonline.com", "epostoffice.gov.in", "epost-indiapost.gov.in"]) {
+      assert.deepEqual(hit(d), [], d);
+    }
+  });
+
+  it("gov 는 KISA 에서 본 모양(gov.무작위.일반도메인)일 때만 잡는다", () => {
+    assert.deepEqual(hit("gov.aw1y.bar"), ["EV-DOM-GOV"]);
+    assert.deepEqual(hit("gov.cs3a.shop"), ["EV-DOM-GOV"]);
+    assert.deepEqual(hit("minwon.gov.yashwan.shop"), [], "gov 가 맨 앞이 아니면 아님");
+  });
+
+  it("go.kr·or.kr 같은 공공기관 도메인은 사칭 검사에서 항상 뺀다", () => {
+    assert.deepEqual(hit("hometax-new.go.kr"), []);
+    assert.deepEqual(hit("nhis-event.or.kr"), []);
   });
 
   it("이름이 단어 앞부분이 아니거나 gov 로 시작하는 다른 단어면 잡지 않는다", () => {
@@ -46,8 +66,8 @@ describe("공식 도메인 사칭 감지 (D40 ②)", () => {
   });
 
   it("여러 도메인 중 사칭만 골라 낸다(중복 없이)", () => {
-    const r = findLookalikes(["epost.go.kr", "epost-kr.top", "epost-kr.top"]);
-    assert.deepEqual(r, [{ domain: "epost-kr.top", card_id: "EV-DOM-EPOST" }]);
+    const r = findLookalikes(["epost.go.kr", "koreapost-kr.top", "koreapost-kr.top"]);
+    assert.deepEqual(r, [{ domain: "koreapost-kr.top", card_id: "EV-DOM-EPOST" }]);
   });
 
   it("카드는 모두 근거 카드 필드를 갖는다", () => {
@@ -62,7 +82,7 @@ describe("공식 도메인 사칭 감지 (D40 ②)", () => {
 
 describe("코드 신호와 규칙", () => {
   it("문자 속 사칭 도메인이면 SIG_LOOKALIKE_DOMAIN", () => {
-    const { signals } = extractCodeSignals("[국제발신] 주소 불일치로 보관 중 https://epost-kr.top/a 확인");
+    const { signals } = extractCodeSignals("[국제발신] 주소 불일치로 보관 중 https://koreapost-kr.top/a 확인");
     assert.ok(signals.includes("SIG_LOOKALIKE_DOMAIN"));
   });
 
