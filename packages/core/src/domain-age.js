@@ -15,7 +15,7 @@ import { OFFICIAL_DOMAIN_CARDS } from "./lookalike.js";
 
 const DAY = 86400000;
 export const DEFAULT_THRESHOLD_DAYS = 30;
-export const DEFAULT_TIMEOUT_MS = 1500;
+export const DEFAULT_TIMEOUT_MS = 2500;
 const CACHE_MS = DAY;
 const MAX_TARGETS = 2;
 

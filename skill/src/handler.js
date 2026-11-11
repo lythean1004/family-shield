@@ -248,7 +248,7 @@ export function makeHandler(config) {
   // 도메인 생성일(D41): 등록 도메인 이름만 RDAP에 묻는다. 설정 일수가 0이거나 없으면 끈다(시험 설정은 기본으로 꺼짐).
   const domainAge = config.domainAge !== undefined ? config.domainAge
     : config.domainAgeDays > 0
-      ? createDomainAgeChecker({ thresholdDays: config.domainAgeDays, timeoutMs: config.domainAgeTimeoutMs || 1500 })
+      ? createDomainAgeChecker({ thresholdDays: config.domainAgeDays, timeoutMs: config.domainAgeTimeoutMs || 2500 })
       : null;
   // F4-9 호출 한도 + 동시성 제한. 프로세스 안에서만 동작(운영에서는 Redis로 교체, [임시]).
   const rateLimiter = createRateLimiter({

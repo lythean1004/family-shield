@@ -23,7 +23,7 @@ const DEFAULTS = {
   URL_LOOKUP_TIMEOUT_MS: "800",
   // D41 도메인 생성일: 0이면 끈다
   DOMAIN_AGE_DAYS: "30",
-  DOMAIN_AGE_TIMEOUT_MS: "1500",
+  DOMAIN_AGE_TIMEOUT_MS: "2500",
 };
 
 /**
