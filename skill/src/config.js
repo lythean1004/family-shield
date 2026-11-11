@@ -7,7 +7,7 @@
  * 필수: SKILL_HEADER_TOKEN, AI_API_KEY
  * 선택: AI_BASE_URL, AI_MODEL, AI_WEB_MODEL, AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, SKILL_PORT, SKILL_HOST,
  *       WEB_BASE_URL, PHONE_HMAC_SECRET, PROMPT_VERSION, MAX_CONCURRENT,
- *       SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS,
+ *       SAFE_BROWSING_API_KEY, URL_LOOKUP_TIMEOUT_MS, DOMAIN_AGE_DAYS, DOMAIN_AGE_TIMEOUT_MS,
  *       DATABASE_HOST/PORT/NAME/USER/PASSWORD, VAPID_PUBLIC_KEY/PRIVATE_KEY/SUBJECT
  */
 
@@ -21,6 +21,9 @@ const DEFAULTS = {
   PROMPT_VERSION: "v1",
   MAX_CONCURRENT: "8",
   URL_LOOKUP_TIMEOUT_MS: "800",
+  // D41 도메인 생성일: 0이면 끈다
+  DOMAIN_AGE_DAYS: "30",
+  DOMAIN_AGE_TIMEOUT_MS: "1500",
 };
 
 /**
@@ -53,6 +56,8 @@ export function loadConfig(env = process.env) {
       // URL 평판 조회(F4-11). 없으면 조회하지 않는다(링크 신호는 그대로).
       safeBrowsingKey: get("SAFE_BROWSING_API_KEY") || null,
       urlLookupTimeoutMs: Number(get("URL_LOOKUP_TIMEOUT_MS")),
+      domainAgeDays: Number(get("DOMAIN_AGE_DAYS")),
+      domainAgeTimeoutMs: Number(get("DOMAIN_AGE_TIMEOUT_MS")),
       // 번호 HMAC 키. 없으면 HMAC을 만들지 않는다(마스킹 자체는 동작).
       hmacKey: get("PHONE_HMAC_SECRET") || null,
       maxConcurrent: Number(get("MAX_CONCURRENT")),

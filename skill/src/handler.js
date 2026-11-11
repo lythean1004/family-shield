@@ -18,6 +18,7 @@ import { analyze, MAX_INPUT_CHARS } from "../../packages/core/src/pipeline.js";
 import { createMemoryResultStore, redactToken, toResultView } from "../../packages/core/src/result-token.js";
 import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
 import { loadPhishingListChecker, combineCheckers } from "../../packages/core/src/phishing-list.js";
+import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
 import { readRequest, simpleText, quickReply } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
 import { tokenMatches } from "./config.js";
@@ -52,8 +53,8 @@ const LEVEL_TEXT = {
  * R1(통화 중)은 끊기 안내를 첫 줄에, 나머지 설명을 그 뒤에 붙이고 한계 문구로 닫는다.
  * explanation이 있으면 붙이고, 없으면 신호 요약을 쓴다.
  */
-/** 링크 규칙(R10·R11)의 신호: AI 설명과 별개로 이유를 보여 준다 */
-const LINK_RULE_SIGNALS = new Set(["SIG_MALICIOUS_URL", "SIG_LOOKALIKE_DOMAIN"]);
+/** 링크 규칙과 그 신호: 규칙이 실제로 위험을 냈을 때만 AI 설명과 별개로 이유를 보여 준다 */
+const LINK_RULE_SIGNALS = { R10: "SIG_MALICIOUS_URL", R11: "SIG_LOOKALIKE_DOMAIN", R12: "SIG_NEW_DOMAIN" };
 
 function buildReplyText(result) {
   const lvl = LEVEL_TEXT[result.level] ?? result.level;
@@ -67,9 +68,9 @@ function buildReplyText(result) {
   lines.push(`[${lvl}]`);
 
   if (result.explanation_for_parent?.length) {
-    // 링크 규칙(R10 목록 일치, R11 공식 주소 흉내)은 AI가 모르는 이유라 AI 설명만으로는 위험한 까닭이 안 보인다.
+    // 링크 규칙(R10 목록 일치, R11 공식 주소 흉내, R12 새 도메인+요구)은 AI가 모르는 이유라 AI 설명만으로는 위험한 까닭이 안 보인다.
     // 이 경우 정해 둔 신호 문구를 먼저 붙인다(2026-11-11 카카오 시험).
-    const linkReasons = summarizePhrases((result.signals_final ?? []).filter((id) => LINK_RULE_SIGNALS.has(id)));
+    const linkReasons = summarizePhrases((result.fired_rules ?? []).map((r) => LINK_RULE_SIGNALS[r]).filter(Boolean));
     if (linkReasons.length) lines.push(`위험 이유: ${linkReasons.join(" · ")}`);
     lines.push(...result.explanation_for_parent);
   } else if (result.summary) {
@@ -151,6 +152,7 @@ export async function handleRequest(params, cfg) {
       cards: cfg.cards ?? [],
       ai: cfg.ai,
       urlReputation: cfg.urlReputation ?? null,
+      domainAge: cfg.domainAge ?? null,
     });
   } catch (err) {
     console.error('pipeline error');
@@ -210,6 +212,7 @@ export async function handleAnalyze(params, cfg) {
       cards: cfg.cards ?? [],
       ai: cfg.ai,
       urlReputation: cfg.urlReputation ?? null,
+      domainAge: cfg.domainAge ?? null,
     });
   } catch (err) {
     console.error('pipeline error');
@@ -242,6 +245,11 @@ export function makeHandler(config) {
       timeoutMs: config.urlLookupTimeoutMs || 800,
     }),
   ]);
+  // 도메인 생성일(D41): 등록 도메인 이름만 RDAP에 묻는다. 설정 일수가 0이거나 없으면 끈다(시험 설정은 기본으로 꺼짐).
+  const domainAge = config.domainAge !== undefined ? config.domainAge
+    : config.domainAgeDays > 0
+      ? createDomainAgeChecker({ thresholdDays: config.domainAgeDays, timeoutMs: config.domainAgeTimeoutMs || 1500 })
+      : null;
   // F4-9 호출 한도 + 동시성 제한. 프로세스 안에서만 동작(운영에서는 Redis로 교체, [임시]).
   const rateLimiter = createRateLimiter({
     maxPerMinute: config.maxPerMinute || 5,
@@ -306,7 +314,7 @@ export function makeHandler(config) {
         const { status, body } = await handleAnalyze(
           { text, parentInputs },
           // F4-6: 웹 채널은 카카오 5초 제한이 없으므로 webTimeoutMs(기본 8초)로 덮어 쓴다.
-          { ai: { ...config.ai, model:config.ai.webModel || config.ai.model, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation },
+          { ai: { ...config.ai, model:config.ai.webModel || config.ai.model, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation, domainAge },
         );
         if (body.ok && receipts) {
           body.result.receipt = receipts.issue(body.result,req.auth.userId);
@@ -352,7 +360,7 @@ export function makeHandler(config) {
     try {
       const { status, body } = await handleRequest(
         { utterance: parsed.text, parentInputs: parsed.parentInputs ?? {} },
-        { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation },
+        { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation, domainAge },
       );
       send(status, body);
     } finally {

@@ -141,6 +141,26 @@ describe("핸들러 - 기본", () => {
     assert.ok(text.includes("의심 내용이 있어요."), "AI 설명도 그대로 남긴다");
   });
 
+  it("R12(새 도메인 + 개인정보 요구)로 위험이면 이유 줄에 새 도메인을 보여 준다", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK", "SIG_PERSONAL_INFO"]) },
+      domainAge: async () => ({ ok: true, young: ["fresh-login.shop"] }) };
+    const r = await handleRequest({ utterance: "본인 확인을 위해 주민등록번호를 입력하세요 http://fresh-login.shop/a" }, c);
+    const text = r.body.template.outputs[0].simpleText.text;
+    assert.ok(text.includes("위험 이유: 만든 지 얼마 안 된 링크 주소"), text);
+  });
+
+  it("새 도메인 신호만 있고 위험이 아니면 '위험 이유'를 붙이지 않는다", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK"]) },
+      domainAge: async () => ({ ok: true, young: ["fresh-shop.shop"] }) };
+    const r = await handleRequest({ utterance: "신상품 안내 http://fresh-shop.shop/a" }, c);
+    assert.ok(!r.body.template.outputs[0].simpleText.text.includes("위험 이유:"));
+  });
+
+  it("설정에 도메인 생성일 일수가 없으면 조회기를 만들지 않는다(시험에서 외부 접속 없음)", () => {
+    assert.equal(loadConfig({ SKILL_HEADER_TOKEN: "t", AI_API_KEY: "k" }).config.domainAgeDays, 30);
+    assert.equal(loadConfig({ SKILL_HEADER_TOKEN: "t", AI_API_KEY: "k", DOMAIN_AGE_DAYS: "0" }).config.domainAgeDays, 0);
+  });
+
   it("링크 규칙이 아닌 위험이면 이유 줄을 따로 붙이지 않는다", async () => {
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") } };
     const r = await handleRequest({ utterance: "[검찰청] 링크 클릭: http://x.invalid/a" }, c);

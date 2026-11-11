@@ -15,7 +15,7 @@ import { mask } from "./masking.js";
 import { extractSignals } from "./ai-client.js";
 import { decide } from "./rule-engine.js";
 import { summarize } from "./summarizer.js";
-import { SIG_MALICIOUS_URL, SIG_SHORT_URL } from "./signals.js";
+import { SIG_MALICIOUS_URL, SIG_SHORT_URL, SIG_NEW_DOMAIN } from "./signals.js";
 
 /** F4-1 입력 길이 상한 [임시] */
 export const MAX_INPUT_CHARS = 2000;
@@ -32,6 +32,7 @@ export const MAX_INPUT_CHARS = 2000;
  *   ai?: null | { model: string, apiKey?: string, baseUrl?: string, timeoutMs?: number,
  *                 promptVersion?: string, fetchImpl?: typeof fetch },
  *   urlReputation?: null | ((domains: string[]) => Promise<{ ok: boolean, malicious: string[], shortened?: string[] }>),
+ *   domainAge?: null | ((domains: string[]) => Promise<{ ok: boolean, young: string[], reason?: string }>),
  * }} input
  */
 export async function analyze({
@@ -43,6 +44,7 @@ export async function analyze({
   cards = [],
   ai = null,
   urlReputation = null,
+  domainAge = null,
 }) {
   const raw = typeof text === "string" ? text : "";
   const truncated = [...raw].length > MAX_INPUT_CHARS;
@@ -61,6 +63,10 @@ export async function analyze({
   const reputationP = urlReputation && code.domains.length
     ? urlReputation(code.domains).catch(() => ({ ok: false, malicious: [], reason: "error" }))
     : Promise.resolve(null);
+  // ①'' 도메인 생성일(D41). 역시 AI와 함께 돈다
+  const ageP = domainAge && code.domains.length
+    ? domainAge(code.domains).catch(() => ({ ok: false, young: [], reason: "error" }))
+    : Promise.resolve(null);
 
   let aiResult = null;
   let fallbackReason = null;
@@ -77,6 +83,7 @@ export async function analyze({
   }
   const aiData = aiResult?.ok ? aiResult.data : null;
   const reputation = await reputationP;
+  const age = await ageP;
 
   // ⑤ 합집합 (평판 조회 실패는 신호를 빼지 않을 뿐, 판정을 낮추지 않는다)
   const signalsAi = aiData?.signals ?? [];
@@ -84,6 +91,7 @@ export async function analyze({
   if (reputation?.malicious?.length) signalsCode.push(SIG_MALICIOUS_URL);
   // 국내 목록에서 피싱에 많이 쓰인 단축 서비스(D40): 위험이 아니라 단축 URL 신호
   if (reputation?.shortened?.length && !signalsCode.includes(SIG_SHORT_URL)) signalsCode.push(SIG_SHORT_URL);
+  if (age?.young?.length) signalsCode.push(SIG_NEW_DOMAIN);
   const signalsFinal = [...new Set([...signalsCode, ...signalsAi])];
 
   // ⑥ 규칙
@@ -118,5 +126,7 @@ export async function analyze({
     url_reputation: reputation
       ? { ok: reputation.ok, hits: reputation.malicious.length, shortened: reputation.shortened?.length ?? 0, reason: reputation.reason ?? null }
       : null,
+    // 도메인 생성일 결과(도메인 이름은 담지 않는다): null = 조회 안 함
+    domain_age: age ? { ok: age.ok, young: age.young?.length ?? 0, reason: age.reason ?? null } : null,
   };
 }

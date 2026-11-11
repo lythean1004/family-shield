@@ -8,6 +8,7 @@ export const SIG_LINK               = "SIG_LINK";
 export const SIG_SHORT_URL          = "SIG_SHORT_URL";
 export const SIG_MALICIOUS_URL      = "SIG_MALICIOUS_URL";
 export const SIG_LOOKALIKE_DOMAIN   = "SIG_LOOKALIKE_DOMAIN"; // 공식 주소를 흉내 낸 링크(D40 ②)
+export const SIG_NEW_DOMAIN         = "SIG_NEW_DOMAIN";       // 만든 지 30일 안 된 링크 도메인(D41)
 
 // 코드 + AI 공용
 export const SIG_APP_INSTALL        = "SIG_APP_INSTALL";

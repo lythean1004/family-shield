@@ -17,7 +17,7 @@ import {
   SIG_MONEY, SIG_GIFTCARD, SIG_AVOID_VOICE, SIG_AGENCY_IMPERSONATION,
   SIG_PERSONAL_INFO, SIG_CALL_THIS_NUMBER, SIG_URGENCY, SIG_SECRECY,
   SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT, SIG_DELETE_APP,
-  SIG_MALICIOUS_URL, SIG_LOOKALIKE_DOMAIN,
+  SIG_MALICIOUS_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN,
 } from "./signals.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
@@ -82,6 +82,10 @@ export function decide(context) {
 
   // R11: 공식 주소를 흉내 낸 링크(D40 ②)
   if (sig.has(SIG_LOOKALIKE_DOMAIN)) fire("R11", "위험");
+
+  // R12: 만든 지 30일 안 된 링크 도메인 + (돈, 개인정보, 앱 설치 요구 중 하나). 재촉은 정상 광고와 겹쳐 뺌(D41)
+  if (sig.has(SIG_NEW_DOMAIN) &&
+      (sig.has(SIG_MONEY) || sig.has(SIG_PERSONAL_INFO) || sig.has(SIG_APP_INSTALL))) fire("R12", "위험");
 
   // R7: 링크, 돈, 개인정보, 재촉, 비밀 중 하나 / 또는 가족 사칭+새 번호
   if (sig.has(SIG_LINK) || sig.has(SIG_MONEY) || sig.has(SIG_PERSONAL_INFO) ||
