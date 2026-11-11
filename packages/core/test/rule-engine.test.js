@@ -22,6 +22,22 @@ describe("규칙 엔진 - 위험 판정", () => {
     assert.equal(level, "위험");
   });
 
+  it("R13: 가족 사칭 + 돈 요구 → 위험(새 번호 정보 없어도, 2026-11-12 카카오 확인)", () => {
+    const { level, fired_rules } = decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_MONEY", "SIG_URGENCY"] });
+    assert.equal(level, "위험");
+    assert.ok(fired_rules.includes("R13"));
+  });
+
+  it("R13: 가족 사칭 + 상품권 요구 → 위험", () => {
+    assert.equal(decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_GIFTCARD"] }).level, "위험");
+  });
+
+  it("R13 은 가족 사칭 없이 돈 요구만으로는 켜지지 않는다(주의)", () => {
+    const r = decide({ signals_final: ["SIG_MONEY"] });
+    assert.equal(r.level, "주의");
+    assert.ok(!r.fired_rules.includes("R13"));
+  });
+
   it("R3: 가족 사칭 + 새 번호 + 돈 요구 → 위험 (DEV-C01 기준)", () => {
     const { level, fired_rules } = decide({
       signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_NEW_NUMBER", "SIG_MONEY"],

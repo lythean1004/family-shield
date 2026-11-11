@@ -191,6 +191,12 @@ describe("핸들러 - 기본", () => {
     assert.ok(!text.includes("Google"));
   });
 
+  it("카카오: '엄마 나 입원했어 병원비 90만원 급해'(가족 사칭+돈, 번호 정보 없음) → 위험(R13)", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_FAMILY_IMPERSONATION", "SIG_MONEY", "SIG_URGENCY"], "family") } };
+    const r = await handleRequest({ utterance: "엄마 나 입원했어 병원비 90만원 급해" }, c);
+    assert.ok(r.body.template.outputs[0].simpleText.text.includes("위험"));
+  });
+
   it("건강 관련 안내라 해외 AI로 보내지 않았으면 그 사실을 알린다(작업 ⑦)", async () => {
     const seen = {};
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: async (...a) => { seen.called = true; return fakeGateway([])(...a); } } };

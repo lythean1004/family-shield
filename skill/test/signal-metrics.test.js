@@ -96,10 +96,11 @@ test('handler exposes only an internal metrics object and retains R11/R12 in rec
   const handler = makeHandler({ ai: {}, signalMetrics: metrics, phishingList: null });
   assert.equal(handler.signalMetrics, metrics);
   await handler.close();
-  const r = { level: '위험', signals_final: ['SIG_NEW_DOMAIN'], fired_rules: ['R10', 'R11', 'R12', 'R13', 'secret'] };
-  assert.deepEqual(storedResult(r).fired_rules, ['R10', 'R11', 'R12']);
+  // R13(가족 사칭+돈, D45)까지 알려진 규칙. 모르는 이름(R14·secret)은 버린다
+  const r = { level: '위험', signals_final: ['SIG_NEW_DOMAIN'], fired_rules: ['R10', 'R11', 'R12', 'R13', 'R14', 'secret'] };
+  assert.deepEqual(storedResult(r).fired_rules, ['R10', 'R11', 'R12', 'R13']);
   const receipts = createReceipts('local-test-only');
-  assert.deepEqual(receipts.read(receipts.issue(r), null).fired_rules, ['R10', 'R11', 'R12']);
+  assert.deepEqual(receipts.read(receipts.issue(r), null).fired_rules, ['R10', 'R11', 'R12', 'R13']);
 });
 
 test('HTTP web and Kakao routes share counts, closing emits a sanitized daily fragment', async () => {

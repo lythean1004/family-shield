@@ -12,7 +12,7 @@ export function storedResult(result) {
   const relation=signals.ALLOWED_RELATIONS.has(result.impersonated_relation)?result.impersonated_relation:null
   return {
     level:LEVEL_TO_DB[result.level] ? result.level : '확인필요',
-    fired_rules:(result.fired_rules||[]).filter(r=>/^R([1-9]|1[0-2])$/.test(r)),
+    fired_rules:(result.fired_rules||[]).filter(r=>/^R([1-9]|1[0-3])$/.test(r)),
     signals_final:validSignals,
     impersonation_type:signals.IMPERSONATION_TYPES.has(result.impersonation_type)?result.impersonation_type:'unknown',
     impersonated_relation:relation,

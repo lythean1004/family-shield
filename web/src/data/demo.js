@@ -7,7 +7,7 @@ export const DEMO_SCENARIOS = [
     message: '엄마 나 폰 액정 깨져서 이 번호로 연락해. 급하게 상품권 좀 사 줄 수 있어? 지금 통화는 안 돼.',
     result: {
       level: '위험',
-      fired_rules: ['R3', 'R4', 'R7'],
+      fired_rules: ['R3', 'R13', 'R4', 'R7'],
       signals_final: ['SIG_FAMILY_IMPERSONATION', 'SIG_NEW_NUMBER', 'SIG_GIFTCARD', 'SIG_AVOID_VOICE'],
       impersonation_type: 'family',
       impersonated_relation: '딸',

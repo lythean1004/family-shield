@@ -3,7 +3,7 @@ import * as signalIds from '../../packages/core/src/signals.js';
 import { analyze } from '../../packages/core/src/pipeline.js';
 
 const SIGNALS = new Set(Object.entries(signalIds).filter(([k]) => k.startsWith('SIG_')).map(([,v]) => v));
-const RULES = new Set(Array.from({ length: 12 }, (_, i) => `R${i + 1}`));
+const RULES = new Set(Array.from({ length: 13 }, (_, i) => `R${i + 1}`));
 const LOOKUPS = ['url_reputation', 'domain_age'];
 const RDAP = ['network_success', 'network_failure', 'cache_hit', 'unsupported', 'no_targets', 'date_known', 'date_unknown'];
 const dayKey = ms => new Date(ms + 9 * 3600000).toISOString().slice(0, 10);

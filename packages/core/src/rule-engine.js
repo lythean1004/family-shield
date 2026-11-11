@@ -62,6 +62,9 @@ export function decide(context) {
   if (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_NEW_NUMBER) &&
       (sig.has(SIG_MONEY) || sig.has(SIG_GIFTCARD))) fire("R3", "위험");
 
+  // R13: 가족 사칭 + (돈 or 상품권 요구). 카카오에서는 보낸 번호를 받지 않아 R3의 '새 번호'가 없을 수 있다(D45)
+  if (sig.has(SIG_FAMILY_IMPERSONATION) && (sig.has(SIG_MONEY) || sig.has(SIG_GIFTCARD))) fire("R13", "위험");
+
   // R4: 가족 사칭 + 통화를 피함
   if (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_AVOID_VOICE)) fire("R4", "위험");
 
