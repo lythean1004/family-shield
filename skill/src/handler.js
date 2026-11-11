@@ -19,6 +19,7 @@ import { createMemoryResultStore, redactToken, toResultView } from "../../packag
 import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
 import { loadPhishingListChecker, combineCheckers } from "../../packages/core/src/phishing-list.js";
 import { readRequest, simpleText, quickReply } from "./kakao.js";
+import { summarizePhrases } from "../../packages/core/src/summarizer.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
 import { createDatabase } from './database.js';
@@ -51,6 +52,9 @@ const LEVEL_TEXT = {
  * R1(통화 중)은 끊기 안내를 첫 줄에, 나머지 설명을 그 뒤에 붙이고 한계 문구로 닫는다.
  * explanation이 있으면 붙이고, 없으면 신호 요약을 쓴다.
  */
+/** 링크 규칙(R10·R11)의 신호: AI 설명과 별개로 이유를 보여 준다 */
+const LINK_RULE_SIGNALS = new Set(["SIG_MALICIOUS_URL", "SIG_LOOKALIKE_DOMAIN"]);
+
 function buildReplyText(result) {
   const lvl = LEVEL_TEXT[result.level] ?? result.level;
   const lines = [];
@@ -63,6 +67,10 @@ function buildReplyText(result) {
   lines.push(`[${lvl}]`);
 
   if (result.explanation_for_parent?.length) {
+    // 링크 규칙(R10 목록 일치, R11 공식 주소 흉내)은 AI가 모르는 이유라 AI 설명만으로는 위험한 까닭이 안 보인다.
+    // 이 경우 정해 둔 신호 문구를 먼저 붙인다(2026-11-11 카카오 시험).
+    const linkReasons = summarizePhrases((result.signals_final ?? []).filter((id) => LINK_RULE_SIGNALS.has(id)));
+    if (linkReasons.length) lines.push(`위험 이유: ${linkReasons.join(" · ")}`);
     lines.push(...result.explanation_for_parent);
   } else if (result.summary) {
     lines.push(`감지된 신호: ${result.summary}`);

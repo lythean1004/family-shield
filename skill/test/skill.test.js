@@ -132,6 +132,21 @@ describe("핸들러 - 기본", () => {
     assert.ok(text.includes("확인 필요") || text.includes("주의") || text.includes("위험"));
   });
 
+  it("링크 규칙(R11)으로 위험이면 AI 설명이 있어도 이유 문구를 함께 보여 준다(2026-11-11 카카오 시험)", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK"]) } };
+    const r = await handleRequest({ utterance: "[시험] 건강검진 안내 nhis-event.or.kr" }, c);
+    const text = r.body.template.outputs[0].simpleText.text;
+    assert.ok(text.includes("위험"));
+    assert.ok(text.includes("위험 이유: 공식 주소를 흉내 낸 링크"), text);
+    assert.ok(text.includes("의심 내용이 있어요."), "AI 설명도 그대로 남긴다");
+  });
+
+  it("링크 규칙이 아닌 위험이면 이유 줄을 따로 붙이지 않는다", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") } };
+    const r = await handleRequest({ utterance: "[검찰청] 링크 클릭: http://x.invalid/a" }, c);
+    assert.ok(!r.body.template.outputs[0].simpleText.text.includes("위험 이유:"));
+  });
+
   it("위험 판정이면 quickReplies에 처음으로 버튼", async () => {
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") } };
     const r = await handleRequest(
