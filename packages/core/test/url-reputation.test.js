@@ -109,6 +109,26 @@ describe("Safe Browsing 조회기", () => {
     assert.equal(seen.calls, 2);
   });
 
+  it("결과에 출처(safe_browsing)를 붙인다(Google 경고 표시 구분용)", async () => {
+    const r = await createSafeBrowsingChecker({ apiKey: "k", fetchImpl: gateway(["evil.invalid/"]) })(["evil.invalid"]);
+    assert.equal(r.source, "safe_browsing");
+  });
+
+  it("Google 목록 정보는 30분 넘게 기억하지 않는다(약관: 30분 이내 갱신 정보만)", async () => {
+    const seen = {};
+    let t = 0;
+    const long = async (url) => ({ ok: true, status: 200, json: async () => ({ fullHashes: [], cacheDuration: "86400s" }) });
+    const fetchImpl = async (url) => { seen.calls = (seen.calls ?? 0) + 1; return long(url); };
+    const check = createSafeBrowsingChecker({ apiKey: "k", fetchImpl, clock: () => t });
+    await check(["x.invalid"]);
+    t = 29 * 60_000;
+    await check(["x.invalid"]);
+    assert.equal(seen.calls, 1);
+    t = 30 * 60_000 + 1;
+    await check(["x.invalid"]);
+    assert.equal(seen.calls, 2);
+  });
+
   it("실패·시간 초과는 ok:false, 판정을 낮추지 않도록 malicious는 빈 목록", async () => {
     const slow = () => new Promise(() => {});
     const r1 = await createSafeBrowsingChecker({ apiKey: "k", fetchImpl: slow, timeoutMs: 20 })(["x.invalid"]);

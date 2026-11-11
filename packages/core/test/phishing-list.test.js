@@ -4,6 +4,8 @@ import {
   normalizeHost, hostKey, candidateHosts, isSharedHost, registrableDomain, buildKeys, parseKeyFile,
   createPhishingListChecker, combineCheckers, loadPhishingListChecker,
 } from "../src/phishing-list.js";
+// 출처 칸(source·sources)은 따로 시험하고, 여기서는 위험·단축 판정만 비교한다
+const core = ({ source, sources, ...rest }) => rest;
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -178,13 +180,17 @@ describe("목록 대조기", () => {
 
   it("목록에 없으면 malicious 가 비어 있다(안전하다는 뜻이 아님)", async () => {
     const r = await check(["cjlogistics.com", "epost.go.kr"]);
-    assert.deepEqual(r, { ok: true, malicious: [] });
+    assert.deepEqual(core(r), { ok: true, malicious: [] });
   });
 
   it("단축 서비스 목록에 있으면 shortened 로 알려 준다(위험 아님)", async () => {
     const c = createPhishingListChecker({ keys, shortenerKeys: new Set([hostKey("go9.co")]) });
     const r = await c(["go9.co", "evil-delivery.xyz"]);
-    assert.deepEqual(r, { ok: true, malicious: ["evil-delivery.xyz"], shortened: ["go9.co"] });
+    assert.deepEqual(core(r), { ok: true, malicious: ["evil-delivery.xyz"], shortened: ["go9.co"] });
+  });
+
+  it("결과에 출처(kisa)를 붙인다", async () => {
+    assert.equal((await check(["evil-delivery.xyz"])).source, "kisa");
   });
 
   it("키가 없으면 대조기를 만들지 않는다", () => {
@@ -201,23 +207,30 @@ describe("대조기 합치기", () => {
 
   it("위험 도메인은 합집합, 모두 성공이면 ok", async () => {
     const r = await combineCheckers([listCheck, sbOk])(["a.xyz", "b.top"]);
-    assert.deepEqual(r, { ok: true, malicious: ["a.xyz", "b.top"] });
+    assert.deepEqual(core(r), { ok: true, malicious: ["a.xyz", "b.top"] });
   });
 
   it("하나가 실패해도 다른 쪽 결과는 남고, ok=false 와 이유를 남긴다", async () => {
     const r = await combineCheckers([listCheck, sbFail])(["a.xyz"]);
-    assert.deepEqual(r, { ok: false, malicious: ["a.xyz"], reason: "timeout" });
+    assert.deepEqual(core(r), { ok: false, malicious: ["a.xyz"], reason: "timeout" });
   });
 
   it("예외도 실패로 처리한다", async () => {
     const r = await combineCheckers([listCheck, sbThrow])(["a.xyz"]);
-    assert.deepEqual(r, { ok: false, malicious: ["a.xyz"], reason: "error" });
+    assert.deepEqual(core(r), { ok: false, malicious: ["a.xyz"], reason: "error" });
   });
 
   it("shortened 도 합친다", async () => {
     const a = async () => ({ ok: true, malicious: [], shortened: ["go9.co"] });
     const r = await combineCheckers([a, sbOk])(["go9.co"]);
-    assert.deepEqual(r, { ok: true, malicious: ["b.top", "a.xyz"], shortened: ["go9.co"] });
+    assert.deepEqual(core(r), { ok: true, malicious: ["b.top", "a.xyz"], shortened: ["go9.co"] });
+  });
+
+  it("출처별 위험 도메인을 sources 로 모은다(KISA 와 Google 구분)", async () => {
+    const kisa = async () => ({ ok: true, malicious: ["a.xyz"], source: "kisa" });
+    const sb = async () => ({ ok: true, malicious: ["b.top"], source: "safe_browsing" });
+    const r = await combineCheckers([kisa, sb])(["a.xyz", "b.top"]);
+    assert.deepEqual(r.sources, { kisa: ["a.xyz"], safe_browsing: ["b.top"] });
   });
 
   it("null 은 건너뛰고, 남는 것이 없으면 null", () => {
@@ -238,7 +251,7 @@ ${hostKey("go9.co")}
     const { check, hostKeys, shortenerKeys } = loadPhishingListChecker(dir);
     assert.equal(hostKeys, 1);
     assert.equal(shortenerKeys, 1);
-    assert.deepEqual(await check(["evil.top", "go9.co"]), { ok: true, malicious: ["evil.top"], shortened: ["go9.co"] });
+    assert.deepEqual(core(await check(["evil.top", "go9.co"])), { ok: true, malicious: ["evil.top"], shortened: ["go9.co"] });
   });
 
   it("파일이 없으면 대조기 없음", () => {

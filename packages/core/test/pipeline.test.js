@@ -124,7 +124,7 @@ describe("파이프라인 - URL 평판 조회 (F4-11, R10)", () => {
     assert.ok(r.signals_code.includes("SIG_MALICIOUS_URL"));
     assert.equal(r.level, "위험");
     assert.ok(r.fired_rules.includes("R10"));
-    assert.deepEqual(r.url_reputation, { ok: true, hits: 1, shortened: 0, reason: null });
+    assert.deepEqual(r.url_reputation, { ok: true, hits: 1, shortened: 0, reason: null, sources: { unknown: 1 } });
     assert.ok(!JSON.stringify(r.url_reputation).includes("evil"));
   });
 
@@ -145,6 +145,25 @@ describe("파이프라인 - URL 평판 조회 (F4-11, R10)", () => {
     assert.ok(r.signals_code.includes("SIG_SHORT_URL"));
     assert.ok(!r.signals_code.includes("SIG_MALICIOUS_URL"));
     assert.deepEqual(r.url_reputation, { ok: true, hits: 0, shortened: 1, reason: null });
+  });
+
+  it("Google 목록이면 SIG_SB_UNSAFE_URL, KISA 목록이면 SIG_MALICIOUS_URL 로 나눈다(Google 출처 표시 구분)", async () => {
+    const sbOnly = await analyze({
+      text: "택배 확인 http://evil.invalid/a",
+      urlReputation: async () => ({ ok: true, malicious: ["evil.invalid"], sources: { safe_browsing: ["evil.invalid"] } }),
+    });
+    assert.ok(sbOnly.signals_code.includes("SIG_SB_UNSAFE_URL"));
+    assert.ok(!sbOnly.signals_code.includes("SIG_MALICIOUS_URL"));
+    assert.equal(sbOnly.level, "위험");
+    assert.ok(sbOnly.fired_rules.includes("R10"));
+    assert.deepEqual(sbOnly.url_reputation.sources, { safe_browsing: 1 });
+
+    const kisaOnly = await analyze({
+      text: "택배 확인 http://evil.invalid/a",
+      urlReputation: async () => ({ ok: true, malicious: ["evil.invalid"], source: "kisa" }),
+    });
+    assert.ok(kisaOnly.signals_code.includes("SIG_MALICIOUS_URL"));
+    assert.ok(!kisaOnly.signals_code.includes("SIG_SB_UNSAFE_URL"));
   });
 
   it("단축 URL만 있으면 조회하지 않는다(D11)", async () => {

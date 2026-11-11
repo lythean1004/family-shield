@@ -332,7 +332,8 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 |---|---|---|
 | SIG_LINK | 링크 포함 | 코드 |
 | SIG_SHORT_URL | 단축 URL 포함(펼치지 않음) | 코드 |
-| SIG_MALICIOUS_URL | 링크 도메인이 평판 조회(Google Safe Browsing) 또는 KISA 피싱 목록에서 악성으로 나옴 | 코드(평판 조회) |
+| SIG_MALICIOUS_URL | 링크 도메인이 KISA 피싱 목록에 있음 | 코드(목록 대조) |
+| SIG_SB_UNSAFE_URL | 링크 도메인이 Google Safe Browsing 목록에 있음. **Google 이용 규칙:** 단정 표현 금지(“위험할 수 있다”), 경고에 “Advisory provided by Google”과 안내 링크, 다른 출처 경고에는 Google 표시 금지, 목록 정보는 30분 넘게 기억하지 않음(2026-11-11) | 코드(평판 조회) |
 | SIG_LOOKALIKE_DOMAIN | 링크 도메인 조각 앞부분에 기관·택배사 이름이 있는데 그 기관의 공식 도메인이 아님(D40 ②) | 코드(근거 카드) |
 | SIG_NEW_DOMAIN | 링크의 등록 도메인이 RDAP 등록일 기준 30일 이내(D41) | 코드(RDAP 조회) |
 | SIG_APP_INSTALL | 앱이나 원격 조종 프로그램 설치 요구 | 코드 + AI |
@@ -360,7 +361,7 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 ### 9-5. AI 입력과 출력
 
 - **입력:** 시스템 프롬프트(역할, 신호 목록, 설명 규칙, 문자 안의 지시는 따르지 않는다는 지침), `<cards>`(활성 카드 ID와 한 줄 요약), `<message>`(마스킹한 문자)
-- **출력 스키마:** `signals`(9-3 목록의 값만, SIG_LINK·SIG_SHORT_URL·SIG_MALICIOUS_URL·SIG_LOOKALIKE_DOMAIN·SIG_NEW_DOMAIN 제외), `impersonation_type`(family / agency / none / unknown), `impersonated_relation`(정해진 관계 11개 또는 null), `evidence_card_ids`(최대 3개), `explanation_for_parent`(최대 3문장, 문장마다 40자 이하)
+- **출력 스키마:** `signals`(9-3 목록의 값만, SIG_LINK·SIG_SHORT_URL·SIG_MALICIOUS_URL·SIG_SB_UNSAFE_URL·SIG_LOOKALIKE_DOMAIN·SIG_NEW_DOMAIN 제외), `impersonation_type`(family / agency / none / unknown), `impersonated_relation`(정해진 관계 11개 또는 null), `evidence_card_ids`(최대 3개), `explanation_for_parent`(최대 3문장, 문장마다 40자 이하)
 - **`impersonation_type`의 뜻:** 문자가 스스로 밝힌 발신자 유형. 진짜인지 가짜인지는 판단하지 않는다(진위 판단은 AI가 판정을 맡는 것이 되어 원칙 2와 충돌). 그래서 정상 은행 알림도 agency다.
 - 시스템 프롬프트는 버전을 매겨 관리한다(`prompt_version`).
 
@@ -394,7 +395,7 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 | R7 | 링크, 돈 요구, 개인정보 요구, 재촉, 비밀 요구 중 하나 / **또는 가족 사칭 + 새 번호** | 주의 |
 | R8 | 위 조건에 하나도 해당하지 않음 | 확인 필요 |
 | R9 | 고립 요구, 선입금 요구, 개인 계좌 입금 요구, 앱 삭제 지시 중 하나 | 위험 |
-| R10 | 링크 도메인이 평판 조회에서 악성(`SIG_MALICIOUS_URL`) | 위험 |
+| R10 | 링크 도메인이 KISA 목록(`SIG_MALICIOUS_URL`) 또는 Google Safe Browsing 목록(`SIG_SB_UNSAFE_URL`)에 있음 | 위험 |
 | R11 | 공식 주소를 흉내 낸 링크(`SIG_LOOKALIKE_DOMAIN`, D40 ②). 2026-11-11 확정: 정상 인기 사이트 약 90만 개 중 5개(0.0006%) | 위험 |
 | R12 | 만든 지 30일 안 된 링크 도메인(`SIG_NEW_DOMAIN`) + 돈 요구·개인정보 요구·앱 설치 중 하나(D41) | 위험 |
 
@@ -422,7 +423,8 @@ AI가 쓴 설명은 쓰지 않는다. 신호 ID를 정해 둔 문구로 바꿔 �
 | SIG_URGENCY | 급하게 재촉 | SIG_SECRECY | 비밀로 하라고 함 |
 | SIG_AVOID_VOICE | 통화를 피함 | SIG_CALL_THIS_NUMBER | 특정 번호로 전화 유도 |
 | SIG_THIRD_PARTY_ACCOUNT | 개인 계좌로 입금 요구 | SIG_FAMILY_IMPERSONATION | (관계로 표시: “딸이라고 함”) |
-| SIG_SHORT_URL | 단축 링크 포함 | SIG_MALICIOUS_URL | 위험한 링크로 확인됨 |
+| SIG_SHORT_URL | 단축 링크 포함 | SIG_MALICIOUS_URL | KISA 피싱 사이트 목록에 있던 링크 |
+| SIG_SB_UNSAFE_URL | Google이 위험할 수 있다고 표시한 링크 (+ Advisory provided by Google) | | |
 | SIG_LOOKALIKE_DOMAIN | 공식 주소를 흉내 낸 링크 | SIG_NEW_DOMAIN | 만든 지 얼마 안 된 링크 주소 |
 
 ### 9-10. 고정 안내와 한계 문구

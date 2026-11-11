@@ -171,6 +171,26 @@ describe("핸들러 - 기본", () => {
     assert.ok(!text.includes("특이 내용을 찾지 못했어요."), "AI 설명은 쓰지 않는다");
   });
 
+  it("Google 목록으로 위험이면 단정하지 않는 이유 문구, 'Advisory provided by Google', Google 안내 버튼", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK"]) },
+      urlReputation: async () => ({ ok: true, malicious: ["evil.invalid"], sources: { safe_browsing: ["evil.invalid"] } }) };
+    const r = await handleRequest({ utterance: "택배 확인 http://evil.invalid/a" }, c);
+    const text = r.body.template.outputs[0].simpleText.text;
+    assert.ok(text.includes("위험 이유: Google이 위험할 수 있다고 표시한 링크"), text);
+    assert.ok(text.includes("Advisory provided by Google"));
+    const qr = r.body.template.quickReplies ?? [];
+    assert.ok(qr.some((q) => q.action === "webLink" && q.webLinkUrl === "https://developers.google.com/safe-browsing/v4/advisory"));
+  });
+
+  it("KISA 목록으로만 위험이면 Google 표시를 붙이지 않는다", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK"]) },
+      urlReputation: async () => ({ ok: true, malicious: ["evil.invalid"], source: "kisa" }) };
+    const r = await handleRequest({ utterance: "택배 확인 http://evil.invalid/a" }, c);
+    const text = r.body.template.outputs[0].simpleText.text;
+    assert.ok(text.includes("위험 이유: KISA 피싱 사이트 목록에 있던 링크"), text);
+    assert.ok(!text.includes("Google"));
+  });
+
   it("링크 규칙이 아닌 위험이면 이유 줄을 따로 붙이지 않는다", async () => {
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") } };
     const r = await handleRequest({ utterance: "[검찰청] 링크 클릭: http://x.invalid/a" }, c);

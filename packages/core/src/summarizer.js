@@ -23,7 +23,9 @@ const SIGNAL_PHRASE = {
   SIG_CALL_THIS_NUMBER:     "특정 번호로 전화 유도",
   SIG_THIRD_PARTY_ACCOUNT:  "개인 계좌로 입금 요구",
   SIG_SHORT_URL:            "단축 링크 포함",
-  SIG_MALICIOUS_URL:        "위험한 링크로 확인됨",
+  SIG_MALICIOUS_URL:        "KISA 피싱 사이트 목록에 있던 링크",
+  // Google 경고는 단정 표현 금지(Safe Browsing 이용 규칙), 출처 표시는 화면·카카오에서 따로 붙인다
+  SIG_SB_UNSAFE_URL:        "Google이 위험할 수 있다고 표시한 링크",
   SIG_LOOKALIKE_DOMAIN:     "공식 주소를 흉내 낸 링크",
   SIG_NEW_DOMAIN:           "만든 지 얼마 안 된 링크 주소",
   // SIG_FAMILY_IMPERSONATION은 relation과 함께 동적으로 처리

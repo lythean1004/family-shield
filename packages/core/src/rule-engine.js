@@ -17,7 +17,7 @@ import {
   SIG_MONEY, SIG_GIFTCARD, SIG_AVOID_VOICE, SIG_AGENCY_IMPERSONATION,
   SIG_PERSONAL_INFO, SIG_CALL_THIS_NUMBER, SIG_URGENCY, SIG_SECRECY,
   SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT, SIG_DELETE_APP,
-  SIG_MALICIOUS_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN,
+  SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN,
 } from "./signals.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
@@ -78,7 +78,7 @@ export function decide(context) {
       sig.has(SIG_THIRD_PARTY_ACCOUNT) || sig.has(SIG_DELETE_APP)) fire("R9", "위험");
 
   // R10: 악성 URL
-  if (sig.has(SIG_MALICIOUS_URL)) fire("R10", "위험");
+  if (sig.has(SIG_MALICIOUS_URL) || sig.has(SIG_SB_UNSAFE_URL)) fire("R10", "위험");
 
   // R11: 공식 주소를 흉내 낸 링크(D40 ②)
   if (sig.has(SIG_LOOKALIKE_DOMAIN)) fire("R11", "위험");

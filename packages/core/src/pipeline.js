@@ -15,7 +15,7 @@ import { mask } from "./masking.js";
 import { extractSignals } from "./ai-client.js";
 import { decide } from "./rule-engine.js";
 import { summarize } from "./summarizer.js";
-import { SIG_MALICIOUS_URL, SIG_SHORT_URL, SIG_NEW_DOMAIN } from "./signals.js";
+import { SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_SHORT_URL, SIG_NEW_DOMAIN } from "./signals.js";
 
 /** F4-1 입력 길이 상한 [임시] */
 export const MAX_INPUT_CHARS = 2000;
@@ -88,7 +88,11 @@ export async function analyze({
   // ⑤ 합집합 (평판 조회 실패는 신호를 빼지 않을 뿐, 판정을 낮추지 않는다)
   const signalsAi = aiData?.signals ?? [];
   const signalsCode = [...code.signals];
-  if (reputation?.malicious?.length) signalsCode.push(SIG_MALICIOUS_URL);
+  // 출처별로 신호를 나눈다: Google 경고에는 Google 출처 표시가 필요하고, 다른 출처에는 붙이면 안 된다
+  const bySource = !reputation?.malicious?.length ? {}
+    : reputation.sources ?? { [reputation.source ?? "unknown"]: reputation.malicious };
+  if (bySource.safe_browsing?.length) signalsCode.push(SIG_SB_UNSAFE_URL);
+  if (Object.entries(bySource).some(([k, v]) => k !== "safe_browsing" && v?.length)) signalsCode.push(SIG_MALICIOUS_URL);
   // 국내 목록에서 피싱에 많이 쓰인 단축 서비스(D40): 위험이 아니라 단축 URL 신호
   if (reputation?.shortened?.length && !signalsCode.includes(SIG_SHORT_URL)) signalsCode.push(SIG_SHORT_URL);
   if (age?.young?.length) signalsCode.push(SIG_NEW_DOMAIN);
@@ -124,7 +128,8 @@ export async function analyze({
     ai_meta: aiResult?.meta ?? null,
     // 평판 조회 결과(도메인 이름은 담지 않는다): null = 조회 안 함
     url_reputation: reputation
-      ? { ok: reputation.ok, hits: reputation.malicious.length, shortened: reputation.shortened?.length ?? 0, reason: reputation.reason ?? null }
+      ? { ok: reputation.ok, hits: reputation.malicious.length, shortened: reputation.shortened?.length ?? 0, reason: reputation.reason ?? null,
+          ...(Object.keys(bySource).length ? { sources: Object.fromEntries(Object.entries(bySource).map(([k, v]) => [k, v.length])) } : {}) }
       : null,
     // 도메인 생성일 결과(도메인 이름은 담지 않는다): null = 조회 안 함
     domain_age: age ? { ok: age.ok, young: age.young?.length ?? 0, reason: age.reason ?? null } : null,

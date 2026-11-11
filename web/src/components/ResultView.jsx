@@ -114,6 +114,13 @@ export default function ResultView({
         )}
       </div>
 
+      {/* Google Safe Browsing 이용 규칙: Google 목록으로 낸 경고에만 출처 표시와 안내 링크 */}
+      {result.signals_final?.includes('SIG_SB_UNSAFE_URL') && (
+        <p className="limit-notice">
+          Advisory provided by Google ·{' '}
+          <a href="https://developers.google.com/safe-browsing/v4/advisory" target="_blank" rel="noopener noreferrer">Google 안내</a>
+        </p>
+      )}
       <LimitNotice />
       {showReportLink && !demo && <MisjudgeLink result={result} />}
     </>

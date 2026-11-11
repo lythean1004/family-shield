@@ -178,7 +178,7 @@ export function createPhishingListChecker({ keys, shortenerKeys } = {}) {
     const list = [...new Set(domains ?? [])];
     const malicious = list.filter((d) => candidateHosts(d).some((h) => keys.has(hostKey(h))));
     const shortened = list.filter((d) => !malicious.includes(d) && short.has(hostKey(d)));
-    return shortened.length ? { ok: true, malicious, shortened } : { ok: true, malicious };
+    return shortened.length ? { ok: true, malicious, shortened, source: "kisa" } : { ok: true, malicious, source: "kisa" };
   };
 }
 
@@ -195,11 +195,19 @@ export function combineCheckers(checkers) {
       Promise.resolve().then(() => c(domains)).catch(() => ({ ok: false, malicious: [], reason: "error" }))));
     const malicious = [...new Set(results.flatMap((r) => r?.malicious ?? []))];
     const shortened = [...new Set(results.flatMap((r) => r?.shortened ?? []))];
+    // 출처별 위험 도메인(KISA·Google 경고 문구와 출처 표시를 나누기 위해)
+    const sources = {};
+    for (const r of results) {
+      if (!r?.malicious?.length) continue;
+      const key = r.source ?? "unknown";
+      sources[key] = [...new Set([...(sources[key] ?? []), ...r.malicious])];
+    }
     const failed = results.filter((r) => !r?.ok);
     const out = failed.length === 0
       ? { ok: true, malicious }
       : { ok: false, malicious, reason: failed.map((r) => r?.reason ?? "error").join(",") };
     if (shortened.length) out.shortened = shortened;
+    if (Object.keys(sources).length) out.sources = sources;
     return out;
   };
 }

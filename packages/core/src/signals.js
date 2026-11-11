@@ -6,7 +6,8 @@
 // 코드 전용
 export const SIG_LINK               = "SIG_LINK";
 export const SIG_SHORT_URL          = "SIG_SHORT_URL";
-export const SIG_MALICIOUS_URL      = "SIG_MALICIOUS_URL";
+export const SIG_MALICIOUS_URL      = "SIG_MALICIOUS_URL";    // KISA 피싱 목록(또는 출처 미상 조회기)
+export const SIG_SB_UNSAFE_URL      = "SIG_SB_UNSAFE_URL";    // Google Safe Browsing 의심 목록(Google 출처 표시 필요)
 export const SIG_LOOKALIKE_DOMAIN   = "SIG_LOOKALIKE_DOMAIN"; // 공식 주소를 흉내 낸 링크(D40 ②)
 export const SIG_NEW_DOMAIN         = "SIG_NEW_DOMAIN";       // 만든 지 30일 안 된 링크 도메인(D41)
 

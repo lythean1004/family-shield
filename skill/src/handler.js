@@ -58,7 +58,11 @@ const LEVEL_TEXT = {
  * 확인 필요는 정해 둔 문장, 그 밖에는 explanation이 있으면 붙이고, 없으면 신호 요약을 쓴다.
  */
 /** 링크 규칙과 그 신호: 규칙이 실제로 위험을 냈을 때만 AI 설명과 별개로 이유를 보여 준다 */
-const LINK_RULE_SIGNALS = { R10: "SIG_MALICIOUS_URL", R11: "SIG_LOOKALIKE_DOMAIN", R12: "SIG_NEW_DOMAIN" };
+const LINK_RULE_SIGNALS = { R10: ["SIG_MALICIOUS_URL", "SIG_SB_UNSAFE_URL"], R11: ["SIG_LOOKALIKE_DOMAIN"], R12: ["SIG_NEW_DOMAIN"] };
+/** Google Safe Browsing 이용 규칙: Google 경고에는 출처 표시와 안내 링크를 붙인다(다른 출처 경고에는 붙이지 않는다) */
+const GOOGLE_ATTRIBUTION = "Advisory provided by Google";
+const GOOGLE_ADVISORY_URL = "https://developers.google.com/safe-browsing/v4/advisory";
+const hasGoogleWarning = (result) => (result.signals_final ?? []).includes("SIG_SB_UNSAFE_URL");
 
 function buildReplyText(result) {
   const lvl = LEVEL_TEXT[result.level] ?? result.level;
@@ -77,13 +81,15 @@ function buildReplyText(result) {
   } else if (result.explanation_for_parent?.length) {
     // 링크 규칙(R10 목록 일치, R11 공식 주소 흉내, R12 새 도메인+요구)은 AI가 모르는 이유라 AI 설명만으로는 위험한 까닭이 안 보인다.
     // 이 경우 정해 둔 신호 문구를 먼저 붙인다(2026-11-11 카카오 시험).
-    const linkReasons = summarizePhrases((result.fired_rules ?? []).map((r) => LINK_RULE_SIGNALS[r]).filter(Boolean));
+    const present = new Set(result.signals_final ?? []);
+    const linkReasons = summarizePhrases((result.fired_rules ?? []).flatMap((r) => LINK_RULE_SIGNALS[r] ?? []).filter((id) => present.has(id)));
     if (linkReasons.length) lines.push(`위험 이유: ${linkReasons.join(" · ")}`);
     lines.push(...result.explanation_for_parent);
   } else if (result.summary) {
     lines.push(`감지된 신호: ${result.summary}`);
   }
 
+  if (hasGoogleWarning(result)) lines.push(GOOGLE_ATTRIBUTION);
   lines.push(FIXED.DISCLAIMER); // F4-8: 모든 결과 화면에 한계 문구
   return lines.join("\n");
 }
@@ -104,6 +110,8 @@ async function buildQuickReplies(result, webBaseUrl, resultStore) {
       replies.push(quickReply.webLink("자세히 보기", `${webBaseUrl}/check/result?t=${token}`));
     } catch { /* The already computed verdict remains available if DB storage fails. */ }
   }
+  // Google 출처 표시의 안내 링크(부모님이 누를 때만 열림, D25 답변 버튼)
+  if (hasGoogleWarning(result)) replies.push(quickReply.webLink("Google 안내", GOOGLE_ADVISORY_URL));
   replies.push(quickReply.message("처음으로", "처음으로"));
   return replies;
 }

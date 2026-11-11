@@ -12,6 +12,7 @@
 import { createHash } from "node:crypto";
 
 export const SAFE_BROWSING_URL = "https://safebrowsing.googleapis.com/v5/hashes:search";
+const MAX_CACHE_MS = 30 * 60_000;
 const KNOWN_THREATS = new Set(["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"]);
 const IGNORE_ATTRS = new Set(["CANARY", "THREAT_ATTRIBUTE_UNSPECIFIED"]);
 const HOST_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
@@ -87,13 +88,14 @@ export function createSafeBrowsingChecker({ apiKey, fetchImpl = fetch, timeoutMs
       try { body = await res.json(); } catch { return { ok: false, malicious: [], reason: "bad json" }; }
 
       const threats = new Set((body.fullHashes ?? []).filter((f) => isThreat(f.fullHashDetails)).map((f) => f.fullHash));
-      const expiresAt = clock() + parseDurationMs(body.cacheDuration);
+      // 약관: Google 목록 정보는 갱신 후 30분 안의 것만 위험으로 쓴다
+      const expiresAt = clock() + Math.min(parseDurationMs(body.cacheDuration), MAX_CACHE_MS);
       for (const p of need) cache.set(p, { expiresAt, threats });
     }
 
     const malicious = byDomain
       .filter(({ hashes }) => hashes.some((h) => cache.get(h.prefix)?.threats.has(h.fullHash)))
       .map((d) => d.domain);
-    return { ok: true, malicious };
+    return { ok: true, malicious, source: "safe_browsing" };
   };
 }
