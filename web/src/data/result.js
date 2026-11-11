@@ -1,3 +1,4 @@
+import { CHECK_LEVEL_TEXT } from '../../../packages/core/src/fixed-text.js'
 // 판별 결과 표시용 변환 — 입력은 core pipeline analyze() 출력 모양 그대로 받는다.
 // level: '위험' | '주의' | '확인필요'  →  화면 키 danger | caution | check
 export const LEVEL_KEY = { 위험: 'danger', 주의: 'caution', 확인필요: 'check' }
@@ -15,7 +16,7 @@ export function verdictDescription(level, impersonationType) {
     return '사기에서 자주 보이는 말이 있어요.'
   }
   if (key === 'caution') return '사기에서 쓰는 말이 섞여 있어요. 확인하고 움직이세요.'
-  return '눈에 띄는 사기 신호는 없었어요. 그래도 공식 번호로 확인하면 확실해요.'
+  return CHECK_LEVEL_TEXT // 카카오와 같은 출처(core/fixed-text.js)
 }
 
 // AI 실패·시간 초과(F4-6) 때 이유 칸 문구

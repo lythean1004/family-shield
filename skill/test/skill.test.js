@@ -5,6 +5,7 @@ import { handleRequest, handleResultLookup, handleAnalyze, makeHandler } from ".
 import { createMemoryResultStore } from "../../packages/core/src/result-token.js";
 import { readRequest, simpleText, quickReply, anonymousCode } from "../src/kakao.js";
 import { loadConfig, tokenMatches } from "../src/config.js";
+import { CHECK_LEVEL_TEXT } from "../../packages/core/src/fixed-text.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "../src/rate-limit.js";
 
 // ── kakao.js ─────────────────────────────────────────────────────────────────
@@ -159,6 +160,15 @@ describe("핸들러 - 기본", () => {
   it("설정에 도메인 생성일 일수가 없으면 조회기를 만들지 않는다(시험에서 외부 접속 없음)", () => {
     assert.equal(loadConfig({ SKILL_HEADER_TOKEN: "t", AI_API_KEY: "k" }).config.domainAgeDays, 30);
     assert.equal(loadConfig({ SKILL_HEADER_TOKEN: "t", AI_API_KEY: "k", DOMAIN_AGE_DAYS: "0" }).config.domainAgeDays, 0);
+  });
+
+  it("확인 필요면 AI 설명 대신 정해 둔 문장을 쓴다('안전'으로 읽히는 AI 문장 방지, 2026-11-11 카카오 확인)", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway([]) } };
+    const r = await handleRequest({ utterance: "아무말이나 보내봅니다" }, c);
+    const text = r.body.template.outputs[0].simpleText.text;
+    assert.ok(text.includes("확인 필요"));
+    assert.ok(text.includes(CHECK_LEVEL_TEXT), text);
+    assert.ok(!text.includes("특이 내용을 찾지 못했어요."), "AI 설명은 쓰지 않는다");
   });
 
   it("링크 규칙이 아닌 위험이면 이유 줄을 따로 붙이지 않는다", async () => {

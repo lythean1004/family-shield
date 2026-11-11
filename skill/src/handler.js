@@ -21,6 +21,7 @@ import { loadPhishingListChecker, combineCheckers } from "../../packages/core/sr
 import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
 import { readRequest, simpleText, quickReply } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
+import { CHECK_LEVEL_TEXT } from "../../packages/core/src/fixed-text.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
 import { createDatabase } from './database.js';
@@ -53,7 +54,7 @@ const LEVEL_TEXT = {
 /**
  * 판정 결과를 카카오 응답 텍스트로 변환한다.
  * R1(통화 중)은 끊기 안내를 첫 줄에, 나머지 설명을 그 뒤에 붙이고 한계 문구로 닫는다.
- * explanation이 있으면 붙이고, 없으면 신호 요약을 쓴다.
+ * 확인 필요는 정해 둔 문장, 그 밖에는 explanation이 있으면 붙이고, 없으면 신호 요약을 쓴다.
  */
 /** 링크 규칙과 그 신호: 규칙이 실제로 위험을 냈을 때만 AI 설명과 별개로 이유를 보여 준다 */
 const LINK_RULE_SIGNALS = { R10: "SIG_MALICIOUS_URL", R11: "SIG_LOOKALIKE_DOMAIN", R12: "SIG_NEW_DOMAIN" };
@@ -69,7 +70,10 @@ function buildReplyText(result) {
 
   lines.push(`[${lvl}]`);
 
-  if (result.explanation_for_parent?.length) {
+  if (result.level === "확인필요") {
+    // AI 설명은 ‘안전’으로 읽힐 수 있어 쓰지 않는다. 웹과 같은 정해 둔 문장
+    lines.push(CHECK_LEVEL_TEXT);
+  } else if (result.explanation_for_parent?.length) {
     // 링크 규칙(R10 목록 일치, R11 공식 주소 흉내, R12 새 도메인+요구)은 AI가 모르는 이유라 AI 설명만으로는 위험한 까닭이 안 보인다.
     // 이 경우 정해 둔 신호 문구를 먼저 붙인다(2026-11-11 카카오 시험).
     const linkReasons = summarizePhrases((result.fired_rules ?? []).map((r) => LINK_RULE_SIGNALS[r]).filter(Boolean));
