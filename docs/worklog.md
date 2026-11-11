@@ -1,5 +1,21 @@
 # 작업 기록
 
+## 2026-11-11 링크 점검 보강(D40 ①②) 구현·측정·운영 반영
+
+**① KISA 피싱 목록 대조:** 공공데이터포털 KISA 피싱 사이트 CSV 2종(~2024-12-31 131,752건, ~2023-12-31 27,582건, 이용허락범위 제한 없음)을 `data/kisa/`(커밋 안 함)에 받아 호스트 SHA-256 앞 16자리만 `content/phishing/kisa-hosts.txt`(31,111개)로 만들었다. 단축 서비스처럼 경로가 많은 도메인 42개는 위험이 아닌 단축 URL 신호(`kisa-shorteners.txt`). 서버 메모리 대조(1,000건 16ms), Safe Browsing과 합침. `packages/core/src/phishing-list.js`, 시험 먼저.
+
+**② 공식 도메인 사칭 감지:** 근거 카드 `content/evidence/official-domains.json` 10장(우체국, CJ, 로젠, 롯데, 한진, 교통민원24, 건강보험, 국세청·홈택스, 정부, 텔레그램), 신호 `SIG_LOOKALIKE_DOMAIN`, 규칙 R11. `packages/core/src/lookalike.js`.
+
+**정상 도메인 대량 시험(선택지 C, 운영자 승인):** Tranco 100만 개(`data/tranco/`, 커밋 안 함), 스크립트 `eval/lookalike-fp.mjs`. 첫 시험 상위 10만에서 R11 오탐 1,553개(해외 정부 gov.uk 등, telegram.com, epostbank.go.kr)와 KISA 목록 오탐 28개(t.me, line.me, korea.kr, ilogen.com 등)를 찾아 고쳤다: gov는 `gov.무작위.일반도메인`만, 텔레그램은 철자 변형만, 우체국은 koreapost·korpost만, 국내·해외 공공기관 도메인 제외, KISA 목록에서 Tranco 100만·카드 공식 도메인 제외, 국가 도메인은 상위 도메인으로 묶지 않음. **고칠 때 보지 않은 89만 6천 개에서 R11 5개(0.0006%)** → 운영자 승인으로 R11 ‘위험’ 확정(decisions D40). KISA 목록 오탐은 Tranco를 제외 목록으로 써서 독립 측정 불가(한계).
+
+**스킴 없는 링크 인식 보완:** 운영 확인 중 `xnr.ae1t.yachts`처럼 `http://` 없이 쓴 새 도메인 끝부분을 링크로 못 알아보는 문제 발견(KISA 스킴 없는 1,975건 중 612건 누락). KISA에서 20번 이상 나온 끝부분 87개 추가 → 24건. 규칙만 평가 200건은 판정이 하나도 바뀌지 않음(놓침률 44.3%, 오경보 0%; 평가 링크가 모두 `.invalid`라 이 기능은 측정 불가).
+
+**Codex 근거 카드 확인(`4a23785`):** 10장 모두 `source_checked`(전문가 검수 아님), `terms_checked=false` 유지. 공식 도메인 추가: `lotteglogis-direct-go.com`, `hanjinoneclick.co.kr`, `telegram.dog`. 이름 규칙은 변경 없음. 미확인: `cjlogistics.co.th`, `hanjintravel.com`(대한항공 자료의 업무 메일 도메인으로만 확인, 보류), `koreapost.com`·`tn-nhis.com`·`telegrem.store`(공식 근거 없음, 미확인이 사칭 확정은 아님). Codex 지적 반영: `or.kr`은 비영리 단체도 등록 가능하므로 공공기관 일괄 제외에서 뺐다(`9b191d5`, KISA 2년치에 or.kr 피싱은 공식 nhis.or.kr 1건뿐, Tranco 결과 동일). 남은 지적: `hanjin` 앞부분 규칙이 다른 정상 계열사를 잡을 수 있음(현재 Tranco에서 hanjintravel.com 1건). 새 카드 후보: 관세청, 금융감독원, 주요 은행·카드사·통신사.
+
+**운영 반영:** VM `9b191d5`, core 251·skill 56 통과, active. VM에서 규칙만으로 확인: `xnr.ae1t.yachts` 위험(R10), `koreapost-kr.top` 위험(R11), 진짜 `service.epost.go.kr` 주의, `lotteglogis-direct-go.com` 주의, `nhis-event.or.kr` 위험(R11). 로컬 전체 시험 392건 통과.
+
+다음: 운영자가 카카오에서 가짜 주소로 확인, D41 도메인 생성일 확인 설계안, hanjin 규칙 재검토, 새 카드(금감원·은행 등)는 같은 오탐 시험을 거쳐 추가.
+
 ## 2026-11-11 중간과제 제출, 링크 평판 조회 키 적용
 
 **중간과제(구글폼) 제출 완료.** 저장소 기록(10/28 기준)과 수행계획서 기능 ①~⑦로 작성했다. 단계 ‘주요 기능 동작’, 일정 ‘일부 지연’(놓침률 미달·법률 검토 대기), 12/11 ‘계획한 범위대로 제출 가능’. 가장 큰 어려움은 법률·개인정보 검토(테스트 가족 실사용의 전제). 추가 멘토링은 다른 분야 전문가(개인정보 법률), 분야는 AI 기술·데이터, 검증·도입 확산, 사업화·법률, 기타(개인정보 법률 검토).
