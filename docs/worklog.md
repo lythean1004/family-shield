@@ -1,5 +1,12 @@
 # 작업 기록
 
+## 2026-11-11 DB 통합 시험 (V100 서버, 가짜 데이터)
+
+- 이 PC의 Docker 메모리 부담 때문에 운영자 결정으로 공용 V100 서버(`machine.runyour.ai`)에서 실행. 서버 규칙(SERVER_NOTES.md)에 시작·종료 기록, 내 폴더(`~/work/family-shield-dbtest`)만 사용, `nice -n 10`, 시스템 설치 없음(apt·Docker 안 씀).
+- 준비: Node 20.20.2(공식 tarball, SHA256 확인), PostgreSQL 16.15 바이너리(`@embedded-postgres/linux-x64`, 폴더 안에만), 127.0.0.1:55432 trust. 역할·DB는 `deploy/remote/10-install-postgres.sh` 3·4단계와 같게(fs_app noinherit, anon/authenticated/service_role, pgcrypto). 마이그레이션 16개 적용(운영 VM과 같은 수).
+- **결과(`a97897d` 기준): DB 통합 시험 3묶음 22/22, DB 권한 시험 38/38, DB 포함 전체 443/443 통과.** Codex가 바꾼 판정 기록(R11·R12 저장) 경로 포함.
+- 정리: 시험 DB 정지, 폴더 삭제, SERVER_NOTES 기록 삭제, 남은 postgres 프로세스 없음 확인. 다시 할 때는 같은 순서로 약 5분.
+
 ## 2026-11-11 한계 문구 통일(D42)·확인 필요 문장·웹 배포·배포 스크립트 보완 (Claude Code)
 
 - **D42 한계 문구 통일(운영자 결정 B):** 카카오 답·웹 음성·PRD 9-10을 project.md 문장으로. 짧은 문구에 “메시지 속 번호나 링크가 아닌”과 “놓칠 수 있습니다”가 빠져 있었다. 카카오 답이 이 문장으로 끝나는지 시험으로 고정(`77f723b`). 카카오 확인(21:28).
