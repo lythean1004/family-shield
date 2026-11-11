@@ -239,6 +239,387 @@
       "checked_at": "2026-11-11",
       "terms_checked": false,
       "status": "source_checked"
+    },
+    {
+      "id": "EV-DOM-FSS",
+      "name": "금융감독원",
+      "official_domains": [
+        "fss.or.kr"
+      ],
+      "source_url": "https://www.fss.or.kr/fss/main/main.do",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.fss.or.kr/fss/main/main.do 에서 확인: 금융감독원 통합홈페이지 제목·민원/보이스피싱 지킴이·금융소비자정보포털 파인 연결 확인. fine.fss.or.kr은 같은 등록 도메인의 하위 주소. 사칭 자료: https://m.korea.kr/briefing/pressReleaseView.do?newsId=156784413&pWise=mSub&pWiseSub=C1 (게시일 2026-10-06). 금융권 개인정보 유출 보상 사칭 경고. 기관별 가짜 호스트 모양 미공개. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-SPO",
+      "name": "검찰(대검찰청 요청 대상)",
+      "official_domains": [
+        "spo.go.kr",
+        "kics.go.kr"
+      ],
+      "source_url": "https://www.spo.go.kr/site/spo/main.do",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.spo.go.kr/site/spo/main.do 에서 확인: 검찰 누리집의 기관 소개·형사사법포털(kics.go.kr) 사건/벌과금 직접 연결 확인. 현재 첫 화면의 기관명은 공소청(본청)으로 표시됨. https://spo.go.kr/site/highseoul/04/10404000000002018102506.jsp 에도 형사사법포털 주소 명시. 사칭 이름 근거 없음: 기관 자체 공지 검색에서 이름이 든 가짜 호스트 원문 미확보. 공공기관 사칭 일반 경고만으로 검찰 이름 규칙을 만들지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-POLICE",
+      "name": "경찰청",
+      "official_domains": [
+        "police.go.kr"
+      ],
+      "source_url": "https://ecrm.police.go.kr/minwon/crs/quick/qna",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://ecrm.police.go.kr/minwon/crs/quick/qna 에서 확인: 경찰청 사이버범죄 신고시스템(ECRM) 명칭·신고 안내 확인. 경찰청 자체 보안 공지와 교차 확인. 사칭 자료: https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1001&q_bbscttSn=20250421165004902 (게시일 2025-04-21). 교통민원24 사칭 경고는 기존 EFINE 대상. 경찰청 이름의 새 호스트 모양 근거로 전용하지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-SCOURT",
+      "name": "대법원·전자소송",
+      "official_domains": [
+        "scourt.go.kr"
+      ],
+      "source_url": "https://slseobu.scourt.go.kr/dcboard/new/DcNewsViewAction.work?cbub_code=000215&gubun=41&pageIndex=1&searchWord=&seqnum=17925",
+      "posted_at": "2025-07-09",
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://slseobu.scourt.go.kr/dcboard/new/DcNewsViewAction.work?cbub_code=000215&gubun=41&pageIndex=1&searchWord=&seqnum=17925 에서 확인: 서울서부지방법원 자체 공지에서 법원 명칭·운영 안내 확인. 전자소송 안내서 https://help.scourt.go.kr/nm/min_16/min_16_10/minsa_file.pdf 에 ecfs.scourt.go.kr 명시(같은 등록 도메인). 사칭 자료: https://slseobu.scourt.go.kr/dcboard/new/DcNewsViewAction.work?cbub_code=000215&gubun=41&pageIndex=1&searchWord=&seqnum=17925 (게시일 2025-07-09). 법원 등기/영장 부서 사칭 및 링크 유도 경고. 가짜 호스트 모양 미공개. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-CUSTOMS",
+      "name": "관세청·유니패스",
+      "official_domains": [
+        "customs.go.kr"
+      ],
+      "source_url": "https://www.customs.go.kr/kcs/main.do",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.customs.go.kr/kcs/main.do 에서 확인: 관세청 대표 누리집·운영 주체 및 유니패스(unipass.customs.go.kr), 개인통관고유부호(ecos.customs.go.kr) 직접 연결 확인. 사칭 자료: https://www.korea.kr/news/policyNewsView.do?newsId=148966893 (게시일 2026-06-22). 마약 밀수 조사 등을 빙자한 관세청 사칭·가짜 홈페이지 유도 경고. 가짜 호스트 모양 미공개. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-NPS",
+      "name": "국민연금공단",
+      "official_domains": [
+        "nps.or.kr"
+      ],
+      "source_url": "https://www.nps.or.kr/gate.do",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.nps.or.kr/gate.do 에서 확인: 국민연금공단 게이트·저작권 표기와 전자민원/기금운용/노후준비 하위 사이트 연결 확인. 사칭 자료: https://www.nps.or.kr/pnsgdnc/newgdnc/getOHAE0001M1.do?hmpgBbsCd=BS20240137&hmpgCd=01&menuId=MN24000897&pageIndex=1&pstId=NE202300000000029004&searchGbu=%EC%A0%84%EC%B2%B4&searchText=%EC%8A%A4%EB%AF%B8%EC%8B%B1&sortSe=FR (게시일 2023-12-10). 스미싱 예시의 모양은 단축 서비스+임의 경로. 기관 이름 라벨의 증거가 아님. 공지 게시일과 본문 예시의 연도(2025)가 달라 예시 갱신일은 미확인. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-EX",
+      "name": "한국도로공사·하이패스",
+      "official_domains": [
+        "ex.co.kr",
+        "hipass.co.kr"
+      ],
+      "source_url": "https://www.ktdb.go.kr/www/selectTrnsportTreeView.do?key=32",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.ktdb.go.kr/www/selectTrnsportTreeView.do?key=32 에서 확인: 국가교통DB 고속도로 교통량 자료의 출처 한국도로공사와 ex.co.kr 직접 연결 확인. https://gonggam.korea.kr/newsContentView.es?mid=a10206000000&news_id=f818da80-ebc5-4702-93ae-9808e9ec1b81&section_id=NCCD_POLICY (2026-10-01)에 통행료 환급 누리집 hipass.co.kr 명시. 두 대표 사이트 직접 열기는 차단되어 공공기관 자료로 확인. 사칭 이름 근거 없음: 통행료 사칭 관련 검색에서 기관/공공기관의 가짜 호스트 모양 원문 미확보. 언론 보도만으로 규칙을 만들지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-KBANK",
+      "name": "KB국민은행",
+      "official_domains": [
+        "kbstar.com"
+      ],
+      "source_url": "https://obank.kbstar.com/quics?page=osecure",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://obank.kbstar.com/quics?page=osecure 에서 확인: KB국민은행 보안센터·인증 안내·운영 주체 확인. obank는 같은 등록 도메인의 하위 주소. 사칭 자료: https://obank.kbstar.com/quics?articleId=127403&bbsMode=view&boardId=992&page=C034274 (게시일 2023-12-11). 급여이체확인증 위장 악성메일 경고. 확인한 본문에는 은행 이름을 쓴 가짜 호스트 모양 없음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-NHBANK",
+      "name": "NH농협은행",
+      "official_domains": [
+        "nhbank.com",
+        "nonghyup.com"
+      ],
+      "source_url": "https://www.nonghyup.com/complaint/protect/financeConsumerProtect.do",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.nonghyup.com/complaint/protect/financeConsumerProtect.do 에서 확인: 농협 자체 금융소비자 보호 안내에서 NH농협은행/농·축협 구분과 banking.nonghyup.com 인터넷뱅킹 연결 확인. nonghyup.com은 은행 전용이 아닌 농협 공용 등록 도메인. https://www.nhbank.com/upload/files/%EB%86%8D%ED%98%91%EC%9D%80%ED%96%89_10%EB%85%84%EC%82%AC_%EB%82%B4%EC%A7%80_%ED%8E%BC%EC%B9%A8.pdf 발행처 NH농협은행·www.nhbank.com·저작권 표기로 nhbank.com 교차 확인. 사칭 자료: https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72211 (게시일 2026-10-06). 농협 자체 보안 안내 검색과 KISA 금융권 사칭 일반 경고에서 농협 이름이 든 가짜 호스트 모양 미확보. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-SHINHANBANK",
+      "name": "신한은행",
+      "official_domains": [
+        "shinhan.com"
+      ],
+      "source_url": "https://img.shinhan.com/nexhpe/document/ahnlab_document.pdf",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://img.shinhan.com/nexhpe/document/ahnlab_document.pdf 에서 확인: 신한은행 공식 피싱·파밍 치료 안내서에서 정상 인터넷뱅킹 banking.shinhan.com 명시. https://www.shinhan.com/ 의 Shinhan Bank 제목으로 교차 확인. 사칭 자료: https://img.shinhan.com/nexhpe/document/ahnlab_document.pdf (게시일 미확인). 정상 주소를 hosts 변조로 가로채는 파밍 안내. 정상 주소 자체는 사칭 이름 규칙의 근거가 아님. 문서 게시일 미표시. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-WOORIBANK",
+      "name": "우리은행",
+      "official_domains": [
+        "wooribank.com"
+      ],
+      "source_url": "https://www.wooribank.com/",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.wooribank.com/ 에서 확인: 우리은행 대표 화면의 개인/기업 뱅킹·인증/고객센터 연결 확인. spot.wooribank.com 보안 공지와 교차 확인. 사칭 자료: https://spot.wooribank.com/pot/Dream?ARTICLE_ID=22357&BOARD_ID=B00301&bbsMode=view&withyou=CQSCT0116 (게시일 2015-07-02). 큐싱 및 가짜 금융감독원 팝업 경고. 확인한 본문에서 우리은행 이름의 가짜 호스트 모양 미확보. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-HANABANK",
+      "name": "하나은행",
+      "official_domains": [
+        "kebhana.com"
+      ],
+      "source_url": "https://www.kebhana.com/",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.kebhana.com/ 에서 확인: 하나은행 대표 화면·인증센터·기업뱅킹(biz.kebhana.com)·고객센터 연결 확인. 사칭 자료: https://biz.hanabank.com/conts/index.do?goUrl=%2Fcont%2Fcustomer%2Fcustomer04%2Fcustomer042%2Fcustomer0421%2Findex.jsp (게시일 미확인). 보안센터의 피싱 일반 예방 설명. 하나은행 이름이 든 가짜 호스트 모양 미확보. 별도 구 등록 도메인은 이번 제외 목록에 추가하지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-IBK",
+      "name": "IBK기업은행",
+      "official_domains": [
+        "ibk.co.kr"
+      ],
+      "source_url": "https://www.ibk.co.kr/",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.ibk.co.kr/ 에서 확인: IBK기업은행 대표 화면·인증/보안센터 연결 확인. 사칭 자료: https://www.ibk.co.kr/common/navigation.ibk?linkUrl=/financetech/efinance/safe/safe_main.jsp&pageId=SC00000000 (게시일 미확인). 공식 보안센터와 금융권 사칭 경고 검색에서 IBK 이름을 쓴 가짜 호스트 모양 미확보. 짧은 ibk 단독 규칙은 만들지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-KAKAOBANK",
+      "name": "카카오뱅크",
+      "official_domains": [
+        "kakaobank.com"
+      ],
+      "source_url": "https://www.kakaobank.com/view/customer",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.kakaobank.com/view/customer 에서 확인: 카카오뱅크 고객센터·운영 주체 및 전화/광고 진위 확인 안내. 모바일 공지 m.kakaobank.com의 (주)카카오뱅크 표기로 교차 확인. 사칭 자료: https://m.kakaobank.com/Notices/pages/2 (게시일 2026-10-21). 전화번호 사칭 스팸 문자(스미싱) 주의 공지의 제목·날짜 확인. 상세 본문/가짜 호스트 모양은 확보하지 못함. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-TOSSBANK",
+      "name": "토스뱅크",
+      "official_domains": [
+        "tossbank.com"
+      ],
+      "source_url": "https://www.tossbank.com/",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.tossbank.com/ 에서 확인: 토스뱅크 대표 화면의 회사/고객센터·운영 주체 확인. https://www.tossbank.com/customer/counselling 에서 상담 안내 교차 확인. 사칭 이름 근거 없음: 토스와 토스뱅크를 구분해 검색했으나 토스뱅크 자체의 가짜 호스트 모양 원문 미확보. 검색된 토스 일반 사칭 공지를 은행 규칙으로 전용하지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-SHINHANCARD",
+      "name": "신한카드",
+      "official_domains": [
+        "shinhancard.com"
+      ],
+      "source_url": "https://www.shinhancard.com/pconts/html/main.html",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.shinhancard.com/pconts/html/main.html 에서 확인: 신한카드 대표 화면의 카드/결제/SOL페이 서비스 및 자체 소비자 경고 공지 확인. 사칭 자료: https://www.shinhancard.com/pconts/html/helpdesk/dataRoom/MOBFM12048/1232962_1127.html (게시일 2025-05-09). 카드 배송·택배 결제·자녀 사칭 경고. 이미지의 주소는 설명용 가짜 URL 표기이며 신한카드 이름을 쓴 호스트 모양 증거가 아님. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-SAMSUNGCARD",
+      "name": "삼성카드",
+      "official_domains": [
+        "samsungcard.com"
+      ],
+      "source_url": "https://www.samsungcard.com/personal/main/UHPPCO0101M0.jsp",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.samsungcard.com/personal/main/UHPPCO0101M0.jsp 에서 확인: 삼성카드 대표 화면·결제/고객센터 연결 확인. 사칭 자료: https://biz.samsungcard.com/personal/customer-service/provention/accident/UHPPCC0354M3.jsp (게시일 미확인). 금융사기 예방 안내에서 카드사 이름을 쓴 가짜 호스트 모양 미확보. 삼성전자 사칭 사례를 삼성카드 근거로 전용하지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-HYUNDAICARD",
+      "name": "현대카드",
+      "official_domains": [
+        "hyundaicard.com"
+      ],
+      "source_url": "https://www.hyundaicard.com/main/site_map.hc",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.hyundaicard.com/main/site_map.hc 에서 확인: 사이트맵의 결제정보/인증 안내와 사업자번호·Hyundai Card Co., Ltd. 저작권 표기 확인. 사칭 자료: https://www.hyundaicard.com/cpu/cg/CPUCG0201_02.hc?m=lstCntOp (게시일 미확인). 소비자보호 공지 목록에는 사칭 경고가 있으나 현대카드 이름을 쓴 가짜 호스트 모양 원문 미확보. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-KBCARD",
+      "name": "KB국민카드",
+      "official_domains": [
+        "kbcard.com"
+      ],
+      "source_url": "https://card.kbcard.com/CMN/DVIEW/HOAMCXPRIZZC0002",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://card.kbcard.com/CMN/DVIEW/HOAMCXPRIZZC0002 에서 확인: KB국민카드 대표 화면의 결제/고객센터·카드 서비스 확인. mapps.kbcard.com 고객센터로 교차 확인. 사칭 자료: https://mapps.kbcard.com/SVC/DVIEW/HSEMCXCRSZZC0001 (게시일 미확인). KB국민카드 사칭 악성메일 주의 공지 제목 확인. 상세 본문·게시일·가짜 호스트 모양 미확보. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-LOTTECARD",
+      "name": "롯데카드",
+      "official_domains": [
+        "lottecard.co.kr"
+      ],
+      "source_url": "https://www.lottecard.co.kr/app/LPCSTAC_V100.lc",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.lottecard.co.kr/app/LPCSTAC_V100.lc 에서 확인: 롯데카드 사이트의 회사명·주소·서비스 안내 확인. 모바일 고객센터 m.lottecard.co.kr은 같은 등록 도메인. 사칭 자료: https://m.lottecard.co.kr/app/LPCSTRA_V101.lc (게시일 2025-09-03). 고객센터 목록에서 롯데카드 사칭 스미싱 주의 제목·날짜 확인. 상세 본문/가짜 호스트 모양 미확보. 기존 롯데택배 카드와 구분. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-WOORICARD",
+      "name": "우리카드",
+      "official_domains": [
+        "wooricard.com"
+      ],
+      "source_url": "https://pc.wooricard.com/dcpc/yh1/cid/cid01/ceointro/H1CID201S00.do",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://pc.wooricard.com/dcpc/yh1/cid/cid01/ceointro/H1CID201S00.do 에서 확인: 회사소개에 주식회사 우리카드 명시. 하단 회사명·사업자번호·WOORICARD 저작권 표기와 결제/고객센터 연결 확인. 사칭 이름 근거 없음: 기관 자체 검색에서 가짜 호스트 모양 원문 미확보. KISA 카드사 일반 경고는 익명화되어 우리카드 전용 이름 근거가 아님. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-HANACARD",
+      "name": "하나카드",
+      "official_domains": [
+        "hanacard.co.kr"
+      ],
+      "source_url": "https://www.hanacard.co.kr/OPIB0050001M.web?schID=pcd",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.hanacard.co.kr/OPIB0050001M.web?schID=pcd 에서 확인: 하나카드 공식 발급/인증 안내·고객센터 확인. 하나은행 대표 화면의 하나카드 연결과 교차 확인. 사칭 이름 근거 없음: 기관 자체 검색에서 이름을 쓴 가짜 호스트 모양 미확보. 기관이 게시한 공동 예방 자료 및 KISA 일반 경고만으로 하나카드 이름을 추정하지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-BCCARD",
+      "name": "BC카드",
+      "official_domains": [
+        "bccard.com"
+      ],
+      "source_url": "https://www.bccard.com/app/card/MainActn.do",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.bccard.com/app/card/MainActn.do 에서 확인: BC카드 개인 서비스·고객센터 확인. https://www.bccard.com/app/card/html/company/company/location/center/center1/center.jsp 에 비씨카드(주)·저작권 표기. 별도 .co.kr은 연결 오류로 이번 목록에 넣지 않음. 사칭 이름 근거 없음: BC 사칭 피싱메일 공지 검색 결과는 있으나 본문/게시일/가짜 호스트 모양 미확보. 짧은 bc 단독 규칙을 만들지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-COUPANG",
+      "name": "쿠팡",
+      "official_domains": [
+        "coupang.com"
+      ],
+      "source_url": "https://news.coupang.com/archives/46592/",
+      "posted_at": "2024-08-30",
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://news.coupang.com/archives/46592/ 에서 확인: 쿠팡 뉴스룸 경고문에서 공식 웹사이트 www.coupang.com을 직접 명시하고 하단 쿠팡(주) 운영 주체 표시. 사칭 자료: https://news.coupang.com/archives/46592/ (게시일 2024-08-30). 직원/판매자 사칭 선입금 유도 경고. 공식 주소는 명시하지만 가짜 호스트 모양은 공개하지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-NAVERPAY",
+      "name": "네이버페이",
+      "official_domains": [
+        "pay.naver.com"
+      ],
+      "source_url": "https://help.pay.naver.com/",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://help.pay.naver.com/ 에서 확인: 쇼핑&페이 고객센터의 Npay(new-m.pay.naver.com) 직접 연결과 네이버파이낸셜 운영 주체 확인. 포털 전체 naver.com을 새 카드의 공식 도메인으로 등록하지 않음. 사칭 자료: https://help.pay.naver.com/faq/content.help?faqId=16897 (게시일 미확인). 가짜 Npay 안전결제 페이지·외부 결제 링크 사기 유형 안내. 기관 이름 라벨의 구체적인 가짜 호스트 모양 미공개. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-KAKAOPAY",
+      "name": "카카오페이",
+      "official_domains": [
+        "kakaopay.com"
+      ],
+      "source_url": "https://kakaopay.com/qna/consumer/financial_info",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://kakaopay.com/qna/consumer/financial_info 에서 확인: Kakao Pay Corp. 저작권 표기·고객센터(support.kakaopay.com)·결제내역(kpg-payment.kakaopay.com) 직접 연결 확인. 사칭 자료: https://kakaopay.com/qna/consumer/financial_info (게시일 2024-12-11). 카카오페이 사칭 이메일 피싱 주의 제목·날짜 확인. 상세 본문/가짜 호스트 모양 미확보. 포털 전체 kakao.com은 새 카드에 넣지 않음. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
+    },
+    {
+      "id": "EV-DOM-DAANGN",
+      "name": "당근",
+      "official_domains": [
+        "daangn.com"
+      ],
+      "source_url": "https://about.daangn.com/",
+      "posted_at": null,
+      "checked_at": "2026-11-11",
+      "scope": "공식 도메인 제외용(사칭 이름 근거 없음)",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://about.daangn.com/ 에서 확인: 당근 회사소개에서 당근 서비스·공식 보도자료/채용 연결 확인. 자체 보도자료의 당근마켓 운영 주체 설명과 교차 확인. 사칭 자료: https://about.daangn.com/company/pr/archive/%EB%8B%B9%EA%B7%BC%EB%A7%88%EC%BC%93-%EC%95%88%EC%A0%84%ED%95%9C-c2c-%EA%B1%B0%EB%9E%98-%ED%99%98%EA%B2%BD-%EC%A1%B0%EC%84%B1-%EC%9C%84%ED%95%9C-%EC%A4%91%EA%B3%A0%EA%B1%B0%EB%9E%98-%EB%8D%B0%EC%9D%B4%ED%84%B0-%EA%B3%B5%EA%B0%9C/ (게시일 2023-07-10). 외부 가짜 안전결제 페이지로 유도하는 수법 설명. 구체적인 가짜 호스트 모양 미공개. 이용자가 작성한 게시물은 공식 경고 근거에서 제외. 별도 문자·인증·청구서 도메인은 직접 안내 근거가 확보된 경우에만 포함하며 미확인 주소는 추정하지 않음. 이용조건은 개별 확인하지 않았으며 전문가 검수 전. 공식 호스트의 개별 게시물·거래까지 안전하다는 뜻은 아님."
     }
   ]
 }

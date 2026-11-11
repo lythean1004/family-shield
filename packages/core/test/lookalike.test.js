@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { domainSegments, findLookalikes, OFFICIAL_DOMAIN_CARDS } from "../src/lookalike.js";
 import { extractCodeSignals } from "../src/extract.js";
 import { decide } from "../src/rule-engine.js";
+import { lookupTargets } from "../src/domain-age.js";
+import { buildKeys, hostKey } from "../src/phishing-list.js";
 
 describe("도메인 조각 나누기", () => {
   it("최상위 도메인(2단계 국가 도메인 포함)을 빼고 점·하이픈으로 나눈다", () => {
@@ -111,6 +113,65 @@ describe("공식 도메인 사칭 감지 (D40 ②)", () => {
       for (const k of ["id", "name", "official_domains", "source_url", "checked_at", "scope", "terms_checked", "status"]) {
         assert.ok(k in c, `${c.id}: ${k}`);
       }
+    }
+  });
+});
+
+describe("공식 도메인 제외용 카드 확대 (요청서 3)", () => {
+  // 기대 도메인은 조사 결과에서 고정한다. 카드 목록 자체에서 기대값을 만들지 않는다.
+  const expected = {
+    FSS: ["fss.or.kr"], SPO: ["spo.go.kr", "kics.go.kr"], POLICE: ["police.go.kr"],
+    SCOURT: ["scourt.go.kr"], CUSTOMS: ["customs.go.kr"], NPS: ["nps.or.kr"],
+    EX: ["ex.co.kr", "hipass.co.kr"], KBANK: ["kbstar.com"],
+    NHBANK: ["nhbank.com", "nonghyup.com"], SHINHANBANK: ["shinhan.com"],
+    WOORIBANK: ["wooribank.com"], HANABANK: ["kebhana.com"], IBK: ["ibk.co.kr"],
+    KAKAOBANK: ["kakaobank.com"], TOSSBANK: ["tossbank.com"],
+    SHINHANCARD: ["shinhancard.com"], SAMSUNGCARD: ["samsungcard.com"],
+    HYUNDAICARD: ["hyundaicard.com"], KBCARD: ["kbcard.com"],
+    LOTTECARD: ["lottecard.co.kr"], WOORICARD: ["wooricard.com"],
+    HANACARD: ["hanacard.co.kr"], BCCARD: ["bccard.com"], COUPANG: ["coupang.com"],
+    NAVERPAY: ["pay.naver.com"], KAKAOPAY: ["kakaopay.com"], DAANGN: ["daangn.com"],
+  };
+  const domains = Object.values(expected).flat();
+  const allow = new Set(OFFICIAL_DOMAIN_CARDS.flatMap(c => c.official_domains));
+
+  it("근거가 확인된 기관만 등록하고 이름 근거가 없는 카드는 탐지 규칙을 갖지 않는다", () => {
+    for (const [suffix, official] of Object.entries(expected)) {
+      const id = `EV-DOM-${suffix}`;
+      const card = OFFICIAL_DOMAIN_CARDS.find(c => c.id === id);
+      assert.ok(card, id);
+      assert.deepEqual(card.official_domains, official, id);
+      assert.equal(card.scope, "공식 도메인 제외용(사칭 이름 근거 없음)", id);
+      for (const field of ["prefixes", "regex", "label_regex", "first_label_on_generic"]) {
+        assert.equal((card[field] ?? []).length, 0, `${id}: ${field}`);
+      }
+    }
+  });
+
+  it("공식 주소와 하위 주소는 R11·RDAP 조회·KISA 키 생성에서 제외한다", () => {
+    for (const domain of domains) {
+      for (const host of [domain, `notice.${domain}`, `auth.mobile.${domain}`]) {
+        assert.deepEqual(findLookalikes([host]), [], host);
+        assert.deepEqual(lookupTargets([host]), [], host);
+        assert.equal(buildKeys([`https://${host}/synthetic-test`], { allow }).keys.size, 0, host);
+      }
+    }
+  });
+
+  it("공식 이름을 덧붙인 다른 주소까지 제외하지 않는다(모두 접속하지 않는 합성 주소)", () => {
+    for (const domain of domains) {
+      for (const host of [`${domain}.example.invalid`, `other-${domain.replaceAll('.', '-')}.invalid`]) {
+        assert.ok(lookupTargets([host]).length > 0, host);
+        assert.ok(buildKeys([`https://${host}/synthetic-test`], { allow }).keys.has(hostKey(host)), host);
+      }
+    }
+  });
+
+  it("짧은 기관 약자·일반 단어·다른 회사 이름만으로 새 위험 신호를 만들지 않는다", () => {
+    for (const label of ["kb", "nh", "ibk", "bc", "sc", "bank", "card", "pay", "kbank",
+      "samsung-electronics", "hyundai-motor", "hana-tour", "lotte-shopping", "carrot-farm",
+      "coupang-notice", "kakaopay123", "shinhan-card"]) {
+      assert.deepEqual(findLookalikes([`${label}.invalid`]), [], label);
     }
   });
 });
