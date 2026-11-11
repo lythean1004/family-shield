@@ -36,7 +36,8 @@ export function checkCase(c) {
   const need = ["case_id", "split", "group", "message_text", "gold"];
   for (const k of need) if (c[k] == null) errs.push(`필드 없음: ${k}`);
   if (errs.length) return errs;
-  if (!["dev", "test"].includes(c.split)) errs.push(`split 값: ${c.split}`);
+  // supplement: 평가용 200건과 따로 두는 보충 세트(2026-11-12, D45 측정용). 묶음별 목표 건수에 넣지 않는다
+  if (!["dev", "test", "supplement"].includes(c.split)) errs.push(`split 값: ${c.split}`);
   // 개발용 20건은 D1/D2 구분 전에 만들어 group "D"를 쓴다. 평가용은 D1/D2로 나눠야 한다.
   const groupOk = GROUPS.has(c.group) || (c.split === "dev" && c.group === "D");
   if (!groupOk) errs.push(`group 값: ${c.group}`);
