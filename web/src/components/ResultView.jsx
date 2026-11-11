@@ -21,6 +21,7 @@ import CallButton from './CallButton.jsx'
 import MisjudgeLink from './MisjudgeLink.jsx'
 import SpeakButton from './SpeakButton.jsx'
 import { levelKey, verdictDescription, AI_FALLBACK_TEXT, AI_DECLINED_TEXT } from '../data/result.js'
+import { HEALTH_SKIPPED_TEXT } from '../../../packages/core/src/fixed-text.js'
 import { POLICE, sourceText } from '../data/contacts.js'
 
 export default function ResultView({
@@ -58,7 +59,7 @@ export default function ResultView({
         <section aria-label="이유">
           <SignalList signals={result.signals_final} impersonatedRelation={result.impersonated_relation} />
           {result.fallback_used ? (
-            <p className="screen-body">{result.ai_consent === false ? AI_DECLINED_TEXT : AI_FALLBACK_TEXT}</p>
+            <p className="screen-body">{result.ai_skipped === 'health' ? HEALTH_SKIPPED_TEXT : result.ai_consent === false ? AI_DECLINED_TEXT : AI_FALLBACK_TEXT}</p>
           ) : (
             explanation.slice(0, 3).map((s) => (
               <p key={s} className="screen-body">{s}</p>

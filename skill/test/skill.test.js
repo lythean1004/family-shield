@@ -135,7 +135,7 @@ describe("핸들러 - 기본", () => {
 
   it("링크 규칙(R11)으로 위험이면 AI 설명이 있어도 이유 문구를 함께 보여 준다(2026-11-11 카카오 시험)", async () => {
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK"]) } };
-    const r = await handleRequest({ utterance: "[시험] 건강검진 안내 nhis-event.or.kr" }, c);
+    const r = await handleRequest({ utterance: "[시험] 보험료 환급 안내 nhis-event.or.kr" }, c);
     const text = r.body.template.outputs[0].simpleText.text;
     assert.ok(text.includes("위험"));
     assert.ok(text.includes("위험 이유: 공식 주소를 흉내 낸 링크"), text);
@@ -189,6 +189,15 @@ describe("핸들러 - 기본", () => {
     const text = r.body.template.outputs[0].simpleText.text;
     assert.ok(text.includes("위험 이유: KISA 피싱 사이트 목록에 있던 링크"), text);
     assert.ok(!text.includes("Google"));
+  });
+
+  it("건강 관련 안내라 해외 AI로 보내지 않았으면 그 사실을 알린다(작업 ⑦)", async () => {
+    const seen = {};
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: async (...a) => { seen.called = true; return fakeGateway([])(...a); } } };
+    const r = await handleRequest({ utterance: "[○○병원] 11월 2일 오전 10시 내과 예약 확인됐습니다." }, c);
+    const text = r.body.template.outputs[0].simpleText.text;
+    assert.equal(seen.called, undefined, "AI 호출 없음");
+    assert.ok(text.includes("건강 관련 내용이 있어 해외 AI로 보내지 않았어요."), text);
   });
 
   it("링크 규칙이 아닌 위험이면 이유 줄을 따로 붙이지 않는다", async () => {

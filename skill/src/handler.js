@@ -22,7 +22,7 @@ import { loadPhishingListChecker, combineCheckers } from "../../packages/core/sr
 import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
 import { readRequest, simpleText, quickReply } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
-import { CHECK_LEVEL_TEXT } from "../../packages/core/src/fixed-text.js";
+import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT } from "../../packages/core/src/fixed-text.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
 import { createDatabase } from './database.js';
@@ -89,6 +89,8 @@ function buildReplyText(result) {
     lines.push(`감지된 신호: ${result.summary}`);
   }
 
+  // 작업 ⑦: 건강 관련 안내라 해외 AI로 보내지 않은 경우
+  if (result.ai_skipped === "health") lines.push(HEALTH_SKIPPED_TEXT);
   if (hasGoogleWarning(result)) lines.push(GOOGLE_ATTRIBUTION);
   lines.push(FIXED.DISCLAIMER); // F4-8: 모든 결과 화면에 한계 문구
   return lines.join("\n");

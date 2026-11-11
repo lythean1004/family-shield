@@ -14,6 +14,7 @@ import { extractCodeSignals } from "./extract.js";
 import { mask } from "./masking.js";
 import { extractSignals } from "./ai-client.js";
 import { decide } from "./rule-engine.js";
+import { hasHealthInfo, maskHealth, shouldSkipAiForHealth } from "./sensitive.js";
 import { summarize } from "./summarizer.js";
 import { SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_SHORT_URL, SIG_NEW_DOMAIN } from "./signals.js";
 
@@ -70,11 +71,17 @@ export async function analyze({
 
   let aiResult = null;
   let fallbackReason = null;
+  let aiSkipped = null;
   if (!ai || !ai.model) {
     fallbackReason = "AI 꺼짐";
+  } else if (shouldSkipAiForHealth(input, code.signals)) {
+    // 작업 ⑦: 진짜 병원·약국·검진 안내로 보이면 건강정보를 해외 AI로 보내지 않는다(판정은 규칙이 그대로 정함)
+    fallbackReason = "건강정보";
+    aiSkipped = "health";
   } else {
     aiResult = await extractSignals({
-      message: masked,
+      // 사기 미끼로 보여 AI를 쓰더라도 진료과·검사·질환·처방 단어는 가린다
+      message: hasHealthInfo(input) ? maskHealth(masked) : masked,
       cards,
       allowedCardIds: new Set(cards.map((c) => c.id)),
       ...ai,
@@ -124,6 +131,7 @@ export async function analyze({
     summary: summarize(signalsFinal, { impersonated_relation: relation }),
     fallback_used: !aiData,
     fallback_reason: fallbackReason,
+    ai_skipped: aiSkipped,
     truncated,
     ai_meta: aiResult?.meta ?? null,
     // 평판 조회 결과(도메인 이름은 담지 않는다): null = 조회 안 함

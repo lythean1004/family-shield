@@ -49,7 +49,7 @@ export function redactToken(url) {
 /** 웹 P4가 쓰는 필드만 남긴다. 원문·번호 HMAC·도메인·AI 메타는 담지 않는다. */
 const VIEW_FIELDS = [
   "level", "fired_rules", "signals_final", "impersonation_type", "impersonated_relation",
-  "explanation_for_parent", "fallback_used", "summary",
+  "explanation_for_parent", "fallback_used", "summary", "ai_skipped",
 ];
 export function toResultView(result) {
   const out = {};
