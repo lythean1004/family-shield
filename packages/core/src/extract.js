@@ -13,8 +13,9 @@
  * options.registeredLast4 : 사칭된 가족의 등록 번호 끝 4자리(P3에서 고른 뒤 알 수 있음)
  *   두 값이 모두 있고 다르면 SIG_NEW_NUMBER. 같아도 판정을 낮추지 않는다(발신번호 조작 가능).
  */
+import { findLookalikes } from "./lookalike.js";
 import {
-  SIG_LINK, SIG_SHORT_URL, SIG_APP_INSTALL, SIG_MONEY,
+  SIG_LINK, SIG_SHORT_URL, SIG_LOOKALIKE_DOMAIN, SIG_APP_INSTALL, SIG_MONEY,
   SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
@@ -96,6 +97,8 @@ export function extractCodeSignals(text, options = {}) {
     else domains.add(domain);
     if (/\.apk(?:$|[?#])/i.test(link)) signals.add(SIG_APP_INSTALL); // 설치 파일 링크
   }
+  // 공식 주소를 흉내 낸 도메인(D40 ②). 단축 URL은 이름이 없으므로 대상 아님
+  if (findLookalikes([...domains]).length) signals.add(SIG_LOOKALIKE_DOMAIN);
 
   // 요구 키워드
   for (const [signal, patterns] of Object.entries(PATTERNS)) {

@@ -24,6 +24,7 @@ const SIGNAL_PHRASE = {
   SIG_THIRD_PARTY_ACCOUNT:  "개인 계좌로 입금 요구",
   SIG_SHORT_URL:            "단축 링크 포함",
   SIG_MALICIOUS_URL:        "위험한 링크로 확인됨",
+  SIG_LOOKALIKE_DOMAIN:     "공식 주소를 흉내 낸 링크",
   // SIG_FAMILY_IMPERSONATION은 relation과 함께 동적으로 처리
 };
 

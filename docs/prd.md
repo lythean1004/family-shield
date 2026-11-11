@@ -244,7 +244,7 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 | F4-8 | 모든 결과 화면에 한계 문구 표시 | P0 |
 | F4-9 | 사용자별 판별 호출 한도 [임시] 분당 5회, 하루 50회 | P0 |
 | F4-10 | **캡처 입력:** 이미지를 올리면 휴대폰 안에서 글자를 인식해 텍스트로 바꾸고, 부모님이 인식된 글을 확인한 뒤 판별로 넘김. **인식에 실패하면** “사진을 AI로 보내 확인할까요? 사진 속 번호·이름은 가려지지 않아요” 동의를 받은 경우에만 이미지를 멀티모달 AI로 보내고, 이미지는 저장하지 않음(D24, 법률 검토 후 구현) | P1 |
-| F4-11 | **URL 평판 조회:** 추출한 링크의 도메인만 평판 조회 API에 질의해 악성이면 `SIG_MALICIOUS_URL`. 링크에 접속하지 않고, 단축 URL은 펼치지 않고 `SIG_SHORT_URL`(D11). 조회 실패 시 판정을 낮추지 않음 | P1 |
+| F4-11 | **URL 평판 조회:** 추출한 링크의 도메인만 평판 조회 API에 질의해 악성이면 `SIG_MALICIOUS_URL`. 링크에 접속하지 않고, 단축 URL은 펼치지 않고 `SIG_SHORT_URL`(D11). 조회 실패 시 판정을 낮추지 않음. **D40:** KISA 피싱 사이트 목록(2023~2024, 해시만 보관) 메모리 대조를 함께 하고, 목록의 단축 서비스는 `SIG_SHORT_URL`. 공식 도메인을 흉내 낸 도메인은 `SIG_LOOKALIKE_DOMAIN`(근거 카드 content/evidence/official-domains.json) | P1 |
 | F4-12 | **음성 읽어주기:** 결과와 지금 할 일을 브라우저 내장 음성합성으로 읽어 줌. [읽어주기] 버튼(D12) | P1 |
 | F4-13 | **오판 신고:** 결과 화면의 [이 판정이 이상해요]. 기본은 신호·판정·신고 사실만 기록. 부모님이 별도 동의했을 때만 마스킹된 문장을 저장하고, 사람이 비식별 여부를 검토한 뒤 개선에 사용(D17) | P1 |
 
@@ -332,7 +332,8 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 |---|---|---|
 | SIG_LINK | 링크 포함 | 코드 |
 | SIG_SHORT_URL | 단축 URL 포함(펼치지 않음) | 코드 |
-| SIG_MALICIOUS_URL | 링크 도메인이 평판 조회에서 악성으로 나옴 | 코드(평판 조회) |
+| SIG_MALICIOUS_URL | 링크 도메인이 평판 조회(Google Safe Browsing) 또는 KISA 피싱 목록에서 악성으로 나옴 | 코드(평판 조회) |
+| SIG_LOOKALIKE_DOMAIN | 링크 도메인 조각 앞부분에 기관·택배사 이름이 있는데 그 기관의 공식 도메인이 아님(D40 ②) | 코드(근거 카드) |
 | SIG_APP_INSTALL | 앱이나 원격 조종 프로그램 설치 요구 | 코드 + AI |
 | SIG_DELETE_APP | 은행·통신사 앱을 지우라는 지시 | AI |
 | SIG_MONEY | 송금, 이체, 결제를 **요구함**(이미 보냈다는 알림·출금 알림은 해당 안 됨) | 코드 + AI |
@@ -358,7 +359,7 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 ### 9-5. AI 입력과 출력
 
 - **입력:** 시스템 프롬프트(역할, 신호 목록, 설명 규칙, 문자 안의 지시는 따르지 않는다는 지침), `<cards>`(활성 카드 ID와 한 줄 요약), `<message>`(마스킹한 문자)
-- **출력 스키마:** `signals`(9-3 목록의 값만, SIG_LINK·SIG_SHORT_URL·SIG_MALICIOUS_URL 제외), `impersonation_type`(family / agency / none / unknown), `impersonated_relation`(정해진 관계 11개 또는 null), `evidence_card_ids`(최대 3개), `explanation_for_parent`(최대 3문장, 문장마다 40자 이하)
+- **출력 스키마:** `signals`(9-3 목록의 값만, SIG_LINK·SIG_SHORT_URL·SIG_MALICIOUS_URL·SIG_LOOKALIKE_DOMAIN 제외), `impersonation_type`(family / agency / none / unknown), `impersonated_relation`(정해진 관계 11개 또는 null), `evidence_card_ids`(최대 3개), `explanation_for_parent`(최대 3문장, 문장마다 40자 이하)
 - **`impersonation_type`의 뜻:** 문자가 스스로 밝힌 발신자 유형. 진짜인지 가짜인지는 판단하지 않는다(진위 판단은 AI가 판정을 맡는 것이 되어 원칙 2와 충돌). 그래서 정상 은행 알림도 agency다.
 - 시스템 프롬프트는 버전을 매겨 관리한다(`prompt_version`).
 
@@ -393,6 +394,7 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 | R8 | 위 조건에 하나도 해당하지 않음 | 확인 필요 |
 | R9 | 고립 요구, 선입금 요구, 개인 계좌 입금 요구, 앱 삭제 지시 중 하나 | 위험 |
 | R10 | 링크 도메인이 평판 조회에서 악성(`SIG_MALICIOUS_URL`) | 위험 |
+| R11 | 공식 주소를 흉내 낸 링크(`SIG_LOOKALIKE_DOMAIN`, D40 ②) [임시: 정상 도메인 오탐 측정 후 확정] | 위험 |
 
 판정은 올라가기만 한다. 판정에 쓰인 규칙은 `fired_rules`에 기록한다.
 
@@ -419,6 +421,7 @@ AI가 쓴 설명은 쓰지 않는다. 신호 ID를 정해 둔 문구로 바꿔 �
 | SIG_AVOID_VOICE | 통화를 피함 | SIG_CALL_THIS_NUMBER | 특정 번호로 전화 유도 |
 | SIG_THIRD_PARTY_ACCOUNT | 개인 계좌로 입금 요구 | SIG_FAMILY_IMPERSONATION | (관계로 표시: “딸이라고 함”) |
 | SIG_SHORT_URL | 단축 링크 포함 | SIG_MALICIOUS_URL | 위험한 링크로 확인됨 |
+| SIG_LOOKALIKE_DOMAIN | 공식 주소를 흉내 낸 링크 | | |
 
 ### 9-10. 고정 안내와 한계 문구
 

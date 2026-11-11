@@ -17,7 +17,7 @@ const IPV4_RE = /^\d{1,3}(?:\.\d{1,3}){3}$/;
 const KEY_RE = /^[0-9a-f]{16}$/;
 
 /** 2단계 국가 도메인: 이것 자체는 대조 후보가 아니다 */
-const SECOND_LEVEL = new Set([
+export const SECOND_LEVEL = new Set([
   "co.kr", "or.kr", "go.kr", "ne.kr", "re.kr", "pe.kr", "ac.kr", "hs.kr", "ms.kr", "es.kr", "kg.kr", "sc.kr", "mil.kr",
   "co.jp", "ne.jp", "or.jp", "com.cn", "net.cn", "com.hk", "co.uk", "com.au",
 ]);
