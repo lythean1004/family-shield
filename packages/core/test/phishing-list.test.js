@@ -62,12 +62,18 @@ describe("공용 도메인 제외 (정상 사이트 오탐 방지)", () => {
     }
   });
 
-  it("공공·교육기관 도메인(go.kr, or.kr, ac.kr 등)은 목록에 넣지 않는다(KISA 원본에 기관 주소가 섞여 있음)", () => {
-    for (const h of ["www.nhis.or.kr", "www.efine.go.kr", "lms.univ.ac.kr", "nhis.or.kr"]) {
+  it("공공·교육기관 도메인(go.kr, ac.kr 등)은 목록에 넣지 않는다(KISA 원본에 기관 주소가 섞여 있음)", () => {
+    for (const h of ["www.efine.go.kr", "lms.univ.ac.kr"]) {
       assert.equal(isSharedHost(h), true, h);
     }
-    const { keys } = buildKeys(["http://www.nhis.or.kr", "https://www.nhis.or.kr/x", "a.efine.go.kr", "b.efine.go.kr"]);
+    const { keys } = buildKeys(["a.efine.go.kr", "b.efine.go.kr"]);
     assert.equal(keys.size, 0);
+  });
+
+  it("or.kr 은 비영리 단체도 등록할 수 있어 공공기관으로 보지 않는다(Codex 확인, 2026-11-11). 진짜 기관은 허용 목록으로 뺀다", () => {
+    assert.equal(isSharedHost("nhis-event.or.kr"), false);
+    const { keys } = buildKeys(["http://www.nhis.or.kr", "nhis-event.or.kr/x"], { allow: new Set(["nhis.or.kr"]) });
+    assert.deepEqual([...keys], [hostKey("nhis-event.or.kr")]);
   });
 
   it("공용 호스팅의 하위 주소와 일반 도메인은 공용이 아니다", () => {

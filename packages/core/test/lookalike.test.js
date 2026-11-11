@@ -53,9 +53,13 @@ describe("공식 도메인 사칭 감지 (D40 ②)", () => {
     assert.deepEqual(hit("minwon.gov.yashwan.shop"), [], "gov 가 맨 앞이 아니면 아님");
   });
 
-  it("go.kr·or.kr 같은 공공기관 도메인은 사칭 검사에서 항상 뺀다", () => {
+  it("go.kr 같은 공공기관 도메인은 사칭 검사에서 항상 뺀다", () => {
     assert.deepEqual(hit("hometax-new.go.kr"), []);
-    assert.deepEqual(hit("nhis-event.or.kr"), []);
+  });
+
+  it("or.kr 은 공공기관 전용이 아니므로 공식 도메인이 아니면 검사한다", () => {
+    assert.deepEqual(hit("nhis-event.or.kr"), ["EV-DOM-NHIS"]);
+    assert.deepEqual(hit("www.nhis.or.kr"), []);
   });
 
   it("이름이 단어 앞부분이 아니거나 gov 로 시작하는 다른 단어면 잡지 않는다", () => {

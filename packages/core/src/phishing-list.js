@@ -68,7 +68,8 @@ const SHARED_PARENTS = [
 ];
 
 /** 일반인이 등록할 수 없는 공공·교육기관 도메인: 목록에 넣지 않는다(원본에 기관 주소가 섞여 있음) */
-const PROTECTED_SUFFIXES = ["go.kr", "or.kr", "ac.kr", "mil.kr", "re.kr", "hs.kr", "ms.kr", "es.kr", "kg.kr", "sc.kr", "gov"];
+// or.kr 은 비영리 법인·단체도 등록할 수 있어 넣지 않는다(2026-11-11 Codex 확인, KISA 등록자격). 진짜 기관은 근거 카드·허용 목록으로 뺀다
+const PROTECTED_SUFFIXES = ["go.kr", "ac.kr", "mil.kr", "re.kr", "hs.kr", "ms.kr", "es.kr", "kg.kr", "sc.kr", "gov"];
 
 const underAny = (h, list) => list.some((p) => h === p || h.endsWith(`.${p}`));
 
