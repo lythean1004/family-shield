@@ -6,7 +6,7 @@
  */
 
 // 1) 스킴이 있는 URL, www.로 시작하는 주소
-export const SCHEME_URL_RE = /(?:https?|ftp):\/\/[^\s,)'"<>\]]+|www\.[^\s,)'"<>\]]+/gi;
+export const SCHEME_URL_RE = /(?:https?|ftp):\/\/[^\s,)'"<>\]]+|(?<![@\w.\-/])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*www\.[^\s,)'"<>\]]+/gi;
 
 // 2) 스킴 없이 쓴 주소(예: bit.ly/abc, evil.invalid/login).
 //    이메일의 도메인 부분(@ 뒤)은 잡지 않는다.
@@ -22,8 +22,12 @@ const TLDS = [
   "cx", "ms", "uno", "bz", "ru", "social", "casa", "pl", "cl", "id", "tw", "es", "tc", "monster", "cam", "lgbt",
   "agency", "expert", "eu", "bid", "tel", "bio", "yt", "black", "li", "rocks", "mov", "us", "miami",
 ].join("|");
+// 2026-11-11 후속 조사: 스킴 없는 누락 14행, IANA 2026111100 위임 목록 확인.
+const FOLLOWUP_TLDS = ["show", "media", "gold", "vin", "services", "ski", "pub", "moe", "mobi", "baby", "rent"].join("|");
 export const BARE_DOMAIN_RE = new RegExp(
-  `(?<![@\\w.\\-/])(?:[a-z0-9](?:[a-z0-9\\-]{0,61}[a-z0-9])?\\.)+(?:${TLDS})(?![a-z0-9\\-])(?:[/?#][^\\s,)'"<>\\]]*)?`,
+  // 새 끝부분은 example.media.backup 같은 파일명 중간까지 잡지 않는다.
+  // 기존 끝부분의 경계까지 일괄 변경하면 미지원 국가 도메인의 인식이 달라져 별도 검토로 남긴다.
+  `(?<![@\\w.\\-/])(?:[a-z0-9](?:[a-z0-9\\-]{0,61}[a-z0-9])?\\.)+(?:${TLDS}|(?:${FOLLOWUP_TLDS})(?!\\.[a-z0-9\\-]))(?![a-z0-9\\-])(?:[/?#][^\\s,)'"<>\\]]*)?`,
   "gi",
 );
 
