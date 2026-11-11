@@ -41,6 +41,31 @@ describe("묻는 대상 고르기 (D41)", () => {
 });
 
 describe("도메인 생성일 확인기", () => {
+  it("운영 집계는 요청·캐시·미지원·대상 없음·등록일 미확인·부분 실패를 구분한다", async () => {
+    const check = createDomainAgeChecker({ bootstrap: BOOT, clock: () => NOW, includeStats: true,
+      fetchImpl: async (url) => {
+        if (url.includes('fail.')) return { ok: false, status: 503 };
+        if (url.includes('gone.')) return { ok: false, status: 404 };
+        return { ok: true, json: async () => ({ events: [{ eventAction: 'registration', eventDate: '2026-11-01T00:00:00Z' }] }) };
+      } });
+    const first = await check(['new.shop', 'fail.top']);
+    assert.equal(first.ok, false);
+    assert.equal(first.stats.network_success, 1);
+    assert.equal(first.stats.network_failure, 1);
+    assert.equal(first.stats.date_known, 1);
+    const cached = await check(['new.shop']);
+    assert.equal(cached.stats.cache_hit, 1);
+    assert.equal(cached.stats.network_success, 0);
+    const missing = await check(['gone.shop']);
+    assert.equal(missing.stats.network_success, 1);
+    assert.equal(missing.stats.date_unknown, 1);
+    const unsupported = await check(['sample.invalid']);
+    assert.equal(unsupported.stats.unsupported, 1);
+    assert.equal(unsupported.stats.network_success, 0);
+    assert.equal((await check(['familyshield.kr'])).stats.no_targets, 1);
+    assert.ok(!JSON.stringify(first.stats).includes('.shop'));
+  });
+
   it("30일 이내 등록이면 young 에 넣는다. 바깥으로는 등록 도메인 이름만 간다", async () => {
     const calls = [];
     const check = createDomainAgeChecker({

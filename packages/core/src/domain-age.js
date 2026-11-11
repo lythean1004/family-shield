@@ -64,7 +64,7 @@ export function lookupTargets(domains) {
 
 /**
  * @param {{ bootstrap?: object, fetchImpl?: typeof fetch, timeoutMs?: number,
- *           thresholdDays?: number, clock?: () => number }} opts
+ *           thresholdDays?: number, clock?: () => number, includeStats?: boolean }} opts
  * @returns {(domains: string[]) => Promise<{ ok: boolean, young: string[], reason?: string }>}
  */
 export function createDomainAgeChecker({
@@ -73,6 +73,7 @@ export function createDomainAgeChecker({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   thresholdDays = DEFAULT_THRESHOLD_DAYS,
   clock = Date.now,
+  includeStats = false,
 } = {}) {
   const bases = baseMap(bootstrap);
   /** 등록 도메인 → { expiresAt, registeredAt: number|null } */
@@ -80,9 +81,9 @@ export function createDomainAgeChecker({
 
   async function registeredAt(reg) {
     const hit = cache.get(reg);
-    if (hit && hit.expiresAt > clock()) return { ok: true, registeredAt: hit.registeredAt };
+    if (hit && hit.expiresAt > clock()) return { ok: true, registeredAt: hit.registeredAt, outcome: 'cache_hit' };
     const base = bases.get(reg.split(".").pop());
-    if (!base) return { ok: true, registeredAt: null }; // 안내 파일에 없는 끝부분: 알 수 없음
+    if (!base) return { ok: true, registeredAt: null, outcome: 'unsupported' }; // 안내 파일에 없는 끝부분: 알 수 없음
     let timer;
     try {
       const res = await Promise.race([
@@ -96,12 +97,12 @@ export function createDomainAgeChecker({
         const t = ev?.eventDate ? Date.parse(ev.eventDate) : NaN;
         value = Number.isFinite(t) ? t : null;
       } else if (res.status !== 404) {
-        return { ok: false, reason: `http ${res.status}` };
+        return { ok: false, reason: `http ${res.status}`, outcome: 'network_failure' };
       }
       cache.set(reg, { expiresAt: clock() + CACHE_MS, registeredAt: value });
-      return { ok: true, registeredAt: value };
+      return { ok: true, registeredAt: value, outcome: 'network_success' };
     } catch (e) {
-      return { ok: false, reason: e?.message === "timeout" ? "timeout" : "error" };
+      return { ok: false, reason: e?.message === "timeout" ? "timeout" : "error", outcome: 'network_failure' };
     } finally {
       clearTimeout(timer);
     }
@@ -110,14 +111,21 @@ export function createDomainAgeChecker({
   return async function check(domains) {
     const list = [...new Set(domains ?? [])];
     const targets = lookupTargets(list);
-    if (targets.length === 0) return { ok: true, young: [] };
+    const stats = { network_success: 0, network_failure: 0, cache_hit: 0, unsupported: 0,
+      no_targets: targets.length === 0 ? 1 : 0, date_known: 0, date_unknown: 0 };
+    const withStats = value => includeStats ? { ...value, stats } : value;
+    if (targets.length === 0) return withStats({ ok: true, young: [] });
     const results = await Promise.all(targets.map(async (reg) => ({ reg, ...(await registeredAt(reg)) })));
+    for (const r of results) {
+      stats[r.outcome]++;
+      stats[r.ok && r.registeredAt != null ? 'date_known' : 'date_unknown']++;
+    }
     const now = clock();
     const youngRegs = new Set(results
       .filter((r) => r.ok && r.registeredAt != null && now - r.registeredAt <= thresholdDays * DAY && now >= r.registeredAt)
       .map((r) => r.reg));
     const young = list.filter((d) => youngRegs.has(registrableDomain(normalizeHost(d))));
     const failed = results.filter((r) => !r.ok);
-    return failed.length ? { ok: false, young, reason: failed.map((r) => r.reason).join(",") } : { ok: true, young };
+    return withStats(failed.length ? { ok: false, young, reason: failed.map((r) => r.reason).join(",") } : { ok: true, young });
   };
 }

@@ -14,7 +14,8 @@
  * 이 파일은 Node built-in `http` 서버와 독립 함수 두 가지로 쓸 수 있다.
  * 테스트에서는 handleRequest()를 직접 가져다 쓴다.
  */
-import { analyze, MAX_INPUT_CHARS } from "../../packages/core/src/pipeline.js";
+import { MAX_INPUT_CHARS } from "../../packages/core/src/pipeline.js";
+import { analyzeCounted, createSignalMetrics } from './signal-metrics.js';
 import { createMemoryResultStore, redactToken, toResultView } from "../../packages/core/src/result-token.js";
 import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
 import { loadPhishingListChecker, combineCheckers } from "../../packages/core/src/phishing-list.js";
@@ -142,6 +143,7 @@ export async function handleRequest(params, cfg) {
 
   // R1 빠른 경로: 통화 중이면 AI 없이 즉시 반환
   if (parentInputs.call_in_progress) {
+    cfg.signalMetrics?.record({ rules: ['R1'], status: 'fast_path', elapsedMs: 0 });
     return {
       status: 200,
       // F4-4 끊기 안내가 첫 줄, F4-8 한계 문구는 빠른 경로에도 붙인다
@@ -151,7 +153,7 @@ export async function handleRequest(params, cfg) {
 
   let result;
   try {
-    result = await analyze({
+    result = await analyzeCounted({
       text: utterance,
       parentInputs,
       hmacKey: cfg.hmacKey ?? undefined,
@@ -159,7 +161,7 @@ export async function handleRequest(params, cfg) {
       ai: cfg.ai,
       urlReputation: cfg.urlReputation ?? null,
       domainAge: cfg.domainAge ?? null,
-    });
+    }, cfg.signalMetrics);
   } catch (err) {
     console.error('pipeline error');
     return { status: 200, body: simpleText(FIXED.ERROR) };
@@ -211,7 +213,7 @@ export async function handleAnalyze(params, cfg) {
 
   let result;
   try {
-    result = await analyze({
+    result = await analyzeCounted({
       text,
       parentInputs: params.parentInputs ?? {},
       hmacKey: cfg.hmacKey ?? undefined,
@@ -219,7 +221,7 @@ export async function handleAnalyze(params, cfg) {
       ai: cfg.ai,
       urlReputation: cfg.urlReputation ?? null,
       domainAge: cfg.domainAge ?? null,
-    });
+    }, cfg.signalMetrics);
   } catch (err) {
     console.error('pipeline error');
     return { status: 500, body: { ok: false, reason: "pipeline_error" } };
@@ -232,6 +234,7 @@ export async function handleAnalyze(params, cfg) {
  * @param {object} config  loadConfig()의 config 객체
  */
 export function makeHandler(config) {
+  const signalMetrics = config.signalMetrics ?? createSignalMetrics();
   const db = config.database ? createDatabase(config.database) : null;
   const auth = db ? createAuth(db, config) : null;
   const authApi = auth ? createAuthApi(auth, config) : null;
@@ -254,7 +257,7 @@ export function makeHandler(config) {
   // 도메인 생성일(D41): 등록 도메인 이름만 RDAP에 묻는다. 설정 일수가 0이거나 없으면 끈다(시험 설정은 기본으로 꺼짐).
   const domainAge = config.domainAge !== undefined ? config.domainAge
     : config.domainAgeDays > 0
-      ? createDomainAgeChecker({ thresholdDays: config.domainAgeDays, timeoutMs: config.domainAgeTimeoutMs || 2500 })
+      ? createDomainAgeChecker({ thresholdDays: config.domainAgeDays, timeoutMs: config.domainAgeTimeoutMs || 2500, includeStats: true })
       : null;
   // F4-9 호출 한도 + 동시성 제한. 프로세스 안에서만 동작(운영에서는 Redis로 교체, [임시]).
   const rateLimiter = createRateLimiter({
@@ -320,7 +323,7 @@ export function makeHandler(config) {
         const { status, body } = await handleAnalyze(
           { text, parentInputs },
           // F4-6: 웹 채널은 카카오 5초 제한이 없으므로 webTimeoutMs(기본 8초)로 덮어 쓴다.
-          { ai: { ...config.ai, model:config.ai.webModel || config.ai.model, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation, domainAge },
+          { ai: { ...config.ai, model:config.ai.webModel || config.ai.model, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation, domainAge, signalMetrics },
         );
         if (body.ok && receipts) {
           body.result.receipt = receipts.issue(body.result,req.auth.userId);
@@ -366,7 +369,7 @@ export function makeHandler(config) {
     try {
       const { status, body } = await handleRequest(
         { utterance: parsed.text, parentInputs: parsed.parentInputs ?? {} },
-        { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation, domainAge },
+        { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation, domainAge, signalMetrics },
       );
       send(status, body);
     } finally {
@@ -377,6 +380,7 @@ export function makeHandler(config) {
     if (!res.headersSent) res.writeHead(503, {'content-type':'application/json','cache-control':'no-store'});
     res.end(JSON.stringify({ok:false,reason:'unavailable'}));
   });
-  safeHandler.close = () => db?.close();
+  safeHandler.signalMetrics = signalMetrics;
+  safeHandler.close = () => { signalMetrics.flush({ includeToday: true }); return db?.close(); };
   return safeHandler;
 }

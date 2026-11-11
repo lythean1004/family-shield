@@ -11,6 +11,7 @@
 import { createServer } from "node:http";
 import { loadConfig } from "./config.js";
 import { makeHandler } from "./handler.js";
+import { createSignalMetrics } from './signal-metrics.js';
 
 const cfg = loadConfig(process.env);
 if (!cfg.ok) {
@@ -19,7 +20,26 @@ if (!cfg.ok) {
 }
 const { config } = cfg;
 
-const server = createServer(makeHandler(config));
+const signalMetrics = createSignalMetrics({ emit: row => console.log(JSON.stringify(row)) });
+const handler = makeHandler({ ...config, signalMetrics });
+const server = createServer(handler);
+const metricsTimer = setInterval(() => signalMetrics.flush(), 60000);
+metricsTimer.unref();
+let stopping = false;
+function stop() {
+  if (stopping) return;
+  stopping = true;
+  // Finish in-flight analyses before flushing the last daily fragment.
+  const deadline = setTimeout(() => process.exit(1), 30000);
+  deadline.unref();
+  server.close(async () => {
+    clearInterval(metricsTimer);
+    try { await handler.close(); }
+    finally { clearTimeout(deadline); }
+  });
+}
+process.once('SIGTERM', stop);
+process.once('SIGINT', stop);
 
 server.listen(config.port, config.host, () => {
   console.log(`스킬 서버 시작: http://${config.host}:${config.port}/api/kakao-skill`);
