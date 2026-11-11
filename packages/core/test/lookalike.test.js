@@ -83,6 +83,28 @@ describe("공식 도메인 사칭 감지 (D40 ②)", () => {
     assert.deepEqual(r, [{ domain: "koreapost-kr.top", card_id: "EV-DOM-EPOST" }]);
   });
 
+  it("통신사 이름은 관측된 문자 조합의 DNS 라벨 전체만 맞춘다", () => {
+    const cases = {
+      'EV-DOM-KT': ['kt-sms-vip', 'kt-sms', 'kt-text', 'ktsms', 'bg-ktsms'],
+      'EV-DOM-SKT': ['skt-sms-vip', 'skt-sms', 'skt-text', 'skt12-txt'],
+      'EV-DOM-LGUPLUS': ['lg-sms-vip', 'lg-sms'],
+    };
+    for (const [id, labels] of Object.entries(cases)) {
+      for (const label of labels) {
+        assert.deepEqual(hit(`${label}.invalid`), [id]);
+        assert.deepEqual(hit(`notice.${label}.example.invalid`), [id]);
+      }
+    }
+    for (const label of ['kt', 'skt', 'lg', 'kb', 'nh', 'woori', 'card', 'ktown',
+      'kt-home', 'skt-bugo', 'lg-electronics', 'lguplusm', 'my-kt-sms', 'kt-sms-shop', 'skt-txt']) {
+      assert.deepEqual(hit(`${label}.invalid`), [], label);
+    }
+    for (const domain of ['kt-sms.kt.com', 'kt-sms.olleh.com', 'skt-sms.sktelecom.com',
+      'skt-sms.tworld.co.kr', 'skt-sms.sktpass.com', 'lg-sms.lguplus.com', 'lg-sms.uplus.co.kr']) {
+      assert.deepEqual(hit(domain), [], domain);
+    }
+  });
+
   it("카드는 모두 근거 카드 필드를 갖는다", () => {
     assert.ok(OFFICIAL_DOMAIN_CARDS.length >= 10);
     for (const c of OFFICIAL_DOMAIN_CARDS) {

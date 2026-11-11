@@ -15,7 +15,7 @@ import { normalizeHost, isProtectedHost, SECOND_LEVEL } from "./phishing-list.js
 
 const CARD_FILE = join(import.meta.dirname, "..", "..", "..", "content", "evidence", "official-domains.json");
 
-/** @type {{ id:string, name:string, official_domains:string[], prefixes?:string[], regex?:string[], first_label_on_generic?:string[] }[]} */
+/** @type {{ id:string, name:string, official_domains:string[], prefixes?:string[], regex?:string[], label_regex?:string[], first_label_on_generic?:string[] }[]} */
 export const OFFICIAL_DOMAIN_CARDS = JSON.parse(readFileSync(CARD_FILE, "utf8")).cards;
 
 const COMPILED = OFFICIAL_DOMAIN_CARDS.map((c) => ({
@@ -23,6 +23,7 @@ const COMPILED = OFFICIAL_DOMAIN_CARDS.map((c) => ({
   official: c.official_domains.map((d) => d.toLowerCase()),
   prefixes: c.prefixes ?? [],
   regex: (c.regex ?? []).map((r) => new RegExp(r)),
+  labelRegex: (c.label_regex ?? []).map((r) => new RegExp(r)),
   firstLabel: new Set(c.first_label_on_generic ?? []),
 }));
 
@@ -48,11 +49,14 @@ export function findLookalikes(domains) {
     if (!host || isProtectedHost(host)) continue;
     const segs = domainSegments(host);
     const labels = host.split(".");
+    const drop = SECOND_LEVEL.has(labels.slice(-2).join(".")) ? 2 : 1;
+    const nameLabels = labels.slice(0, -drop);
     // "이름.무작위.일반도메인" 모양(KISA에서 본 gov.aw1y.bar). 국가 도메인(gov.uk 등)은 아님
     const firstOnGeneric = labels.length === 3 && labels[2].length >= 3 ? labels[0] : null;
     for (const c of COMPILED) {
       if (c.official.some((o) => isUnder(host, o))) continue;
       const matched = (firstOnGeneric !== null && c.firstLabel.has(firstOnGeneric)) ||
+        nameLabels.some((label) => c.labelRegex.some((re) => re.test(label))) ||
         segs.some((s) => c.prefixes.some((p) => s.startsWith(p)) || c.regex.some((re) => re.test(s)));
       if (matched) { out.push({ domain: d, card_id: c.id }); break; }
     }
