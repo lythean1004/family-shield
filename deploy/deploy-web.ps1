@@ -29,7 +29,8 @@ test -f $B/web.new/index.html
 rm -rf $B/web.old; mv $B/web $B/web.old; mv $B/web.new $B/web
 echo "published: $(ls $B/web/assets | tr '\n' ' ')"
 '@
-$remote | ssh -o BatchMode=yes fs-ncp "tr -d '\r' | bash -s"
+# PowerShell 5 adds a BOM when piping to ssh; strip it so the first line (set -e) still runs
+$remote | ssh -o BatchMode=yes fs-ncp "tr -d '\r' | sed '1s/^\xEF\xBB\xBF//' | bash -s"
 if ($LASTEXITCODE -ne 0) { Write-Host 'Publish failed. The previous version is still live.'; exit 1 }
 
 $code = (Invoke-WebRequest -Uri 'https://familyshield.kr/' -UseBasicParsing -TimeoutSec 15).StatusCode
