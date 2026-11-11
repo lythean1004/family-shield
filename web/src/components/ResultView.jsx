@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom'
 import VerdictBanner from './VerdictBanner.jsx'
 import SignalList from './SignalList.jsx'
 import Warning112 from './Warning112.jsx'
-import LimitNotice from './LimitNotice.jsx'
+import LimitNotice, { LIMIT_NOTICE } from './LimitNotice.jsx'
 import ActionButton from './ActionButton.jsx'
 import CallButton from './CallButton.jsx'
 import MisjudgeLink from './MisjudgeLink.jsx'
@@ -44,7 +44,7 @@ export default function ResultView({
   const speakText = [
     verdictDescription(result.level, type),
     ...explanation.slice(0, 3),
-    '이 결과는 참고용입니다. 의심되면 반드시 직접 공식 번호로 확인하세요.',
+    LIMIT_NOTICE, // 화면과 같은 project.md 문장(2026-11-11 결정 B)
   ].join(' ')
 
   return (

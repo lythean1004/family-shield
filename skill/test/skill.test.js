@@ -201,6 +201,15 @@ describe("핸들러 - R1과 한계 문구", () => {
     const text = r.body.template.outputs[0].simpleText.text;
     assert.ok(text.includes("참고용"), "한계 문구 포함");
   });
+
+  it("한계 문구는 project.md 문장 그대로다(문자 속 번호·링크 말고, 놓칠 수 있음)", async () => {
+    const PROJECT_MD = "이 결과는 참고용입니다. 정상 메시지를 위험으로 보거나 위험한 메시지를 놓칠 수 있습니다. " +
+      "확실하지 않으면 메시지 속 번호나 링크가 아닌, 직접 찾은 공식 번호로 확인하세요.";
+    const normal = await handleRequest({ utterance: "[롯데택배] 배송 예정입니다." }, cfg);
+    assert.ok(normal.body.template.outputs[0].simpleText.text.endsWith(PROJECT_MD));
+    const call = await handleRequest({ utterance: "검찰청입니다", parentInputs: { call_in_progress: true } }, cfg);
+    assert.ok(call.body.template.outputs[0].simpleText.text.endsWith(PROJECT_MD));
+  });
 });
 
 describe("자세히 보기 1회용 토큰 (D34, PRD 13-4)", () => {
