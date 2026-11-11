@@ -4,7 +4,7 @@
  * - 링크에 접속하지 않는다. 문자 속 링크의 도메인 이름만 본다.
  * - 도메인을 점·하이픈으로 나눈 조각(최상위 도메인 제외)의 앞부분에 기관 이름이 있으면 사칭 후보.
  *   정부(gov)는 "gov.무작위.일반도메인" 모양만 본다(2026-11-11 Tranco 오탐 시험 결과).
- * - go.kr·or.kr 등 공공기관 도메인은 일반인이 등록할 수 없으므로 항상 뺀다.
+ * - go.kr 등 보호 대상 도메인은 뺀다. or.kr은 공공기관 전용이 아니므로 검사한다.
  *   단어 중간은 보지 않는다(redefine.com의 efine 같은 오탐 방지).
  * - 그 기관의 공식 도메인과 그 하위 주소는 빼고 SIG_LOOKALIKE_DOMAIN 을 켠다.
  * - 기관 이름·공식 도메인은 근거 카드(content/evidence/official-domains.json)에서만 가져온다.
@@ -45,7 +45,7 @@ export function findLookalikes(domains) {
   const out = [];
   for (const d of new Set(domains ?? [])) {
     const host = normalizeHost(d);
-    if (!host || isProtectedHost(host)) continue; // go.kr·or.kr 등은 일반인이 등록할 수 없다
+    if (!host || isProtectedHost(host)) continue;
     const segs = domainSegments(host);
     const labels = host.split(".");
     // "이름.무작위.일반도메인" 모양(KISA에서 본 gov.aw1y.bar). 국가 도메인(gov.uk 등)은 아님

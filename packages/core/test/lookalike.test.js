@@ -37,6 +37,15 @@ describe("공식 도메인 사칭 감지 (D40 ②)", () => {
     }
   });
 
+  it("한진은 이름 전체·숫자 조합만 잡고 다른 브랜드의 앞부분은 잡지 않는다", () => {
+    for (const d of ["hanjin1.invalid", "hanjin2.invalid", "hanjin3.invalid", "hanjin.delivery.invalid", "hanjin-delivery.invalid"]) {
+      assert.deepEqual(hit(d), ["EV-DOM-HANJIN"], d);
+    }
+    for (const d of ["hanjintravel.com", "www.hanjinkal.co.kr", "hanjintravel.invalid", "hanjinschool.invalid", "hanjinoneclick.co.kr"]) {
+      assert.deepEqual(hit(d), [], d);
+    }
+  });
+
   it("Tranco 오탐 시험에서 걸렸던 정상 도메인은 잡지 않는다", () => {
     for (const d of ["www.gov.uk", "beian.gov.cn", "turkiye.gov.tr", "gov.uz", "gov.on.ca", "gov.wales",
       "e-gov.go.jp", "slack-gov.com", "awsdns-us-gov-05.net", "gov-static.tech",

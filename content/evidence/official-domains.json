@@ -1,5 +1,5 @@
 {
-  "_note": "D40 ② 공식 도메인 사칭 감지용 근거 카드. official_domains는 진짜 주소를 사칭으로 보지 않게 빼는 데만 쓴다. status needs_review 카드는 사람이 원문을 확인하기 전까지 화면 근거로 쓰지 않는다. prefixes는 도메인 조각(점·하이픈으로 나눈 것)의 앞부분, regex는 조각 앞부분에 맞춘다. first_label_on_generic은 '이름.무작위.일반도메인'처럼 라벨이 3개이고 맨 앞 라벨이 그 이름이며 최상위 도메인이 3글자 이상(국가 도메인 아님)일 때만 맞춘다(2026-11-11 Tranco 오탐 시험 결과로 좁힘). go.kr·or.kr 등 공공기관 도메인은 항상 검사에서 뺀다.",
+  "_note": "D40 ② 공식 도메인 사칭 감지용 근거 카드. official_domains는 진짜 주소를 사칭으로 보지 않게 빼는 데만 쓴다. status needs_review 카드는 사람이 원문을 확인하기 전까지 화면 근거로 쓰지 않는다. prefixes는 도메인 조각(점·하이픈으로 나눈 것)의 앞부분, regex는 조각 앞부분에 맞춘다. first_label_on_generic은 '이름.무작위.일반도메인'처럼 라벨이 3개이고 맨 앞 라벨이 그 이름이며 최상위 도메인이 3글자 이상(국가 도메인 아님)일 때만 맞춘다(2026-11-11 Tranco 오탐 시험 결과로 좁힘). go.kr 등 보호 대상은 검사에서 빼되 or.kr은 공공기관 전용이 아니므로 검사한다.",
   "cards": [
     {
       "id": "EV-DOM-EPOST",
@@ -80,8 +80,8 @@
         "hanjin.co.kr",
         "hanjinoneclick.co.kr"
       ],
-      "prefixes": [
-        "hanjin"
+      "regex": [
+        "^hanjin[0-9]*$"
       ],
       "source_url": "https://www.hanjin.com/kor/Main.do",
       "posted_at": null,
@@ -89,7 +89,7 @@
       "scope": "한진택배 사칭 링크 도메인 감지",
       "terms_checked": false,
       "status": "source_checked",
-      "check_note": "2026-11-11 https://www.hanjin.com/kor/Main.do 에서 (주)한진 운영 주체와 HANJIN Logistics Corporation 저작권 표기 확인. https://www.hanjin.co.kr/ 가 위 공식 페이지로 이동함을 확인. 공식 메인의 '원클릭 택배' 메뉴가 https://hanjinoneclick.co.kr/ 를 직접 가리키므로 hanjinoneclick.co.kr 추가(대상 페이지 자체는 403, 공식 연결로 확인). 추가 확인 대상 hanjintravel.com은 https://www.koreanair.com/contents/footer/terms-and-policies/privacy-policy/list-of-recipients-of-personal-information 에서 한진트래블 업무 이메일 도메인으로 확인했으나, 웹사이트로 안내한 근거는 미확인하여 미추가. 대한항공 기프트카드 안내의 홈페이지 링크는 구주소 kaltour.com 이고 이 구주소의 이동 확인도 실패했다. 대상 hanjintravel.com 미접속, 사칭 확정 아님. https://www.hanjin.com/kor/CMS/PrivacyMgr/agreeList.do?mCode=MN012 의 자료 상업 이용·제3자 제공 제한을 읽었으나 카드 인용 허락은 미확인하여 terms_checked=false 유지. 게시일 미표시, 전문가 검수 전."
+      "check_note": "2026-11-11 https://www.hanjin.com/kor/Main.do 에서 (주)한진 운영 주체와 HANJIN Logistics Corporation 저작권 표기 확인. https://www.hanjin.co.kr/ 가 위 공식 페이지로 이동함을 확인. 공식 메인의 '원클릭 택배' 메뉴가 https://hanjinoneclick.co.kr/ 를 직접 가리키므로 hanjinoneclick.co.kr 추가(대상 페이지 자체는 403, 공식 연결로 확인). 추가 확인 대상 hanjintravel.com은 https://www.koreanair.com/contents/footer/terms-and-policies/privacy-policy/list-of-recipients-of-personal-information 에서 한진트래블 업무 이메일 도메인으로 확인했으나, 웹사이트로 안내한 근거는 미확인하여 미추가. 대한항공 기프트카드 안내의 홈페이지 링크는 구주소 kaltour.com 이고 이 구주소의 이동 확인도 실패했다. 대상 hanjintravel.com 미접속, 사칭 확정 아님. https://www.hanjin.com/kor/CMS/PrivacyMgr/agreeList.do?mCode=MN012 의 자료 상업 이용·제3자 제공 제한을 읽었으나 카드 인용 허락은 미확인하여 terms_checked=false 유지. 게시일 미표시, 전문가 검수 전. 2026-11-11 후속 작업 1: 미확인 계열사 주소를 추가하지 않고 이름 조각 전체가 hanjin 또는 hanjin+숫자일 때만 감지하도록 좁혔다. KISA 기존 3건 유지, Tranco 100만 전체 R11 5→4건(.kr 0건). 근거·한계는 docs/links-followup-review.md."
     },
     {
       "id": "EV-DOM-EFINE",
