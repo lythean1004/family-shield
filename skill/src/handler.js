@@ -17,6 +17,7 @@
 import { analyze, MAX_INPUT_CHARS } from "../../packages/core/src/pipeline.js";
 import { createMemoryResultStore, redactToken, toResultView } from "../../packages/core/src/result-token.js";
 import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
+import { loadPhishingListChecker, combineCheckers } from "../../packages/core/src/phishing-list.js";
 import { readRequest, simpleText, quickReply } from "./kakao.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
@@ -224,10 +225,15 @@ export function makeHandler(config) {
   const familyApi = db ? createFamilyApi(auth,createConfirmService(db,receipts),config,{notify:push.notify,recordCheck}) : null;
   const resultStore = config.resultStore || (db && config.webBaseUrl ? createDbResultStore(db) : null);
   // 평판 조회기: 캐시를 프로세스 동안 공유한다. 키가 없으면 null(조회 안 함).
-  const urlReputation = createSafeBrowsingChecker({
-    apiKey: config.safeBrowsingKey,
-    timeoutMs: config.urlLookupTimeoutMs || 800,
-  });
+  // 국내 KISA 목록(D40 ①)은 메모리 대조라 외부 전송·지연이 없다. 둘 다 없으면 null(조회 안 함).
+  const phishingList = config.phishingList === undefined ? loadPhishingListChecker().check : config.phishingList;
+  const urlReputation = combineCheckers([
+    phishingList,
+    createSafeBrowsingChecker({
+      apiKey: config.safeBrowsingKey,
+      timeoutMs: config.urlLookupTimeoutMs || 800,
+    }),
+  ]);
   // F4-9 호출 한도 + 동시성 제한. 프로세스 안에서만 동작(운영에서는 Redis로 교체, [임시]).
   const rateLimiter = createRateLimiter({
     maxPerMinute: config.maxPerMinute || 5,

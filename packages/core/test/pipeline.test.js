@@ -124,7 +124,7 @@ describe("파이프라인 - URL 평판 조회 (F4-11, R10)", () => {
     assert.ok(r.signals_code.includes("SIG_MALICIOUS_URL"));
     assert.equal(r.level, "위험");
     assert.ok(r.fired_rules.includes("R10"));
-    assert.deepEqual(r.url_reputation, { ok: true, hits: 1, reason: null });
+    assert.deepEqual(r.url_reputation, { ok: true, hits: 1, shortened: 0, reason: null });
     assert.ok(!JSON.stringify(r.url_reputation).includes("evil"));
   });
 
@@ -135,6 +135,16 @@ describe("파이프라인 - URL 평판 조회 (F4-11, R10)", () => {
     });
     assert.equal(r.level, "주의");
     assert.equal(r.url_reputation.ok, false);
+  });
+
+  it("국내 목록의 단축 서비스면 SIG_SHORT_URL 을 더한다(위험으로 올리지 않음, D40)", async () => {
+    const r = await analyze({
+      text: "확인 go9.co/SWh",
+      urlReputation: async () => ({ ok: true, malicious: [], shortened: ["go9.co"] }),
+    });
+    assert.ok(r.signals_code.includes("SIG_SHORT_URL"));
+    assert.ok(!r.signals_code.includes("SIG_MALICIOUS_URL"));
+    assert.deepEqual(r.url_reputation, { ok: true, hits: 0, shortened: 1, reason: null });
   });
 
   it("단축 URL만 있으면 조회하지 않는다(D11)", async () => {
