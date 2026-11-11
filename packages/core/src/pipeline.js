@@ -108,6 +108,7 @@ export async function analyze({
   // ⑥ 규칙
   const { level, fired_rules } = decide({
     signals_final: signalsFinal,
+    signals_code: signalsCode,
     call_in_progress: Boolean(parentInputs.call_in_progress),
     called_before: Boolean(parentInputs.called_before),
     family_denied: Boolean(parentInputs.family_denied),

@@ -42,6 +42,22 @@ describe("규칙 엔진 - 위험 판정", () => {
     assert.ok(decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_MONEY", "SIG_AVOID_VOICE"] }).fired_rules.includes("R13"));
   });
 
+
+  it("R13 압박은 코드가 찾은 신호만 본다: AI만 통화 회피를 붙인 진짜 가족 부탁은 R13 아님(SUP-D01)", () => {
+    const r = decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_MONEY", "SIG_AVOID_VOICE"], signals_code: ["SIG_MONEY"] });
+    assert.ok(!r.fired_rules.includes("R13"));
+  });
+
+  it("R13 압박을 코드가 찾으면 위험(SUP-A03)", () => {
+    const r = decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_MONEY", "SIG_AVOID_VOICE"], signals_code: ["SIG_MONEY", "SIG_AVOID_VOICE"] });
+    assert.equal(r.level, "위험");
+    assert.ok(r.fired_rules.includes("R13"));
+  });
+
+  it("R13 상품권 요구는 코드 압박 없이도 위험", () => {
+    assert.ok(decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_GIFTCARD"], signals_code: [] }).fired_rules.includes("R13"));
+  });
+
   it("R13 은 가족 사칭 없이 돈 요구만으로는 켜지지 않는다(주의)", () => {
     const r = decide({ signals_final: ["SIG_MONEY"] });
     assert.equal(r.level, "주의");

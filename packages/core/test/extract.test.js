@@ -188,3 +188,37 @@ describe('기관 발신 주장과 전화 유도 확장: 새 합성 문장',()=>{
     '010-0000-3305로 즉시 전화하지 마세요.',
   ])it(`전화 유도 아님: ${message}`,()=>assert.ok(!sig(message).includes('SIG_CALL_THIS_NUMBER')))
 })
+
+// 2026-11-12 추천안 1: AI가 흔들린 압박·기관 표현을 코드로 (SUP-A03, SUP-D01, TEST-B065·B077·E198)
+describe('통화 회피·비밀·고립·강한 재촉을 코드로 찾기', () => {
+  const has = (t, s) => sig(t).includes(s)
+  for (const t of ['엄마 나 딸 병원인데 수술비 먼저 보내줘 전화는 못 받아', '지금 통화가 안 돼. 문자로 해 줘', '통화 어려우니까 문자로만 연락해', '전화하지 말고 문자로 답해 줘', '폰이 고장나서 통화가 안 돼'])
+    it('통화 회피: ' + t, () => assert.ok(has(t, 'SIG_AVOID_VOICE')))
+  for (const t of ['엄마 이번 달 월세 보내줄 수 있어? 저녁에 전화할게', '아까 전화 못 받아서 미안해', '통화 가능해?', '전화 주세요', '어제 통화 안 됐네', '통화 종료 후 직접 찾은 공식 번호로 전화하세요.'])
+    it('통화 회피 아님: ' + t, () => assert.ok(!has(t, 'SIG_AVOID_VOICE')))
+  for (const t of ['아빠한테는 말하지 마', '이거 비밀로 해 줘', '아무한테도 말하지 말고 보내 줘'])
+    it('비밀 요구: ' + t, () => assert.ok(has(t, 'SIG_SECRECY')))
+  for (const t of ['비밀번호를 입력하세요', '인증번호는 타인에게 알려주지 마세요', '비밀번호 바꿨어'])
+    it('비밀 요구 아님: ' + t, () => assert.ok(!has(t, 'SIG_SECRECY')))
+  for (const t of ['수사 중이니 다른 사람과 통화하지 마세요', '가족에게도 연락하지 마십시오'])
+    it('고립 요구: ' + t, () => assert.ok(has(t, 'SIG_ISOLATION')))
+  for (const t of ['모르는 사람과 통화하지 마세요', '가족에게 먼저 연락해 보세요'])
+    it('고립 요구 아님: ' + t, () => assert.ok(!has(t, 'SIG_ISOLATION')))
+  for (const t of ['병원비 90만원 급해', '지금 당장 35만원 부탁해', '빨리 입금해 줘', '급하게 돈이 필요해', '등록금 오늘까지 내야 돼 50만원만', '내일까지 보내 줘야 해'])
+    it('강한 재촉: ' + t, () => assert.ok(has(t, 'SIG_URGENCY')))
+  for (const t of ['급하지 않으니 천천히 해', '오늘 중 수령 바랍니다', '빨리 와 밥 먹자', '[○○약국] 처방전 조제 완료. 오늘 중 수령 바랍니다.', '오늘까지 영업합니다', '내일까지 택배 도착 예정'])
+    it('강한 재촉 아님: ' + t, () => assert.ok(!has(t, 'SIG_URGENCY')))
+})
+
+describe('기관 사칭 보완 (TEST-B065·B077·E198 유형, 새 합성 문장)', () => {
+  const has = (t, s) => sig(t).includes(s)
+  it('기관명으로 시작해 앱 설치를 요구', () => assert.ok(has('국세청 환급 앱을 설치해 주세요 http://tax9.invalid/app', 'SIG_AGENCY_IMPERSONATION')))
+  it('기관명 + 영장 고지', () => assert.ok(has('세무서 영장 발부 예정 안내', 'SIG_AGENCY_IMPERSONATION')))
+  it('고지 끝에 번호만 남김 → 문자 속 번호 유도', () => assert.ok(has('세무서 영장 발부 전 마지막 안내. 010-0000-4401', 'SIG_CALL_THIS_NUMBER')))
+  it('개인 계좌로 이체 요구', () => assert.ok(has('[국세청] 환급금 지급 예정. 개인 계좌 ○○은행 김○○으로 30만원 이체해 주세요.', 'SIG_THIRD_PARTY_ACCOUNT')))
+  for (const t of ['개인 계좌로 입금하라는 요구는 사기입니다.', '본인 명의 계좌로 환불됩니다.', '관세청 홈페이지를 직접 찾아서 확인하세요.', '경찰청에 신고하고 왔어요.', '010-0000-2451에서 전화가 왔어요.'])
+    it('해당 없음: ' + t, () => {
+      const s = sig(t)
+      assert.ok(!s.includes('SIG_THIRD_PARTY_ACCOUNT') && !s.includes('SIG_AGENCY_IMPERSONATION') && !s.includes('SIG_CALL_THIS_NUMBER'), s.join(','))
+    })
+})

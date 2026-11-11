@@ -73,3 +73,25 @@ describe('이해 확인 질문', () => {
     assert.equal(comprehensionQuestion([], 'c1'), null)
   })
 })
+
+// 2026-11-12: 설정의 가족 확인 스위치. 켜짐 판단(두 항목 모두 허락)과 저장이 어긋나 눌러도 꺼진 것처럼 보이던 문제
+import { familyToggleRequest } from '../data/consent.js'
+describe('설정 화면 가족 확인 스위치', () => {
+  const parent = { circles: [{ id: 'c1', isParent: true }], consents: [] }
+  const withAlert = { ...parent, consents: [{ circleId: 'c1', item: 'family_alert', granted: true }] }
+  it('부모님 계정이 아니면 가족 연결부터 안내', () => {
+    const r = familyToggleRequest({ circles: [], consents: [] }, true)
+    assert.match(r.error, /가족 연결과 동의 설정/)
+  })
+  it('가족에게 결과 보내기(②)를 허락하지 않았으면 켜지 않고 동의 화면으로 안내(설명 없이 동의를 만들지 않음)', () => {
+    const r = familyToggleRequest(parent, true)
+    assert.ok(r.error && !r.body)
+    assert.match(r.error, /가족 연결과 동의 설정/)
+  })
+  it('②를 허락했으면 ③ 사칭 확인 요청을 켠다', () => {
+    assert.deepEqual(familyToggleRequest(withAlert, true).body, { circleId: 'c1', item: 'impersonation_check', granted: true, textVersion: CONSENT_VERSION })
+  })
+  it('끄기는 ②가 없어도 언제나 된다', () => {
+    assert.equal(familyToggleRequest(parent, false).body.granted, false)
+  })
+})

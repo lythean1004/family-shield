@@ -40,7 +40,7 @@ describe("파이프라인 - AI 성공", () => {
     });
     assert.equal(r.level, "위험");
     assert.ok(r.fired_rules.includes("R3"));
-    assert.deepEqual(r.signals_code.sort(), ["SIG_MONEY", "SIG_NEW_NUMBER"]);
+    assert.deepEqual(r.signals_code.sort(), ["SIG_MONEY", "SIG_NEW_NUMBER", "SIG_URGENCY"]); // "급하게"도 코드가 찾음(2026-11-12)
     assert.equal(r.fallback_used, false);
     assert.equal(r.impersonated_relation, "딸");
     assert.ok(r.summary.includes("딸이라고 함"));

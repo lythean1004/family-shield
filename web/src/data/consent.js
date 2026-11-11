@@ -109,9 +109,19 @@ export async function loadFamilyConsent() {
     return ['family_alert','impersonation_check'].every(item=>session.consents.find(c=>c.circleId===circle.id&&c.item===item)?.granted)
   } catch { return false }
 }
+/**
+ * 설정 스위치가 보낼 요청을 정한다. 켜짐은 ②가족 알림 + ③사칭 확인이 모두 허락일 때다(loadFamilyConsent).
+ * ②가 없으면 자세한 설명이 있는 동의 화면에서 먼저 허락받는다. 스위치 하나로 설명 없는 동의를 만들지 않는다.
+ */
+export function familyToggleRequest(session, granted) {
+  const circle = session?.circles?.find(c=>c.isParent)
+  if (!circle) return { error: '부모님 휴대폰에서만 켤 수 있어요. 위의 [가족 연결과 동의 설정]에서 먼저 가족을 연결해 주세요.' }
+  const alertGranted = session.consents?.find(c=>c.circleId===circle.id && c.item==='family_alert')?.granted === true
+  if (granted && !alertGranted) return { error: '먼저 “가족에게 결과를 보낼까요?”를 허락해야 해요. 위의 [가족 연결과 동의 설정]에서 설명을 읽고 허락해 주세요.' }
+  return { body: { circleId:circle.id, item:'impersonation_check', granted, textVersion:CONSENT_VERSION } }
+}
 export async function saveFamilyConsent(granted) {
-  const session = await getSession()
-  const circle = session?.circles.find(c=>c.isParent)
-  if (!circle) throw new Error('먼저 부모님 계정으로 가족을 연결해 주세요.')
-  await api('/consent',{circleId:circle.id,item:'impersonation_check',granted,textVersion:CONSENT_VERSION})
+  const { error, body } = familyToggleRequest(await getSession(), granted)
+  if (error) throw new Error(error)
+  await api('/consent', body)
 }
