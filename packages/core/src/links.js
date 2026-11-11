@@ -14,6 +14,13 @@ const TLDS = [
   "co\\.kr", "or\\.kr", "go\\.kr", "ne\\.kr", "kr",
   "com", "net", "org", "info", "biz", "io", "me", "ly", "gl", "do", "la", "at", "to", "cc", "co",
   "xyz", "top", "site", "online", "shop", "link", "click", "app", "page", "live", "store", "invalid",
+  // KISA 피싱 목록(2023~2024)에서 20번 이상 나온 끝부분(2026-11-11, D40). 스킴 없이 쓴 피싱 링크의 31%를 놓치고 있었다
+  "pro", "one", "icu", "art", "work", "buzz", "pw", "mom", "yachts", "cfd", "life", "lat", "sbs", "bar", "hair",
+  "boats", "golf", "run", "wtf", "ac", "wiki", "cyou", "lol", "gg", "rest", "pics", "world", "skin", "press", "su",
+  "digital", "asia", "ink", "loan", "de", "today", "jp", "in", "quest", "gd", "be", "best", "homes", "fit", "guru",
+  "makeup", "sk", "cn", "autos", "im", "so", "help", "email", "fm", "gy", "beauty", "it", "fyi", "ws", "blog", "lu",
+  "cx", "ms", "uno", "bz", "ru", "social", "casa", "pl", "cl", "id", "tw", "es", "tc", "monster", "cam", "lgbt",
+  "agency", "expert", "eu", "bid", "tel", "bio", "yt", "black", "li", "rocks", "mov", "us", "miami",
 ].join("|");
 export const BARE_DOMAIN_RE = new RegExp(
   `(?<![@\\w.\\-/])(?:[a-z0-9](?:[a-z0-9\\-]{0,61}[a-z0-9])?\\.)+(?:${TLDS})(?![a-z0-9\\-])(?:[/?#][^\\s,)'"<>\\]]*)?`,

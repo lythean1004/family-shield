@@ -30,6 +30,17 @@ describe("링크 찾기", () => {
     const links = findLinks("https://a.invalid/x 그리고 bit.ly/abc 확인");
     assert.deepEqual(links, ["https://a.invalid/x", "bit.ly/abc"]);
   });
+  it("스킴 없이 쓴 새 도메인 끝부분(KISA에서 자주 본 것)도 링크로 찾는다", () => {
+    for (const d of ["xnr.ae1t.yachts", "gov.aw1y.bar", "evil.buzz/abc", "a1.icu", "x.cfd", "k1nh.hair",
+      "telegram.lgbt", "yahwagsc.pro", "ab.one", "cj.mom", "z.pw"]) {
+      assert.deepEqual(findLinks(`[시험] 링크 ${d} 확인`), [d], d);
+    }
+  });
+  it("버전 번호·소수·한글 문장은 링크로 보지 않는다", () => {
+    for (const t of ["앱 v2.0 업데이트", "금리 3.5% 인상", "주소 확인 바랍니다.감사합니다", "1.5배 적립", "ver.1.2"]) {
+      assert.deepEqual(findLinks(t), [], t);
+    }
+  });
   it("이메일 도메인은 링크로 보지 않는다", () => {
     assert.deepEqual(findLinks("문의 help@bank.invalid 로 주세요"), []);
   });
