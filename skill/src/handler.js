@@ -328,11 +328,18 @@ export function makeHandler(config) {
         catch { return send(400, { ok: false, reason: "bad json" }); }
         const text = typeof payload?.text === "string" ? payload.text : "";
         const parentInputs = payload?.parentInputs ?? {};
+        // 해외 AI 분석(국외 이전)은 부모님이 허락했을 때만. 아니면 규칙만으로 판정한다(동의 재설계 v3)
+        let aiAllowed = !auth;
+        if (auth) {
+          try { aiAllowed = await auth.overseasAiAllowed(req.auth.userId); } catch { aiAllowed = false; }
+        }
         const { status, body } = await handleAnalyze(
           { text, parentInputs },
           // F4-6: 웹 채널은 카카오 5초 제한이 없으므로 webTimeoutMs(기본 8초)로 덮어 쓴다.
-          { ai: { ...config.ai, model:config.ai.webModel || config.ai.model, timeoutMs: config.ai.webTimeoutMs }, hmacKey: config.hmacKey, cards: [], urlReputation, domainAge, signalMetrics },
+          { ai: aiAllowed ? { ...config.ai, model:config.ai.webModel || config.ai.model, timeoutMs: config.ai.webTimeoutMs } : null,
+            hmacKey: config.hmacKey, cards: [], urlReputation, domainAge, signalMetrics },
         );
+        if (body.ok && !aiAllowed) body.result.ai_consent = false;
         if (body.ok && receipts) {
           body.result.receipt = receipts.issue(body.result,req.auth.userId);
           await recordCheck(req.auth.userId,body.result.receipt);

@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomInt } from 'node:crypto'
 
-export const CONSENT_VERSION = 'demo-2026-10-28-v2'
-export const CONSENT_ITEMS = ['family_alert', 'impersonation_check', 'check_log', 'misjudge_share']
+export const CONSENT_VERSION = 'demo-2026-11-11-v3'
+export const CONSENT_ITEMS = ['family_alert', 'impersonation_check', 'check_log', 'misjudge_share', 'overseas_ai', 'comprehension']
 export const RELATIONS = ['딸', '아들', '배우자', '가족']
 const SESSION_SECONDS = 30 * 24 * 60 * 60
 export const hashToken = (value) => createHash('sha256').update(value).digest('hex')
@@ -118,6 +118,15 @@ export function createAuth(db, { hmacKey }) {
       return { ok: true }
     })
   }
+  // 해외 AI 분석(국외 이전) 동의: 부모님 그룹의 가장 최근 overseas_ai 기록이 허락일 때만. 기록이 없거나 보호자만이면 규칙만 판정
+  async function overseasAiAllowed(userId) {
+    return db.user(userId, async tx => {
+      const { rows: [row] } = await tx.query(`select c.granted from public.consents c
+        join public.circles ci on ci.id=c.circle_id and ci.protected_user_id=$1
+        where c.item='overseas_ai' order by c.created_at desc, c.id desc limit 1`, [userId])
+      return row?.granted === true
+    })
+  }
   async function logout(session) {
     if (!session) return
     await db.service(async tx => {
@@ -125,5 +134,5 @@ export function createAuth(db, { hmacKey }) {
       await tx.query("insert into public.auth_events(user_id,type) values ($1,'session_end')", [session.userId])
     })
   }
-  return { authenticate, profile, redeem, invite, consent, logout, checkLimit }
+  return { authenticate, profile, redeem, invite, consent, overseasAiAllowed, logout, checkLimit }
 }

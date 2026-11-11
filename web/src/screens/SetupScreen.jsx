@@ -2,14 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
+import SpeakButton from '../components/SpeakButton.jsx'
 import { api, getSession } from '../data/api.js'
+import { CONSENT_STEPS, CONSENT_VERSION, emptySelection, selectAll, setChoice, isComplete, consentPlan, comprehensionQuestion } from '../data/consent.js'
+export { CONSENT_VERSION }
 
-export const CONSENT_VERSION = 'demo-2026-10-28-v2'
-const STEPS = [
-  {item:'family_alert',title:'① 가족에게 알려드릴까요?',text:'이번 시연에서는 내가 가족에게 물어보기를 누를 때 연결한 가족이 위험 단계와 정해진 요약을 볼 수 있어요. 알림에는 내용이 표시되지 않아요. 문자 원문은 보내지 않아요. AI 제공사가 가려진 내용을 국외에서 일정 기간 보관할 수 있어요.'},
-  {item:'impersonation_check',title:'② 가족에게 물어볼까요?',text:'가족이 보낸 문자인지 직접 물어보고 답을 받을 수 있어요. 가족 알림에 동의한 경우에만 사용할 수 있어요.'},
-  {item:'check_log',title:'③ 확인 기록을 남길까요?',text:'위험 단계와 신호 등 확인 기록을 24시간 보관해요. 삭제 작업은 10분마다 실행돼요. 문자 원문은 저장하지 않아요. 백업에는 삭제 후 최대 7일 남을 수 있어요.'},
-]
 export default function SetupScreen() {
   const [session,setSession] = useState(undefined)
   const [role,setRole] = useState('parent')
@@ -19,20 +16,33 @@ export default function SetupScreen() {
   const [invite,setInvite] = useState(null)
   const [error,setError] = useState('')
   const [busy,setBusy] = useState(false)
-  const [step,setStep] = useState(0)
+  const [selection,setSelection] = useState(emptySelection())
+  const [open,setOpen] = useState(null)
+  const [quiz,setQuiz] = useState(null) // null | 'ask' | 'retry' | 'done'
   const refresh = async () => { const s=await getSession(); setSession(s); return s }
   useEffect(() => { refresh().catch(e=>setError(e.message)) },[])
   const run = async (fn) => { setBusy(true);setError('');try{await fn()}catch(e){setError(e.message)}finally{setBusy(false)} }
   const parentCircle = session?.circles.find(c=>c.isParent)
-  const current = STEPS[step]
-  const alertGranted = session?.consents.find(c=>c.circleId===parentCircle?.id && c.item==='family_alert')?.granted
+  const latest = item => session?.consents.find(c=>c.circleId===parentCircle?.id && c.item===item)
+  // 새 버전(v3)으로 네 항목을 모두 고른 적이 없으면 동의 화면을 보여 준다
+  const needsConsent = parentCircle && !CONSENT_STEPS.every(st=>latest(st.item)?.text_version===CONSENT_VERSION)
+  const recipients = (session?.members ?? []).filter(m=>m.circleId===parentCircle?.id)
+  const question = comprehensionQuestion(session?.members, parentCircle?.id)
   const login = (event) => {
     event.preventDefault()
-    run(async()=>{const data=await api(role==='parent'?'/auth/join':'/auth/demo',{code,over14});setSession(data.session);setCode('');setStep(0)})
+    run(async()=>{const data=await api(role==='parent'?'/auth/join':'/auth/demo',{code,over14});setSession(data.session);setCode('');setSelection(emptySelection());setQuiz(null)})
   }
-  const consent = (granted) => run(async()=>{
-    await api('/consent',{circleId:parentCircle.id,item:current.item,granted,textVersion:CONSENT_VERSION})
-    await refresh();setStep(step+1)
+  // 고른 대로 저장(가족 보내기를 묻기보다 먼저). 가족 보내기를 허락했으면 이해 확인으로
+  const save = () => run(async()=>{
+    for (const {item,granted} of consentPlan(selection)) {
+      await api('/consent',{circleId:parentCircle.id,item,granted,textVersion:CONSENT_VERSION})
+    }
+    await refresh()
+    setQuiz(selection.family_alert && question ? 'ask' : 'done')
+  })
+  const answer = (correct) => run(async()=>{
+    await api('/consent',{circleId:parentCircle.id,item:'comprehension',granted:correct,textVersion:CONSENT_VERSION})
+    setQuiz(correct ? 'done' : 'retry')
   })
   return <main id="main" className="mode-parent">
     <h1 className="screen-title">가족 연결</h1>
@@ -56,15 +66,38 @@ export default function SetupScreen() {
       <p className="screen-body">연결된 가족: {session.circles.length}명</p>
       <Link className="action-btn action-btn--secondary" to="/family/dashboard">확인 요청 보기</Link>
     </section>}
-    {parentCircle && current && <section aria-label="부모님 직접 동의">
-      <h2 className="screen-title">{current.title}</h2><p className="screen-body">{current.text}</p>
-      <div className="screen-actions">
-        <ActionButton disabled={busy || (current.item==='impersonation_check'&&!alertGranted)} onClick={()=>consent(true)}>동의해요</ActionButton>
-        <ActionButton variant="secondary" disabled={busy} onClick={()=>consent(false)}>동의하지 않아요</ActionButton>
-      </div>
-      {current.item==='impersonation_check'&&!alertGranted && <p className="screen-body">가족 알림에 동의하지 않아 사칭 확인도 꺼져 있어요.</p>}
+    {parentCircle && needsConsent && !quiz && <section aria-label="부모님 직접 동의" className="consent-list">
+      <h2 className="screen-title">허락할 내용을 골라 주세요</h2>
+      <p className="screen-body">하나씩 골라도 되고, 한 번에 모두 허락해도 돼요. [자세히]를 누르면 내용을 볼 수 있어요.</p>
+      <ActionButton disabled={busy} onClick={()=>setSelection(selectAll())}>모두 허락</ActionButton>
+      {CONSENT_STEPS.map(st=>{
+        const locked = st.item==='impersonation_check' && selection.family_alert!==true
+        const isOpen = open===st.item
+        return <article key={st.item} className="consent-item">
+          <h3 className="consent-item__title">{st.title}</h3>
+          <p className="screen-body">{st.summary}</p>
+          {st.item==='family_alert' && <p className="screen-body"><strong>받는 사람:</strong> {recipients.length ? recipients.map(m=>m.callName&&m.callName!==m.relation?`${m.callName}(${m.relation})`:m.relation).join(', ') : '아직 연결된 가족이 없어요'}</p>}
+          <button type="button" className="consent-item__more" aria-expanded={isOpen} aria-controls={`consent-${st.item}`} onClick={()=>setOpen(isOpen?null:st.item)}>{isOpen?'접기':'자세히'}</button>
+          {isOpen && <div id={`consent-${st.item}`}>
+            <ul className="consent-item__details">{st.details.map(d=><li key={d}>{d}</li>)}<li>{st.ifDeclined}</li></ul>
+            <SpeakButton text={[st.title, st.summary, ...st.details, st.ifDeclined].join(' ')} />
+          </div>}
+          <div className="consent-item__choice" role="group" aria-label={`${st.title} 선택`}>
+            <button type="button" className={`consent-choice${selection[st.item]===true?' consent-choice--on':''}`} aria-pressed={selection[st.item]===true} disabled={busy||locked} onClick={()=>setSelection(setChoice(selection,st.item,true))}>허락</button>
+            <button type="button" className={`consent-choice${selection[st.item]===false?' consent-choice--on':''}`} aria-pressed={selection[st.item]===false} disabled={busy} onClick={()=>setSelection(setChoice(selection,st.item,false))}>허락 안 함</button>
+          </div>
+          {locked && <p className="screen-body">②를 허락해야 켤 수 있어요.</p>}
+        </article>
+      })}
+      <ActionButton disabled={busy || !isComplete(selection)} onClick={save}>{isComplete(selection)?'고른 대로 저장':'모든 항목을 골라 주세요'}</ActionButton>
     </section>}
-    {parentCircle && !current && <section><h2 className="screen-title">가족이 연결됐어요</h2><p className="screen-body">동의는 설정에서 바꿀 수 있어요. 알림 도착 시험은 따로 확인해야 해요.</p><Link to="/check/input" className="action-btn action-btn--primary">가상 문자로 확인하기</Link></section>}
+    {parentCircle && (quiz==='ask'||quiz==='retry') && question && <section aria-label="이해 확인">
+      <h2 className="screen-title">확인할게요</h2>
+      {quiz==='retry' && <div className="screen-body" role="status"><p>다시 알려 드릴게요. 내가 “가족에게 물어보기”를 누를 때 아래 가족이 위험 단계와 정해진 요약을 봐요. 문자 원문은 보내지 않아요.</p><SpeakButton text={`내가 가족에게 물어보기를 누를 때 ${question.options[0].label}이 위험 단계와 정해진 요약을 봐요. 문자 원문은 보내지 않아요.`} /><p>보호자 도움 없이 직접 골라 주세요.</p></div>}
+      <p className="screen-body">{question.question}</p>
+      <div className="screen-actions">{question.options.map(o=><ActionButton key={o.label} variant="secondary" disabled={busy} onClick={()=>answer(o.correct)}>{o.label}</ActionButton>)}</div>
+    </section>}
+    {parentCircle && !needsConsent && (quiz===null||quiz==='done') && <section><h2 className="screen-title">가족이 연결됐어요</h2><p className="screen-body">허락한 내용은 설정에서 바꿀 수 있어요. 알림 도착 시험은 따로 확인해야 해요.</p><Link to="/check/input" className="action-btn action-btn--primary">가상 문자로 확인하기</Link></section>}
     {session && <div className="screen-actions"><ActionButton variant="secondary" disabled={busy} onClick={()=>run(async()=>{await api('/auth/logout',{});sessionStorage.clear();setSession(null);setInvite(null)})}>로그아웃</ActionButton></div>}
     <NoLinkFooter/>
   </main>

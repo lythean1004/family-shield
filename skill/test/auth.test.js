@@ -74,6 +74,23 @@ describe('real PostgreSQL: demo login, invitation, consent and isolation', { ski
     await assert.rejects(db.user(outsider.userId,tx=>tx.query("insert into public.consents(circle_id,user_id,item,granted,text_version) values($1,$2,'family_alert',true,'test')",[circleId,outsider.userId])),{code:'42501'})
     await assert.rejects(db.user(parent.userId,tx=>tx.query('select * from private.sessions')),{code:'42501'})
   })
+  test('overseas AI consent is separate; analysis uses AI only after the parent allows it (consent redesign v3)',async()=>{
+    assert.equal(CONSENT_VERSION,'demo-2026-11-11-v3')
+    const g=await guardian()
+    const invitation=await auth.invite(g.userId,'아들')
+    const parent=await auth.redeem(invitation.code,true,invitation.code,true)
+    users.push(parent.userId)
+    const circleId=(await auth.profile(parent.userId)).circles[0].id
+    const consent=(item,granted)=>auth.consent(parent.userId,{circleId,item,granted,textVersion:CONSENT_VERSION})
+    assert.equal(await auth.overseasAiAllowed(parent.userId),false,'no consent yet: rules only')
+    await consent('overseas_ai',true)
+    assert.equal(await auth.overseasAiAllowed(parent.userId),true)
+    await consent('overseas_ai',false)
+    assert.equal(await auth.overseasAiAllowed(parent.userId),false,'withdrawal takes effect')
+    await consent('comprehension',true)
+    await assert.rejects(auth.consent(parent.userId,{circleId,item:'overseas_ai',granted:true,textVersion:'demo-2026-10-28-v2'}),{reason:'consent'})
+    assert.equal(await auth.overseasAiAllowed(g.userId),false,'guardian without a parent circle: rules only')
+  })
   test('session survives a new auth instance and logout revokes it',async()=>{
     const g=await guardian()
     const req={headers:{cookie:`fs_session=${g.token}`}}
