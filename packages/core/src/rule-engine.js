@@ -75,8 +75,8 @@ export function decide(context) {
        (sig.has(SIG_MONEY) && (pressure.has(SIG_URGENCY) || pressure.has(SIG_AVOID_VOICE) ||
                                pressure.has(SIG_SECRECY) || pressure.has(SIG_ISOLATION))))) fire("R13", "위험");
 
-  // R4: 가족 사칭 + 통화를 피함
-  if (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_AVOID_VOICE)) fire("R4", "위험");
+  // R4: 가족 사칭 + 통화를 피함. 통화 회피는 코드가 찾은 신호만 본다(D46, 기록된 AI 결과 재계산 오경보 11→2, 놓침 변화 없음)
+  if (sig.has(SIG_FAMILY_IMPERSONATION) && pressure.has(SIG_AVOID_VOICE)) fire("R4", "위험");
 
   // R5: 가족이 "보낸 적 없어요" 확인
   if (family_denied) fire("R5", "위험");

@@ -79,6 +79,18 @@ describe("규칙 엔진 - 위험 판정", () => {
     assert.equal(level, "위험");
   });
 
+  it("R4: AI만 통화 회피를 붙이고 코드는 못 찾았으면 R4 아님(SUP-D01 “저녁에 전화할게”, D46)", () => {
+    const r = decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_MONEY", "SIG_AVOID_VOICE"], signals_code: ["SIG_MONEY"] });
+    assert.ok(!r.fired_rules.includes("R4"));
+    assert.equal(r.level, "주의");
+  });
+
+  it("R4: 코드가 통화 회피를 찾으면 위험", () => {
+    const r = decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_AVOID_VOICE"], signals_code: ["SIG_AVOID_VOICE"] });
+    assert.equal(r.level, "위험");
+    assert.ok(r.fired_rules.includes("R4"));
+  });
+
   it("R4: 가족 사칭 + 통화 회피 → 위험", () => {
     const { level, fired_rules } = decide({
       signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_AVOID_VOICE"],
