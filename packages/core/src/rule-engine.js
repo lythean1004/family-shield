@@ -62,8 +62,13 @@ export function decide(context) {
   if (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_NEW_NUMBER) &&
       (sig.has(SIG_MONEY) || sig.has(SIG_GIFTCARD))) fire("R3", "위험");
 
-  // R13: 가족 사칭 + (돈 or 상품권 요구). 카카오에서는 보낸 번호를 받지 않아 R3의 '새 번호'가 없을 수 있다(D45)
-  if (sig.has(SIG_FAMILY_IMPERSONATION) && (sig.has(SIG_MONEY) || sig.has(SIG_GIFTCARD))) fire("R13", "위험");
+  // R13: 가족 사칭 + (상품권 요구, 또는 돈 요구 + 압박[재촉·통화 회피·비밀·고립]).
+  // 카카오는 보낸 번호를 받지 않아 R3의 '새 번호'가 없을 수 있다(D45). 압박 조건은 “용돈 보냈어” 같은
+  // 정상 가족 송금 알림의 오경보를 막는다(기록된 AI 결과 3회: 잡는 사기 같음, 새 오경보 3·3·1 → 0)
+  if (sig.has(SIG_FAMILY_IMPERSONATION) &&
+      (sig.has(SIG_GIFTCARD) ||
+       (sig.has(SIG_MONEY) && (sig.has(SIG_URGENCY) || sig.has(SIG_AVOID_VOICE) ||
+                               sig.has(SIG_SECRECY) || sig.has(SIG_ISOLATION))))) fire("R13", "위험");
 
   // R4: 가족 사칭 + 통화를 피함
   if (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_AVOID_VOICE)) fire("R4", "위험");

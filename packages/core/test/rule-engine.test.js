@@ -32,6 +32,16 @@ describe("규칙 엔진 - 위험 판정", () => {
     assert.equal(decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_GIFTCARD"] }).level, "위험");
   });
 
+  it("R13 은 압박 없는 가족 돈 이야기(정상 송금 알림)에는 켜지지 않는다(TEST-D1141 오경보 방지)", () => {
+    const r = decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_MONEY"] });
+    assert.equal(r.level, "주의");
+    assert.ok(!r.fired_rules.includes("R13"));
+  });
+
+  it("R13: 가족 사칭 + 돈 + 통화 회피도 압박으로 본다", () => {
+    assert.ok(decide({ signals_final: ["SIG_FAMILY_IMPERSONATION", "SIG_MONEY", "SIG_AVOID_VOICE"] }).fired_rules.includes("R13"));
+  });
+
   it("R13 은 가족 사칭 없이 돈 요구만으로는 켜지지 않는다(주의)", () => {
     const r = decide({ signals_final: ["SIG_MONEY"] });
     assert.equal(r.level, "주의");

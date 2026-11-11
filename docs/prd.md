@@ -398,7 +398,7 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 | R10 | 링크 도메인이 KISA 목록(`SIG_MALICIOUS_URL`) 또는 Google Safe Browsing 목록(`SIG_SB_UNSAFE_URL`)에 있음 | 위험 |
 | R11 | 공식 주소를 흉내 낸 링크(`SIG_LOOKALIKE_DOMAIN`, D40 ②). 2026-11-11 확정: 정상 인기 사이트 약 90만 개 중 5개(0.0006%) | 위험 |
 | R12 | 만든 지 30일 안 된 링크 도메인(`SIG_NEW_DOMAIN`) + 돈 요구·개인정보 요구·앱 설치 중 하나(D41) | 위험 |
-| R13 | 가족 사칭(`SIG_FAMILY_IMPERSONATION`) + 돈·상품권 요구(`SIG_MONEY`/`SIG_GIFTCARD`). 새 번호 정보가 없어도(카카오는 보낸 번호를 받지 않음, D45) | 위험 |
+| R13 | 가족 사칭(`SIG_FAMILY_IMPERSONATION`) + (상품권 요구, 또는 돈 요구 + 압박: 재촉·통화 회피·비밀·고립 중 하나). 새 번호 정보가 없어도(카카오는 보낸 번호를 받지 않음, D45) | 위험 |
 
 판정은 올라가기만 한다. 판정에 쓰인 규칙은 `fired_rules`에 기록한다.
 
