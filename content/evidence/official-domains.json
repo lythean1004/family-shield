@@ -12,13 +12,13 @@
         "koreapost",
         "korpost"
       ],
-      "source_url": "https://www.epost.go.kr/",
+      "source_url": "https://www.koreapost.go.kr/kpost/index.do",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "우체국 택배·우편 사칭 링크 도메인 감지",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "epost.go.kr 제목 '인터넷우체국' 확인. koreapost.go.kr은 200 응답이나 제목 없음. 2026-11-11 Tranco 시험: 'epost'는 해외 우편 서비스(epost.de 등)와 겹쳐 이름 규칙에서 뺌. KISA 우체국 사칭 16건은 모두 koreapost·korpost"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.koreapost.go.kr/kpost/index.do 에서 우정사업본부 명칭·하단 운영 주체와 인터넷우체국(www.epost.go.kr), 소포(parcel.epost.go.kr), 쇼핑(mall.epost.go.kr) 연결을 확인. https://www.epost.go.kr/ 는 '인터넷우체국' 제목만 읽혀 운영 주체는 우정사업본부 안내로 교차 확인했다. 예금(epostbank.go.kr)·보험(epostlife.go.kr)도 같은 안내에 있으나 요청서에 따라 추가하지 않았다. koreapost.com은 해당 기관 공식 근거를 찾지 못해 미추가(대상 주소 미접속, 사칭 확정 아님). 하단 무단 복제·배포 제한 고지를 읽었으나 이 카드 인용의 이용조건은 확정하지 못해 terms_checked=false 유지. 게시일 미표시, 전문가 검수 전. 기존 규칙 기록: 2026-11-11 Tranco 시험에서 'epost'는 해외 우편 서비스와 겹쳐 이름 규칙에서 제외했고, KISA 우체국 사칭 16건은 모두 koreapost·korpost."
     },
     {
       "id": "EV-DOM-CJ",
@@ -29,13 +29,13 @@
       "prefixes": [
         "cjlogistic"
       ],
-      "source_url": "https://www.cjlogistics.com/",
+      "source_url": "https://www.cjlogistics.com/ko/main",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "CJ대한통운 택배 사칭 링크 도메인 감지",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "자동 접속 응답 없음. 사람이 직접 확인 필요"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.cjlogistics.com/ko/main 에서 CJ대한통운(주)와 CJ Logistics Corporation 저작권 표기 확인. 배송조회 https://www.cjlogistics.com/ko/tool/parcel/tracking 도 같은 공식 도메인 사용. CJ그룹의 https://contents.cj.net/esg/report/KR/CJ_LOGISTICS_SUSTAINABILITY_REPORT_2023_KO.pdf 에 표기된 홈페이지 주소로 교차 확인. 추가 확인 대상 cjlogistics.co.th는 https://www.cjlogistics.com/ko/network/th-th 의 태국 법인 소개에서 해당 주소를 확인하지 못했고 Network 페이지도 접속 실패하여 공식 근거 없음으로 미추가(대상 주소 미접속, 사칭 확정 아님). 법적고지 https://www.cjlogistics.com/ko/agreement/legal-notices 는 제목만 읽혀 카드 인용 이용조건 미확인. 기준 페이지 게시일 미표시, 전문가 검수 전."
     },
     {
       "id": "EV-DOM-LOGEN",
@@ -46,19 +46,20 @@
       "prefixes": [
         "ilogen"
       ],
-      "source_url": "https://www.ilogen.com/",
+      "source_url": "https://www.ilogen.com/web",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "로젠택배 사칭 링크 도메인 감지",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "200 응답이나 제목 없음"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.ilogen.com/web 에서 로젠주식회사와 Logen Co.,Ltd 하단 표기 확인. 여기서 연결한 공식 앱 https://play.google.com/store/apps/details?id=com.ilogen.delivery 의 개발사 로젠(주)·웹사이트 www.ilogen.com 으로 교차 확인. https://www.ilogen.com/web/enterprise/linkService 는 배송조회 전용 URL을 신청 후 개별 안내한다고 하므로 공개되지 않은 주소는 추정해 추가하지 않았다. 검색에 나타난 ilogen.kr도 기존 공식 누리집의 연결 근거를 확보하지 못해 미추가. 이용약관 https://www.ilogen.com/web/util/term_condicion 제14조의 사전 승낙 없는 영리목적 이용 제한을 읽었으나 이 카드 인용에 대한 허락은 미확인하여 terms_checked=false 유지. 게시일 미표시, 전문가 검수 전."
     },
     {
       "id": "EV-DOM-LOTTE",
       "name": "롯데택배(롯데글로벌로지스)",
       "official_domains": [
-        "lotteglogis.com"
+        "lotteglogis.com",
+        "lotteglogis-direct-go.com"
       ],
       "prefixes": [
         "lotteglogi"
@@ -68,26 +69,27 @@
       "checked_at": "2026-11-11",
       "scope": "롯데택배 사칭 링크 도메인 감지",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "제목 '롯데글로벌로지스' 확인"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.lotteglogis.com/ 에서 롯데글로벌로지스 명칭과 LOTTE GLOBAL LOGISTICS CO.,LTD 저작권 표기 확인. 같은 공식 누리집의 '롯데택배다이렉트GO' 메뉴가 https://www.lotteglogis-direct-go.com/?directgo_k=banner 로 연결되며, 도착 페이지에서도 롯데택배 계약·ALPS 서비스 안내 확인. 이 공식 연결을 근거로 lotteglogis-direct-go.com 추가. 기존 도메인의 하위 조회 주소는 이미 포함되므로 중복 추가하지 않았다. 카드 인용 이용조건 및 게시일 미확인, 전문가 검수 전."
     },
     {
       "id": "EV-DOM-HANJIN",
       "name": "한진택배((주)한진)",
       "official_domains": [
         "hanjin.com",
-        "hanjin.co.kr"
+        "hanjin.co.kr",
+        "hanjinoneclick.co.kr"
       ],
       "prefixes": [
         "hanjin"
       ],
-      "source_url": "https://www.hanjin.com/",
+      "source_url": "https://www.hanjin.com/kor/Main.do",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "한진택배 사칭 링크 도메인 감지",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "hanjin.com 제목 '글로벌 종합물류기업 (주)한진' 확인. hanjin.co.kr은 미확인"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.hanjin.com/kor/Main.do 에서 (주)한진 운영 주체와 HANJIN Logistics Corporation 저작권 표기 확인. https://www.hanjin.co.kr/ 가 위 공식 페이지로 이동함을 확인. 공식 메인의 '원클릭 택배' 메뉴가 https://hanjinoneclick.co.kr/ 를 직접 가리키므로 hanjinoneclick.co.kr 추가(대상 페이지 자체는 403, 공식 연결로 확인). 추가 확인 대상 hanjintravel.com은 https://www.koreanair.com/contents/footer/terms-and-policies/privacy-policy/list-of-recipients-of-personal-information 에서 한진트래블 업무 이메일 도메인으로 확인했으나, 웹사이트로 안내한 근거는 미확인하여 미추가. 대한항공 기프트카드 안내의 홈페이지 링크는 구주소 kaltour.com 이고 이 구주소의 이동 확인도 실패했다. 대상 hanjintravel.com 미접속, 사칭 확정 아님. https://www.hanjin.com/kor/CMS/PrivacyMgr/agreeList.do?mCode=MN012 의 자료 상업 이용·제3자 제공 제한을 읽었으나 카드 인용 허락은 미확인하여 terms_checked=false 유지. 게시일 미표시, 전문가 검수 전."
     },
     {
       "id": "EV-DOM-EFINE",
@@ -98,13 +100,13 @@
       "prefixes": [
         "efine"
       ],
-      "source_url": "https://www.efine.go.kr/",
+      "source_url": "https://www.jbpolice.go.kr/index.police?menuCd=DOM_000000209001000000",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "교통 범칙금·과태료 사칭 링크 도메인 감지",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "307 응답(자동 확인 불완전)"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.efine.go.kr/ 직접 열기는 리다이렉트 반복으로 본문 확인 실패. 대신 전북경찰청 공식 안내 https://www.jbpolice.go.kr/index.police?menuCd=DOM_000000209001000000 의 교통민원24(efine.go.kr) 명시 및 www.efine.go.kr 연결을 확인하여 기관·도메인을 확인했다. 경찰청 홍보자료 https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1007&q_bbscttSn=20240222172806796 의 검색 색인에도 같은 주소가 있으나 원문 직접 열기는 실패하여 보조 근거로만 참고. 다른 등록 도메인은 확인하지 못해 미추가. 기준 안내 게시일 및 카드 인용 이용조건 미확인, 전문가 검수 전."
     },
     {
       "id": "EV-DOM-NHIS",
@@ -115,13 +117,13 @@
       "prefixes": [
         "nhis"
       ],
-      "source_url": "https://www.nhis.or.kr/",
+      "source_url": "https://www.nhis.or.kr/nhis/index.do",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "건강보험 사칭 링크 도메인 감지",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "제목 '국민건강보험' 확인"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.nhis.or.kr/nhis/index.do 에서 국민건강보험공단 운영 주체·보건복지부 산하기관 안내·National Health Insurance Service 저작권 표기 확인. 보건복지부 자료 https://www.mohw.go.kr/upload/140/202004/1587890659251_20200426174419.pdf 에 명시된 공단 홈페이지 www.nhis.or.kr 로 교차 확인. tn-nhis.com은 공단·보건복지부 공식 근거를 찾지 못해 미추가(대상 주소 미접속, 사칭 확정 아님). 등록 도메인을 추가할 근거 없음. 카드 인용 이용조건 및 기준 페이지 게시일 미확인, 전문가 검수 전."
     },
     {
       "id": "EV-DOM-NTS",
@@ -133,13 +135,13 @@
       "prefixes": [
         "hometax"
       ],
-      "source_url": "https://www.hometax.go.kr/",
+      "source_url": "https://www.nts.go.kr/",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "국세청·홈택스 사칭 링크 도메인 감지",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "제목 '국세청 홈택스', '국세청' 확인"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.nts.go.kr/ 에서 국세청 운영 주체·공식 전자정부 누리집 안내·National Tax Service 저작권 표기와 홈택스(hometax.go.kr) 직접 연결을 확인. https://www.hometax.go.kr/ 는 '국세청 홈택스' 제목만 읽혀 국세청의 연결 안내로 교차 확인. 국세청이 안내하는 teht.hometax.go.kr 등은 기존 도메인의 하위 주소라 추가 불필요. https://www.nts.go.kr/nts/cm/cntnts/cntntsView.do?cntntsId=8169&mi=6791 의 저작권정책은 공공누리 유형별 조건·출처 표시와 미표시 자료의 사전 협의를 요구한다. 이번 기준 페이지의 개별 이용허락 적용을 확인하지 못해 terms_checked=false 유지. 기준 페이지 게시일 미표시, 전문가 검수 전."
     },
     {
       "id": "EV-DOM-GOV",
@@ -148,13 +150,13 @@
         "gov.kr",
         "go.kr"
       ],
-      "source_url": "https://www.gov.kr/",
+      "source_url": "https://plus.gov.kr/",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "정부 기관을 흉내 낸 링크 도메인 감지. KISA 목록에서 본 'gov.무작위.일반도메인' 모양만(해외 정부 gov.uk 등과 gov가 들어간 정상 서비스 오탐 방지)",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "gov.kr 제목 '정부24' 확인",
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://www.gov.kr/portal/main/nologin 이 https://plus.gov.kr/ 로 이동하고 정부24 민원·정책 서비스가 표시됨을 확인(plus.gov.kr 는 기존 gov.kr 하위 주소). 광진구 공식 안내 https://www.gwangjin.go.kr/portal/main/contents.do?menuNo=200024 의 정부24·gov.kr 명시로 교차 확인. go.kr 는 단일 기관 웹사이트가 아닌 등록 영역이며 KISA KRNIC https://krnic.or.kr/jsp/resources/domainInfo/krDomainInfo.jsp 의 등록자격 표에서 행정·입법·사법기관으로 확인. 같은 표의 or.kr 는 비영리 법인·단체이므로 공공기관 전용으로 일괄 간주할 근거가 없다(코드·이름 규칙은 수정하지 않고 담당자 검토 사항으로 보고). 카드 인용 이용조건 및 기준 페이지 게시일 미확인, 전문가 검수 전.",
       "first_label_on_generic": [
         "gov",
         "gov24",
@@ -168,18 +170,19 @@
       "official_domains": [
         "telegram.org",
         "telegram.me",
-        "t.me"
+        "t.me",
+        "telegram.dog"
       ],
       "regex": [
         "^(?!telegram)te[il1]e?gr[ae]m"
       ],
-      "source_url": "https://telegram.org/",
+      "source_url": "https://core.telegram.org/api/links",
       "posted_at": null,
       "checked_at": "2026-11-11",
       "scope": "텔레그램 계정 탈취용 사칭 링크 도메인 감지. 철자를 틀린 변형만(teiegram, telegrem 등). 정확한 철자 telegram은 같은 이름의 정상 사이트(신문사 등)가 있어 제외",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "제목 'Telegram Messenger' 확인. telegram.me, t.me는 미확인"
+      "status": "source_checked",
+      "check_note": "2026-11-11 https://telegram.org/faq 에서 Telegram 서비스 설명을 확인. 공식 개발 문서 https://core.telegram.org/api/links 는 t.me 링크의 대체 도메인으로 telegram.me 와 telegram.dog 를 명시하므로 기존 t.me·telegram.me 확인 및 telegram.dog 추가. 단축 주소를 펼치거나 이용자 채널·메시지에 접속하지 않았다. 이 확인은 서비스 도메인 관계에 한정되며 해당 주소의 개별 계정·게시물·링크가 안전하다는 뜻은 아니다. telegrem.store는 Telegram 공식 자료에서 근거를 찾지 못해 미추가(대상 주소 미접속, 사칭 확정 아님). 카드 인용 이용조건 및 게시일 미확인, 전문가 검수 전."
     }
   ]
 }
