@@ -75,7 +75,7 @@ describe('real PostgreSQL: demo login, invitation, consent and isolation', { ski
     await assert.rejects(db.user(parent.userId,tx=>tx.query('select * from private.sessions')),{code:'42501'})
   })
   test('overseas AI consent is separate; analysis uses AI only after the parent allows it (consent redesign v3)',async()=>{
-    assert.equal(CONSENT_VERSION,'demo-2026-11-11-v3')
+    assert.equal(CONSENT_VERSION,'demo-2026-11-16-v4')
     const g=await guardian()
     const invitation=await auth.invite(g.userId,'아들')
     const parent=await auth.redeem(invitation.code,true,invitation.code,true)

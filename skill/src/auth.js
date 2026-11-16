@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, randomInt } from 'node:crypto'
 
-export const CONSENT_VERSION = 'demo-2026-11-11-v3'
+export const CONSENT_VERSION = 'demo-2026-11-16-v4'
 export const CONSENT_ITEMS = ['family_alert', 'impersonation_check', 'check_log', 'misjudge_share', 'overseas_ai', 'comprehension']
 export const RELATIONS = ['딸', '아들', '배우자', '가족']
 const SESSION_SECONDS = 30 * 24 * 60 * 60

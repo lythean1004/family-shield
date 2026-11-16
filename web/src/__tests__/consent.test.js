@@ -16,7 +16,7 @@ describe('동의 항목 (작업 ⑤, D43)', () => {
       assert.ok(s.ifDeclined, `${s.item}: 거절하면 어떻게 되는지`)
     }
   })
-  it('버전은 새 구조용', () => assert.equal(CONSENT_VERSION, 'demo-2026-11-11-v3'))
+  it('버전은 새 구조용', () => assert.equal(CONSENT_VERSION, 'demo-2026-11-16-v4'))
 })
 
 describe('전체 동의와 개별 동의', () => {
