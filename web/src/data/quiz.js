@@ -77,4 +77,43 @@ export const QUIZ_ITEMS = [
     level: '확인필요',
     explanation: '공식 주소로 보이지만 그것만으로 안전하다고 할 수는 없어요. 주문한 적이 없다면 택배 앱이나 공식 번호로 확인하세요.',
   },
+  // 시즌 문항: months(보여 줄 달)와 공식 출처(source)가 있어야 한다. 월 1회 공식 경고문(금융위·금감원·경찰청·KISA)을 확인해 갱신
+  {
+    id: 'q10',
+    title: '개인정보 유출 보상 안내',
+    message: '[○○카드] 개인정보 유출 피해 고객 보상 대상입니다. 보상 신청 [링크]',
+    signals: ['SIG_AGENCY_IMPERSONATION', 'SIG_LINK'],
+    level: '위험',
+    explanation: '개인정보 유출 사고 뒤에는 피해 확인·보상을 미끼로 한 문자가 늘어요. 문자 속 링크 말고, 카드사 공식 앱이나 직접 찾은 공식 번호로 확인하세요.',
+    months: [10, 11, 12],
+    source: {
+      title: '금융위원회·금융감독원 소비자경보(주의): 개인정보 유출 2차 피해(보이스피싱·스미싱) 주의, 특별대응기간 12월 말까지 연장',
+      url: 'https://www.fsc.go.kr/no010101/86271',
+      checked_at: '2026-11-26',
+    },
+  },
 ]
+
+/** 하루에 푸는 문항 수 */
+export const QUIZ_DAILY_COUNT = 5
+
+/** 한국 날짜(YYYY-MM-DD 기준 일 번호)와 달 */
+function koreaDay(date) {
+  const kst = new Date(date.getTime() + 9 * 3600 * 1000)
+  return { dayNo: Math.floor(kst.getTime() / 86400000), month: kst.getUTCMonth() + 1 }
+}
+
+/**
+ * 오늘의 퀴즈(멘토링 2026-11-26: 최신 내용으로 바뀌게).
+ * - 이번 달 시즌 문항(months)이 먼저, 시즌이 아닌 시즌 문항은 빼고, 나머지는 날마다 시작점이 바뀌며 돌아간다.
+ * - 같은 날에는 언제 열어도 같은 문항(AI·서버 없이 결정적).
+ */
+export function quizForDate(items, date = new Date(), count = QUIZ_DAILY_COUNT) {
+  const { dayNo, month } = koreaDay(date)
+  const seasonal = items.filter((q) => q.months?.includes(month))
+  // 시즌이 지난 문항은 뺀다(지난 경고를 최신처럼 보여 주지 않는다)
+  const rest = items.filter((q) => !q.months?.length)
+  const start = rest.length ? dayNo % rest.length : 0
+  const rotated = [...rest.slice(start), ...rest.slice(0, start)]
+  return [...seasonal, ...rotated].slice(0, Math.min(count, items.length))
+}

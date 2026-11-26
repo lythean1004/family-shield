@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import ActionButton from '../components/ActionButton.jsx'
 import VerdictBanner from '../components/VerdictBanner.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { QUIZ_ITEMS } from '../data/quiz.js'
+import { QUIZ_ITEMS, quizForDate } from '../data/quiz.js'
 import { levelKey } from '../data/result.js'
 
 const CHOICES = [
@@ -29,8 +29,10 @@ export default function QuizScreen() {
   const [score, setScore]     = useState(0)      // 맞은 개수
   const [done, setDone]       = useState(false)  // 전체 완료
 
-  const item = QUIZ_ITEMS[idx]
-  const total = QUIZ_ITEMS.length
+  // 오늘의 문항(날마다 바뀜, 이번 달 시즌 문항 먼저). 화면을 연 동안에는 고정
+  const [items] = useState(() => quizForDate(QUIZ_ITEMS))
+  const item = items[idx]
+  const total = items.length
   const isCorrect = choice === item?.level
 
   const confirm = () => {
@@ -116,6 +118,9 @@ export default function QuizScreen() {
           </p>
           {/* F7-3: 놓친 신호 짚어주기 */}
           <p className="screen-body">{item.explanation}</p>
+          {item.source && (
+            <p className="settings-note">요즘 주의할 사례 · 출처: {item.source.title} (확인일 {item.source.checked_at})</p>
+          )}
           <div className="screen-actions">
             <ActionButton variant="primary" onClick={next}>
               {idx + 1 < total ? '다음 문제' : '결과 보기'}
