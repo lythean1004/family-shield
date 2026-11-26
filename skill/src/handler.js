@@ -20,7 +20,7 @@ import { createMemoryResultStore, redactToken, toResultView } from "../../packag
 import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
 import { loadPhishingListChecker, combineCheckers } from "../../packages/core/src/phishing-list.js";
 import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
-import { readRequest, simpleText, quickReply } from "./kakao.js";
+import { readRequest, simpleText, quickReply, withImage } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
 import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT } from "../../packages/core/src/fixed-text.js";
 import { tokenMatches } from "./config.js";
@@ -179,8 +179,16 @@ export async function handleRequest(params, cfg) {
 
   const text = buildReplyText(result);
   const replies = await buildQuickReplies(result, cfg.webBaseUrl, cfg.resultStore ?? null);
-  return { status: 200, body: simpleText(text, replies) };
+  const body = simpleText(text, replies);
+  const image = LEVEL_IMAGE[result.level];
+  return { status: 200, body: image && cfg.webBaseUrl ? withImage(body, `${cfg.webBaseUrl}${image.path}`, image.alt) : body };
 }
+
+// 주의·위험만 경고 이미지(web/public/kakao). 확인 필요는 겁주지 않도록 글만
+const LEVEL_IMAGE = {
+  위험: { path: "/kakao/level-danger.png", alt: "위험: 링크 누르지 마세요. 돈이나 정보를 보내지 마세요." },
+  주의: { path: "/kakao/level-caution.png", alt: "주의: 보내기 전에 직접 확인하세요." },
+};
 
 /**
  * GET /api/result?t=… — 1회용 토큰으로 판별 결과 조회(PRD 13-4).

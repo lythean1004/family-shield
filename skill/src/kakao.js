@@ -49,6 +49,15 @@ export function simpleText(text, quickReplies = []) {
   return { version: "2.0", template };
 }
 
+/**
+ * 말풍선 맨 앞에 이미지 하나를 넣는다(멘토링 2026-11-26: 주의·위험은 이미지로 확실하게 경고).
+ * 이미지는 우리 웹 서버의 고정 파일만 쓴다. altText는 화면 읽기·이미지 안 뜰 때 대신 보인다.
+ */
+export function withImage(body, imageUrl, altText) {
+  const template = { ...body.template, outputs: [{ simpleImage: { imageUrl, altText } }, ...body.template.outputs] };
+  return { ...body, template };
+}
+
 /** 버튼 만들기 도우미 (D25: 우리가 먼저 링크를 보내지 않는다 → webLink는 사용자가 누를 때만) */
 export const quickReply = {
   message: (label, messageText) => ({ label, action: "message", messageText }),

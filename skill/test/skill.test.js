@@ -573,3 +573,31 @@ describe("HTTP 서버 - /api/analyze", () => {
   });
 });
 
+
+// 멘토링(2026-11-26): 주의·위험은 이미지까지 넣어 확실하게 경고한다. 확인 필요에는 넣지 않는다(겁주지 않기)
+describe("경고 이미지", () => {
+  const dangerAi = { ...cfg.ai, fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") };
+  const imageOf = (body) => body.template.outputs.find((o) => o.simpleImage)?.simpleImage;
+  const textOf = (body) => body.template.outputs.find((o) => o.simpleText)?.simpleText.text;
+
+  it("위험이면 빨간 경고 이미지가 글보다 먼저 나온다", async () => {
+    const r = await handleRequest({ utterance: "[검찰청] 링크: http://x.invalid/a" }, { ...cfg, ai: dangerAi, webBaseUrl: "https://fs.example" });
+    assert.ok(r.body.template.outputs[0].simpleImage, "첫 말풍선이 이미지");
+    assert.equal(imageOf(r.body).imageUrl, "https://fs.example/kakao/level-danger.png");
+    assert.match(imageOf(r.body).altText, /위험/);
+    assert.ok(textOf(r.body).includes("위험"), "글 답장은 그대로");
+  });
+  it("주의면 주의 이미지", async () => {
+    const r = await handleRequest({ utterance: "확인 부탁 http://x.invalid/a" }, { ...cfg, webBaseUrl: "https://fs.example" });
+    assert.equal(imageOf(r.body)?.imageUrl, "https://fs.example/kakao/level-caution.png");
+  });
+  it("확인 필요에는 이미지가 없다", async () => {
+    const r = await handleRequest({ utterance: "[롯데택배] 배송 예정입니다." }, { ...cfg, webBaseUrl: "https://fs.example" });
+    assert.equal(imageOf(r.body), undefined);
+  });
+  it("웹 주소 설정이 없으면 이미지를 넣지 않는다(글 답장만)", async () => {
+    const r = await handleRequest({ utterance: "[검찰청] 링크: http://x.invalid/a" }, { ...cfg, ai: dangerAi });
+    assert.equal(imageOf(r.body), undefined);
+    assert.ok(r.body.template.outputs[0].simpleText);
+  });
+});
