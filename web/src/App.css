@@ -438,7 +438,7 @@
 }
 .text-link:hover { text-decoration-thickness: 2px; }
 .home-intro {
-  padding: var(--sp-6);
+  padding: var(--sp-4) calc(var(--sp-4) - var(--card-edge));
   background: var(--c-surface);
   border: var(--card-edge) solid var(--c-border);
   border-radius: var(--radius-card);
@@ -693,7 +693,10 @@ a.action-btn { text-decoration: none; }
 @keyframes top-nav-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
 /* 고정 메뉴에 가려지지 않게: 바로가기 링크·앵커 이동 시 위 여백 */
-html { scroll-padding-top: calc(var(--btn-min) + var(--sp-8)); }
+html {
+  scroll-padding-top: calc(var(--btn-min) + var(--sp-8));
+  scroll-padding-bottom: var(--sp-3);
+}
 @media print { .top-nav { display: none; } }
 
 .setup-form { display: grid; gap: var(--sp-4); margin-block: var(--sp-4); font-size: var(--fs-body); }

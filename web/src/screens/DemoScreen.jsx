@@ -2,8 +2,8 @@
  * D1. 공개 데모 /demo — 고정 예시 SC1~SC4(AI 호출 없음, DB 읽지 않음, PRD 12-5).
  * 결과는 P4와 같은 ResultView로 보여 준다. 맨 위에 '예시' 띠 고정.
  */
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { useNavigate, useNavigationType } from 'react-router-dom'
 import ResultView from '../components/ResultView.jsx'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
@@ -16,6 +16,18 @@ export default function DemoScreen() {
   const navigate = useNavigate()
   const [selectedId, setSelectedId] = useState(null)
   const sc = DEMO_SCENARIOS.find((s) => s.id === selectedId)
+  const navigationType = useNavigationType()
+  const previousSelection = useRef(selectedId)
+  const startRef = useRef(null)
+
+  useLayoutEffect(() => {
+    const changed = previousSelection.current !== selectedId
+    previousSelection.current = selectedId
+    if (!changed && navigationType === 'POP') return
+    // 누른 버튼이 사라지므로, 새로 열린 내용을 화면 맨 위에서 이어 읽는다.
+    startRef.current?.focus({ preventScroll: true })
+    window.scrollTo(0, 0)
+  }, [selectedId, navigationType])
 
   return (
     <main id="main" className="mode-parent">
@@ -23,7 +35,7 @@ export default function DemoScreen() {
 
       {!sc && (
         <>
-          <h1 className="screen-title">예시 보기</h1>
+          <h1 ref={startRef} tabIndex={-1} className="screen-title">예시 보기</h1>
           <p className="screen-body">
             실제 사기 문자를 바꿔 만든 예시예요. 실제 판별은 카카오톡 채널에서 해요.
           </p>
@@ -47,7 +59,7 @@ export default function DemoScreen() {
 
       {sc && (
         <>
-          <section className="demo-message" aria-label="예시 문자">
+          <section ref={startRef} tabIndex={-1} className="demo-message" aria-label="예시 문자">
             {sc.callContext && <p className="demo-message__context">{sc.callContext}</p>}
             <p className="demo-message__text">{sc.message}</p>
           </section>
