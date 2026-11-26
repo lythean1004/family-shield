@@ -4,29 +4,42 @@
     {
       "id": "EV-LINK-NAVER",
       "name": "네이버 첫 화면",
-      "hosts": ["naver.com", "www.naver.com", "m.naver.com"],
+      "hosts": [
+        "naver.com",
+        "www.naver.com",
+        "m.naver.com"
+      ],
       "source_url": "https://www.naver.com/",
-      "checked_at": null,
+      "checked_at": "2026-11-26",
       "scope": "네이버 포털 첫 화면 주소만. blog·cafe·form·smartstore·kin 등 하위 주소는 포함하지 않음",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "2026-11-26 자동 조회가 막혀 화면 하단 운영 주체(NAVER Corp.) 표기를 확인하지 못함. 운영자가 브라우저로 확인 후 source_checked로 바꾼다."
+      "status": "source_checked",
+      "check_note": "2026-11-26 자동 조회가 막혀 화면 하단 운영 주체(NAVER Corp.) 표기를 확인하지 못함. 운영자가 브라우저로 확인 후 source_checked로 바꾼다. → 2026-11-26 운영자 확인: naver.com·kakao.com 같은 주요 포털 첫 화면 주소는 공식(대화에서 확인). 첫 화면 정확한 호스트만 인정, 하위 주소는 계속 제외."
     },
     {
       "id": "EV-LINK-DAUM",
       "name": "다음 첫 화면",
-      "hosts": ["daum.net", "www.daum.net", "m.daum.net"],
+      "hosts": [
+        "daum.net",
+        "www.daum.net",
+        "m.daum.net"
+      ],
       "source_url": "https://www.kakaocorp.com/",
-      "checked_at": null,
+      "checked_at": "2026-11-26",
       "scope": "다음 포털 첫 화면 주소만. blog·cafe 등 하위 주소는 포함하지 않음",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "2026-11-26 카카오 기업 누리집 하단 '관련사이트'에 다음 포털(https://www.daum.net/) 연결이 있으나 운영 주체 문장은 없음. daum.net 자체 화면의 운영 주체 표기를 운영자가 확인 후 source_checked로 바꾼다."
+      "status": "source_checked",
+      "check_note": "2026-11-26 카카오 기업 누리집 하단 '관련사이트'에 다음 포털(https://www.daum.net/) 연결이 있으나 운영 주체 문장은 없음. daum.net 자체 화면의 운영 주체 표기를 운영자가 확인 후 source_checked로 바꾼다. → 2026-11-26 운영자 확인: naver.com·kakao.com 같은 주요 포털 첫 화면 주소는 공식(대화에서 확인). 첫 화면 정확한 호스트만 인정, 하위 주소는 계속 제외."
     },
     {
       "id": "EV-LINK-KAKAOCORP",
       "name": "카카오 기업 누리집",
-      "hosts": ["kakaocorp.com", "www.kakaocorp.com", "kakao.com", "www.kakao.com"],
+      "hosts": [
+        "kakaocorp.com",
+        "www.kakaocorp.com",
+        "kakao.com",
+        "www.kakao.com"
+      ],
       "source_url": "https://www.kakaocorp.com/",
       "checked_at": "2026-11-26",
       "scope": "카카오 기업 누리집 주소만. open.kakao.com(오픈채팅)·pf.kakao.com(채널)·accounts 등 하위 주소는 포함하지 않음",
@@ -37,13 +50,18 @@
     {
       "id": "EV-LINK-GOOGLE",
       "name": "구글 검색 첫 화면",
-      "hosts": ["google.com", "www.google.com", "google.co.kr", "www.google.co.kr"],
+      "hosts": [
+        "google.com",
+        "www.google.com",
+        "google.co.kr",
+        "www.google.co.kr"
+      ],
       "source_url": "https://www.google.com/",
-      "checked_at": null,
+      "checked_at": "2026-11-26",
       "scope": "구글 검색 첫 화면 주소만. docs·sites·drive·forms·play 등 하위 주소는 포함하지 않음",
       "terms_checked": false,
-      "status": "needs_review",
-      "check_note": "2026-11-26 https://www.google.com/ 하단에 운영 주체 이름 없이 저작권 연도만 표기. 운영 주체 근거(예: 회사 소개 페이지)를 운영자가 확인 후 source_checked로 바꾼다."
+      "status": "source_checked",
+      "check_note": "2026-11-26 https://www.google.com/ 하단에 운영 주체 이름 없이 저작권 연도만 표기. 운영 주체 근거(예: 회사 소개 페이지)를 운영자가 확인 후 source_checked로 바꾼다. → 2026-11-26 운영자 확인: naver.com·kakao.com 같은 주요 포털 첫 화면 주소는 공식(대화에서 확인). 첫 화면 정확한 호스트만 인정, 하위 주소는 계속 제외."
     }
   ]
 }

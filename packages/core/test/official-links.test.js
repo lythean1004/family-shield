@@ -35,8 +35,12 @@ describe("공식 주소 링크 판단", () => {
     "https://bit.ly/abc",
   ]) it(`공식 아님: ${link}`, () => assert.equal(isOfficialLink(link), false));
 
-  it("확인 전(needs_review) 포털 주소는 아직 공식으로 보지 않는다", () => {
-    assert.equal(isOfficialLink("https://www.naver.com"), false);
+  it("포털 첫 화면은 공식, 하위 주소는 아님(멘토 예시 naver.com)", () => {
+    for (const l of ["naver.com", "https://www.naver.com", "https://m.naver.com", "daum.net", "https://www.google.com"]) assert.equal(isOfficialLink(l), true, l);
+    for (const l of ["https://cafe.naver.com/x", "https://form.naver.com/x", "https://blog.daum.net/x", "https://sites.google.com/x"]) assert.equal(isOfficialLink(l), false, l);
+  });
+  it("멘토 예시: naver.com만 있는 문자는 확인 필요", () => {
+    assert.equal(level("네이버 naver.com 에서 확인하세요"), "확인필요");
   });
 
   it("링크가 하나라도 공식이 아니면 전체를 공식으로 보지 않는다", () => {
