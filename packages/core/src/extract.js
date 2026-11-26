@@ -11,6 +11,7 @@
  *
  * options.senderLast4     : 부모님이 입력한 발신 번호 끝 4자리(F4-1, 선택)
  * options.shortUrlKeys    : 단축 주소 목록 키(시험용). 없으면 저장소 목록(content/phishing/kisa-short-urls.txt)
+ * options.inputComplete   : 전체 입력을 받았는지. false면 공식 주소 예외를 켜지 않는다.
  * options.registeredLast4 : 사칭된 가족의 등록 번호 끝 4자리(P3에서 고른 뒤 알 수 있음)
  *   두 값이 모두 있고 다르면 SIG_NEW_NUMBER. 같아도 판정을 낮추지 않는다(발신번호 조작 가능).
  */
@@ -22,10 +23,11 @@ import {
   SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
+import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
 import { allLinksOfficial } from "./official-links.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
-/** 주소 앞부분(호스트 앞)에 사용자 정보(@)가 있는지. 경로의 @는 보지 않는다 */
+/** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
 function hasUserinfo(link) {
   const authority = link.replace(/^(?:https?|ftp):\/\//i, "").split(/[/?#]/)[0];
   const at = authority.lastIndexOf("@");
@@ -121,7 +123,7 @@ const PATTERNS = {
 
 /**
  * @param {string} text
- * @param {{ senderLast4?: string, registeredLast4?: string }} [options]
+ * @param {{ senderLast4?: string, registeredLast4?: string, inputComplete?: boolean, shortUrlKeys?: Set<string> }} [options]
  * @returns {{ signals: string[], domains: string[] }}
  */
 export function extractCodeSignals(text, options = {}) {
@@ -130,7 +132,8 @@ export function extractCodeSignals(text, options = {}) {
   const input = typeof text === "string" ? text : "";
 
   // 링크
-  const links = findLinks(input);
+  const inspection = inspectLinkCandidates(input, { inputComplete: options.inputComplete !== false });
+  const links = linksForRiskChecks(findLinks(input), inspection);
   for (const link of links) {
     signals.add(SIG_LINK);
     const domain = toDomain(link);
@@ -141,10 +144,14 @@ export function extractCodeSignals(text, options = {}) {
     // https://공식주소@가짜주소: 브라우저는 @ 뒤로 간다. 앞부분으로 공식 주소인 척하는 속임수(D48)
     if (hasUserinfo(link)) signals.add(SIG_DECEPTIVE_URL);
   }
+  // 전체 구문이 확인된 목적지를 기존 검사 입력에 보강한다. 이전 도메인은 삭제하지 않는다.
+  for (const candidate of inspection.candidates) {
+    if (candidate.complete && candidate.host && !isShortener(candidate.host)) domains.add(candidate.host);
+  }
   // KISA 목록에 있던 단축 주소와 그대로 같으면 목록 일치(D48 ①). 펼치지 않고 글자만 대조한다
   if (createShortUrlMatcher(options.shortUrlKeys ?? SHORT_URL_KEYS)(links)) signals.add(SIG_MALICIOUS_URL);
   // 링크가 모두 공식 주소면 R7(링크만으로 주의)에서 뺀다. 판정은 ‘확인 필요’에 머문다
-  if (allLinksOfficial(links)) signals.add(SIG_OFFICIAL_LINK);
+  if (allLinksOfficial(inspection.candidates.map((c) => c.raw), { complete: inspection.complete })) signals.add(SIG_OFFICIAL_LINK);
   // 공식 주소를 흉내 낸 도메인(D40 ②). 단축 URL은 이름이 없으므로 대상 아님
   if (findLookalikes([...domains]).length) signals.add(SIG_LOOKALIKE_DOMAIN);
 

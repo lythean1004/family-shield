@@ -5,7 +5,8 @@ import { handleRequest, handleResultLookup, handleAnalyze, makeHandler } from ".
 import { createMemoryResultStore } from "../../packages/core/src/result-token.js";
 import { readRequest, simpleText, quickReply, anonymousCode } from "../src/kakao.js";
 import { loadConfig, tokenMatches } from "../src/config.js";
-import { CHECK_LEVEL_TEXT } from "../../packages/core/src/fixed-text.js";
+import { CHECK_LEVEL_TEXT, OFFICIAL_LINK_TEXT } from "../../packages/core/src/fixed-text.js";
+import { officialLinkReviewCases } from "../../packages/core/test/fixtures/official-link-review.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "../src/rate-limit.js";
 
 // ── kakao.js ─────────────────────────────────────────────────────────────────
@@ -634,5 +635,16 @@ describe("공식 주소 링크 표시(D49)", () => {
   it("공식 주소가 아니면 붙이지 않는다", async () => {
     const r = await handleRequest({ utterance: "[롯데택배] 배송 예정입니다." }, cfg);
     assert.doesNotMatch(textOf(r.body), /공식 주소로 보이는 링크/);
+  });
+});
+
+describe("공식 주소 안내 교차 사례 — 카카오 답장", () => {
+  for (const c of officialLinkReviewCases) it(c.name, async () => {
+    const r = await handleRequest({ utterance: c.text, parentInputs: c.parentInputs }, { ...cfg, ai: null });
+    assert.equal(r.status, 200);
+    const text = r.body.template.outputs.find((o) => o.simpleText)?.simpleText.text;
+    const banner = { 확인필요: "🔍 확인 필요", 주의: "⚡ 주의", 위험: "⚠️ 위험" }[c.level];
+    assert.ok(text.startsWith(`[${banner}]`));
+    assert.equal(text.includes(OFFICIAL_LINK_TEXT), c.notice);
   });
 });

@@ -6,6 +6,7 @@ import { isOfficialLink, allLinksOfficial } from "../src/official-links.js";
 import { extractCodeSignals } from "../src/extract.js";
 import { decide } from "../src/rule-engine.js";
 import { SIG_LINK, SIG_OFFICIAL_LINK, AI_ALLOWED_SIGNALS } from "../src/signals.js";
+import { officialLinkReviewCases } from "./fixtures/official-link-review.js";
 
 const level = (text) => {
   const s = extractCodeSignals(text).signals;
@@ -92,5 +93,54 @@ describe("저장된 기록(영수증)으로 다시 판정할 때", () => {
     const { codeOnlyFrom } = await import("../src/signals.js");
     const final = [SIG_LINK, SIG_OFFICIAL_LINK];
     assert.equal(decide({ signals_final: final, signals_code: codeOnlyFrom(final) }).level, "확인필요");
+  });
+});
+
+describe("공식 주소 안내의 입력 완결성 (독립 검토)", () => {
+  const normal = "https://www.gov.kr/portal/main";
+
+  it("파서가 전체 후보 확인을 끝내지 못한 상태면 공식 주소 안내를 보류한다", () => {
+    // 공격 주소를 구성하지 않고 파서의 불완전 상태만 전달한다.
+    assert.equal(allLinksOfficial([normal], { complete: false }), false);
+    assert.equal(allLinksOfficial([normal, normal], { complete: false }), false);
+    assert.equal(allLinksOfficial([normal], { complete: true }), true);
+  });
+
+  it("입력이 잘린 상태면 인식된 정상 링크만으로 공식 예외를 켜지 않는다", () => {
+    const s = extractCodeSignals(`공지 ${normal}`, { inputComplete: false }).signals;
+    assert.ok(s.includes(SIG_LINK));
+    assert.ok(!s.includes(SIG_OFFICIAL_LINK));
+    assert.equal(decide({ signals_final: s, signals_code: s }).level, "주의");
+  });
+
+  it("정상 공식 주소 한 개·반복·일반 이메일의 조합은 기존 안내를 유지한다", () => {
+    for (const text of [normal, `${normal} ${normal}`, `문의 help@example.com, john.doe@example.org ${normal}`]) {
+      const s = extractCodeSignals(text).signals;
+      assert.ok(s.includes(SIG_OFFICIAL_LINK), text);
+      assert.equal(decide({ signals_final: s, signals_code: s }).level, "확인필요", text);
+    }
+  });
+
+  it("공식 주소와 미등록 합성 주소의 혼합은 공식 예외 없이 주의다", () => {
+    const s = extractCodeSignals(`${normal} https://sample.invalid/guide`).signals;
+    assert.ok(!s.includes(SIG_OFFICIAL_LINK));
+    assert.equal(decide({ signals_final: s, signals_code: s }).level, "주의");
+  });
+
+  it("파이프라인의 길이 제한도 완결성 상태로 전달한다", async () => {
+    const { analyze, MAX_INPUT_CHARS } = await import("../src/pipeline.js");
+    const r = await analyze({ text: `${normal} ${"안내 ".repeat(MAX_INPUT_CHARS)}` });
+    assert.equal(r.truncated, true);
+    assert.ok(!r.signals_code.includes(SIG_OFFICIAL_LINK));
+    assert.equal(r.level, "주의");
+  });
+});
+
+describe("공식 주소 안내 교차 사례 — 코드 파이프라인", () => {
+  for (const c of officialLinkReviewCases) it(c.name, async () => {
+    const { analyze } = await import("../src/pipeline.js");
+    const r = await analyze({ text: c.text, parentInputs: c.parentInputs });
+    assert.equal(r.level, c.level);
+    assert.equal(r.level === "확인필요" && r.signals_final.includes(SIG_OFFICIAL_LINK), c.notice);
   });
 });

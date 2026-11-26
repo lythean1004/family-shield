@@ -1,0 +1,36 @@
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
+import { buildSync } from 'esbuild'
+import { analyze } from '../../../packages/core/src/pipeline.js'
+import { OFFICIAL_LINK_TEXT } from '../../../packages/core/src/fixed-text.js'
+import { officialLinkReviewCases } from '../../../packages/core/test/fixtures/official-link-review.js'
+
+// 실제 ResultView를 메모리에서 번들·렌더링한다. 브라우저·서버·외부 링크 호출과 임시 파일 쓰기 없음.
+const bundled = buildSync({
+  stdin: {
+    contents: `import { renderToStaticMarkup } from 'react-dom/server';
+      import { StaticRouter } from 'react-router-dom/server';
+      import ResultView from '../components/ResultView.jsx';
+      export const render = result => renderToStaticMarkup(
+        <StaticRouter location="/check/result"><ResultView result={result} /></StaticRouter>);`,
+    resolveDir: fileURLToPath(new URL('.', import.meta.url)), loader: 'jsx',
+  },
+  bundle: true, write: false, platform: 'node', format: 'cjs', jsx: 'automatic',
+  alias: { '@core': fileURLToPath(new URL('../../../packages/core/src', import.meta.url)) },
+  define: { 'process.env.NODE_ENV': '"production"' },
+})
+const module = { exports: {} }
+new Function('module', 'exports', 'require', bundled.outputFiles[0].text)(module, module.exports, createRequire(import.meta.url))
+
+describe('공식 주소 안내 교차 사례 — 실제 웹 결과 화면', () => {
+  for (const c of officialLinkReviewCases) it(c.name, async () => {
+    const result = await analyze({ text: c.text, parentInputs: c.parentInputs })
+    assert.equal(result.level, c.level)
+    const html = module.exports.render(result)
+    assert.equal(html.includes(OFFICIAL_LINK_TEXT), c.notice)
+    const label = c.level === '확인필요' ? '확인 필요' : c.level
+    assert.ok(html.includes(`<span class="verdict-banner__label">${label}</span>`))
+  })
+})

@@ -53,6 +53,7 @@ export async function analyze({
 
   // ① 코드 신호 (원문 기준)
   const code = extractCodeSignals(input, {
+    inputComplete: !truncated,
     senderLast4: parentInputs.sender_last4 ?? undefined,
     registeredLast4,
   });

@@ -14,7 +14,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { OFFICIAL_DOMAIN_CARDS } from "./lookalike.js";
 import { SHARED_PARENTS, normalizeHost } from "./phishing-list.js";
-import { toDomain, isShortener } from "./links.js";
+import { isShortener } from "./links.js";
+import { parseLinkCandidate } from "./link-candidates.js";
 
 const HOST_FILE = join(import.meta.dirname, "..", "..", "..", "content", "evidence", "official-link-hosts.json");
 
@@ -42,14 +43,21 @@ const EMBEDDED_URL_RE = /(?:https?:|%3a%2f%2f|\/\/|www\.|%2f%2f|[?&](?:url|u|q|t
  * @returns {boolean}
  */
 export function isOfficialLink(link) {
-  if (typeof link !== "string" || !link) return false;
-  const noScheme = link.replace(/^(?:https?|ftp):\/\//i, "");
-  const authority = noScheme.split(/[/?#]/)[0];
-  if (authority.includes("@")) return false; // https://공식@가짜 속임수
-  const host = normalizeHost(toDomain(link));
+  const parsed = parseLinkCandidate(link);
+  if (!parsed.complete || parsed.hasUserinfo || parsed.port || !["http:", "https:"].includes(parsed.protocol)) return false;
+  const host = normalizeHost(parsed.host);
   if (!host || isShortener(host)) return false;
-  const rest = noScheme.slice(authority.length);
-  if (EMBEDDED_URL_RE.test(rest)) return false;
+  // 인코딩을 풀어도 별도 목적지가 나타나지 않는지 확인한다. 과도한 중첩·해석 오류는 보류한다.
+  let rest = parsed.rest;
+  for (let depth = 0; depth < 4; depth++) {
+    if (EMBEDDED_URL_RE.test(rest)) return false;
+    try {
+      const decoded = decodeURIComponent(rest);
+      if (decoded === rest) break;
+      if (depth === 3) return false;
+      rest = decoded;
+    } catch { return false; }
+  }
 
   if (EXACT_HOSTS.has(host)) return true;
   if (SHARED_PARENTS.some((p) => isUnder(host, p))) return false; // 포털 하위 주소는 정확한 호스트만
@@ -57,6 +65,6 @@ export function isOfficialLink(link) {
 }
 
 /** 링크가 하나 이상 있고 모두 공식 주소인지 */
-export function allLinksOfficial(links) {
-  return Array.isArray(links) && links.length > 0 && links.every(isOfficialLink);
+export function allLinksOfficial(links, { complete = true } = {}) {
+  return complete === true && Array.isArray(links) && links.length > 0 && links.every(isOfficialLink);
 }
