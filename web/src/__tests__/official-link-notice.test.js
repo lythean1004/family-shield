@@ -42,5 +42,6 @@ it('검증 뒤 설명이 모두 사라져도 받은 신호와 고정 안내를 �
     fallback_used: false, explanation_for_parent: filterExplanation(['이상이 없어요.']) })
   assert.ok(html.includes('signal-list__item'))
   assert.ok(html.includes(AI_FALLBACK_TEXT))
+  assert.ok(!html.includes('만들지 못했어요')) // 저장된 결과도 설명만 비어 있을 수 있다.
   assert.ok(!html.includes('이상이 없어요.'))
 })

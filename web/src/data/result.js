@@ -19,8 +19,8 @@ export function verdictDescription(level, impersonationType) {
   return CHECK_LEVEL_TEXT // 카카오와 같은 출처(core/fixed-text.js)
 }
 
-// AI 실패·시간 초과(F4-6) 때 이유 칸 문구
-export const AI_FALLBACK_TEXT = '자세한 설명을 만들지 못했어요. 판정은 그대로예요.'
+// AI 실패·시간 초과, 검증 또는 구조화된 기록 때문에 설명을 표시할 수 없을 때.
+export const AI_FALLBACK_TEXT = '표시할 추가 설명이 없어요. 판정은 그대로예요.'
 // 해외 AI 분석을 허락하지 않은 경우(동의 재설계 v3): 규칙만으로 판정
 export const AI_DECLINED_TEXT = '해외 AI 분석을 허락하지 않아 정해진 규칙으로만 확인했어요.'
 
