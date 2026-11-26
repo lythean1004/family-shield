@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가족방패 디자인 시안 (2026-11-26)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Pretendard, system-ui, 'Malgun Gothic', sans-serif; background: #e9ebef; color: #1c2230; word-break: keep-all; }
+  header.page { max-width: 1240px; margin: 0 auto; padding: 28px 20px 8px; }
+  header.page h1 { margin: 0 0 6px; font-size: 26px; }
+  header.page p { margin: 0 0 14px; color: #4a5263; line-height: 1.6; }
+  .switch { display: inline-flex; gap: 10px; align-items: center; background: #fff; border: 1px solid #c9ced8; padding: 8px 14px; border-radius: 999px; font-weight: 700; cursor: pointer; font-size: 15px; }
+  .switch input { width: 20px; height: 20px; }
+  .row { max-width: 1240px; margin: 0 auto; padding: 16px 20px 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 28px; }
+  .col h2 { font-size: 19px; margin: 0 0 4px; }
+  .col .desc { margin: 0 0 12px; color: #4a5263; font-size: 14px; line-height: 1.55; min-height: 66px; }
+  .pair { display: flex; gap: 12px; }
+
+  /* ── 공통 폰 틀 ── */
+  .phone { width: 188px; flex: none; border-radius: 26px; border: 6px solid #1c2230; overflow: hidden; background: var(--bg); color: var(--text); font-size: 10.5px; line-height: 1.5; height: 400px; position: relative; }
+  .phone .bar { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; font-weight: 800; font-size: 11px; background: var(--bar-bg); border-bottom: var(--bar-border); }
+  .phone .bar .logo { display: flex; gap: 5px; align-items: center; color: var(--brand-ink); }
+  .phone .bar .logo i { width: 15px; height: 15px; border-radius: 5px; background: var(--brand); display: inline-block; }
+  .phone .bar .menu { font-size: 9.5px; padding: 3px 8px; border-radius: 999px; background: var(--chip-bg); color: var(--text-sub); border: var(--chip-border); }
+  .phone .body { padding: 12px; }
+  .hero { background: var(--hero-bg); border-radius: var(--r-card); padding: 12px; margin-bottom: 10px; color: var(--hero-ink); border: var(--card-border); }
+  .hero b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .hero span { color: var(--hero-sub); }
+  .btn { display: block; width: 100%; text-align: center; padding: 9px; border-radius: var(--r-btn); font-weight: 700; margin-bottom: 7px; font-size: 11px; }
+  .btn.primary { background: var(--primary); color: var(--primary-ink); border: var(--btn-border); box-shadow: var(--btn-shadow); }
+  .btn.danger { background: var(--danger-soft); color: var(--danger); border: var(--btn-border-danger); }
+  .btn.ghost { background: var(--card); color: var(--text); border: var(--card-border); box-shadow: var(--shadow); text-align: left; padding: 9px 11px; display: flex; justify-content: space-between; }
+  .btn.ghost::after { content: '›'; color: var(--text-sub); }
+  .verdict { border-radius: var(--r-card); padding: 11px; background: var(--danger-soft); border: var(--verdict-border); margin-bottom: 9px; }
+  .verdict .lv { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 17px; color: var(--danger); }
+  .verdict .lv i { width: 16px; height: 16px; border-radius: 50%; background: var(--danger); color: var(--danger-on); font-style: normal; font-size: 11px; display: inline-grid; place-items: center; }
+  .verdict p { margin: 4px 0 0; color: var(--verdict-text); }
+  .card { background: var(--card); border-radius: var(--r-card); padding: 10px 11px; margin-bottom: 8px; border: var(--card-border); box-shadow: var(--shadow); }
+  .card h4 { margin: 0 0 4px; font-size: 11px; }
+  .card ul { margin: 0; padding-left: 14px; color: var(--text-sub); }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+  .chips span { background: var(--chip-bg); border: var(--chip-border); color: var(--text-sub); border-radius: 999px; padding: 2px 7px; font-size: 9.5px; }
+  .note { font-size: 9px; color: var(--text-sub); background: var(--chip-bg); border-radius: 10px; padding: 7px 8px; }
+  .levels { display: flex; gap: 5px; margin-top: 8px; }
+  .levels span { flex: 1; text-align: center; border-radius: 8px; padding: 4px 0; font-weight: 700; font-size: 9.5px; }
+  .levels .d { background: var(--danger-soft); color: var(--danger); }
+  .levels .c { background: var(--caution-soft); color: var(--caution); }
+  .levels .k { background: var(--check-soft); color: var(--check); }
+
+  /* ── A. 따뜻한 크림 + 짙은 초록 ── */
+  .theme-a {
+    --bg: #faf7f2; --bar-bg: #faf7f2; --bar-border: 0; --text: #23262d; --text-sub: #5b6170;
+    --brand: #2f6f5e; --brand-ink: #1f4d41; --primary: #2f6f5e; --primary-ink: #fff;
+    --hero-bg: #e7f0ea; --hero-ink: #1f3d35; --hero-sub: #3f5a52;
+    --card: #fff; --card-border: 1px solid #ece6dc; --shadow: 0 1px 2px rgba(60,40,20,.06);
+    --chip-bg: #f1ece3; --chip-border: 0;
+    --danger: #b73a2e; --danger-soft: #fbe9e5; --danger-on: #fff; --verdict-text: #6b2a22; --verdict-border: 0;
+    --caution: #8f5200; --caution-soft: #fdf0dc; --check: #2c5a8a; --check-soft: #e6eef7;
+    --r-card: 18px; --r-btn: 14px; --btn-border: 0; --btn-border-danger: 0; --btn-shadow: 0 2px 6px rgba(47,111,94,.25);
+  }
+  /* ── B. 맑은 블루 (금융앱 느낌) ── */
+  .theme-b {
+    --bg: #f3f5f9; --bar-bg: #f3f5f9; --bar-border: 0; --text: #191f28; --text-sub: #4e5968;
+    --brand: #3267e3; --brand-ink: #1d3f99; --primary: #3267e3; --primary-ink: #fff;
+    --hero-bg: #fff; --hero-ink: #191f28; --hero-sub: #4e5968;
+    --card: #fff; --card-border: 0; --shadow: 0 2px 10px rgba(25,31,40,.06);
+    --chip-bg: #e8ecf3; --chip-border: 0;
+    --danger: #d22f27; --danger-soft: #fdecec; --danger-on: #fff; --verdict-text: #7a1f1a; --verdict-border: 0;
+    --caution: #9a5300; --caution-soft: #fff3e0; --check: #2a57c7; --check-soft: #e8efff;
+    --r-card: 22px; --r-btn: 16px; --btn-border: 0; --btn-border-danger: 0; --btn-shadow: none;
+  }
+  /* ── C. 라벤더 + 코랄 (가족·따뜻함) ── */
+  .theme-c {
+    --bg: #ffffff; --bar-bg: #f6f3ff; --bar-border: 0; --text: #24213a; --text-sub: #575370;
+    --brand: #6a55c9; --brand-ink: #43358f; --primary: #5b47bd; --primary-ink: #fff;
+    --hero-bg: linear-gradient(135deg,#f1edff,#ffeee8); --hero-ink: #2b2550; --hero-sub: #4f4a6b;
+    --card: #fff; --card-border: 1px solid #ebe7f7; --shadow: none;
+    --chip-bg: #f3f1fa; --chip-border: 0;
+    --danger: #c23b30; --danger-soft: #fdebe8; --danger-on: #fff; --verdict-text: #6d241d; --verdict-border: 0;
+    --caution: #8d5100; --caution-soft: #fff2de; --check: #4b45a8; --check-soft: #eeedff;
+    --r-card: 20px; --r-btn: 999px; --btn-border: 0; --btn-border-danger: 0; --btn-shadow: none;
+  }
+  /* ── 고대비 (지금 화면과 비슷한 느낌) — 어느 시안에서나 버튼 하나로 바뀜 ── */
+  body.hc .phone {
+    --bg: #fff; --bar-bg: #fff; --bar-border: 2px solid #111; --text: #000; --text-sub: #111;
+    --brand: #000; --brand-ink: #000; --primary: #0a3fbf; --primary-ink: #fff;
+    --hero-bg: #fff; --hero-ink: #000; --hero-sub: #111;
+    --card: #fff; --card-border: 2px solid #111; --shadow: none;
+    --chip-bg: #fff; --chip-border: 1.5px solid #111;
+    --danger: #a00000; --danger-soft: #fff; --verdict-text: #000; --verdict-border: 3px solid #a00000;
+    --caution: #7a3d00; --caution-soft: #fff; --check: #0a3fbf; --check-soft: #fff;
+    --btn-border: 2px solid #000; --btn-border-danger: 2px solid #a00000; --btn-shadow: none;
+  }
+  body.hc .levels span { border: 2px solid currentColor; }
+  footer.page { max-width: 1240px; margin: 0 auto; padding: 0 20px 40px; color: #4a5263; font-size: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>가족방패 디자인 시안 3가지</h1>
+  <p>왼쪽은 첫 화면, 오른쪽은 판별 결과(위험) 화면입니다. 실제 앱에서는 글자가 이보다 크게(부모님 화면 150%) 나옵니다.<br>
+  부드러운 색을 써도 <b>본문 글자는 배경 대비 4.5:1 이상</b>을 지킵니다. 아래 스위치는 실제 앱에 넣을 [고대비로 보기] 버튼을 미리 보여 줍니다.</p>
+  <label class="switch"><input type="checkbox" id="hc"> 고대비로 보기</label>
+</header>
+
+<section class="row">
+  <!-- A -->
+  <div class="col">
+    <h2>A. 따뜻한 크림 + 짙은 초록</h2>
+    <p class="desc">종이처럼 따뜻한 바탕에 차분한 초록. 병원·은행 앱처럼 "안심되는" 분위기. 위험 빨강이 가장 잘 눈에 띕니다.</p>
+    <div class="pair">
+      <div class="phone theme-a">
+        <div class="bar"><span class="logo"><i></i>가족방패</span><span class="menu">메뉴</span></div>
+        <div class="body">
+          <div class="hero"><b>의심 문자, 혼자 판단하지 마세요</b><span>카카오톡 ‘가족방패’ 채널에 붙여 넣으면 쉬운 말로 알려 드려요.</span></div>
+          <div class="btn primary">공식 번호 보기</div>
+          <div class="btn danger">이미 눌렀거나 보냈어요</div>
+          <div class="btn ghost">예시 보기</div>
+          <div class="btn ghost">오늘의 퀴즈 (연습)</div>
+          <div class="levels"><span class="d">위험</span><span class="c">주의</span><span class="k">확인 필요</span></div>
+        </div>
+      </div>
+      <div class="phone theme-a">
+        <div class="bar"><span class="logo"><i></i>가족방패</span><span class="menu">메뉴</span></div>
+        <div class="body">
+          <div class="verdict"><span class="lv"><i>!</i>위험</span><p>가족인 척하는 사기에서 자주 보이는 말이 있어요.</p></div>
+          <div class="chips"><span>딸이라고 함</span><span>새 번호</span><span>상품권 요구</span><span>통화 회피</span></div>
+          <div class="btn primary">딸에게 진짜인지 물어보기</div>
+          <div class="card"><h4>지금 할 일</h4><ul><li>링크를 누르지 마세요</li><li>돈·상품권을 보내지 마세요</li></ul></div>
+          <div class="note">이 결과는 참고용입니다. 확실하지 않으면 직접 찾은 공식 번호로 확인하세요.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- B -->
+  <div class="col">
+    <h2>B. 맑은 블루 (금융앱 느낌)</h2>
+    <p class="desc">연회색 바탕에 흰 카드, 그림자 없이 넓은 여백. 요즘 은행·송금 앱과 비슷해 자녀 세대도 익숙합니다.</p>
+    <div class="pair">
+      <div class="phone theme-b">
+        <div class="bar"><span class="logo"><i></i>가족방패</span><span class="menu">메뉴</span></div>
+        <div class="body">
+          <div class="hero"><b>의심 문자, 혼자 판단하지 마세요</b><span>카카오톡 ‘가족방패’ 채널에 붙여 넣으면 쉬운 말로 알려 드려요.</span></div>
+          <div class="btn primary">공식 번호 보기</div>
+          <div class="btn danger">이미 눌렀거나 보냈어요</div>
+          <div class="btn ghost">예시 보기</div>
+          <div class="btn ghost">오늘의 퀴즈 (연습)</div>
+          <div class="levels"><span class="d">위험</span><span class="c">주의</span><span class="k">확인 필요</span></div>
+        </div>
+      </div>
+      <div class="phone theme-b">
+        <div class="bar"><span class="logo"><i></i>가족방패</span><span class="menu">메뉴</span></div>
+        <div class="body">
+          <div class="verdict"><span class="lv"><i>!</i>위험</span><p>가족인 척하는 사기에서 자주 보이는 말이 있어요.</p></div>
+          <div class="chips"><span>딸이라고 함</span><span>새 번호</span><span>상품권 요구</span><span>통화 회피</span></div>
+          <div class="btn primary">딸에게 진짜인지 물어보기</div>
+          <div class="card"><h4>지금 할 일</h4><ul><li>링크를 누르지 마세요</li><li>돈·상품권을 보내지 마세요</li></ul></div>
+          <div class="note">이 결과는 참고용입니다. 확실하지 않으면 직접 찾은 공식 번호로 확인하세요.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- C -->
+  <div class="col">
+    <h2>C. 라벤더 + 코랄 (가족·따뜻함)</h2>
+    <p class="desc">보라와 살구빛 그라데이션, 알약 모양 버튼. 가장 부드럽고 "가족" 느낌이 강하지만, 진지한 사기 안내와는 조금 덜 어울릴 수 있어요.</p>
+    <div class="pair">
+      <div class="phone theme-c">
+        <div class="bar"><span class="logo"><i></i>가족방패</span><span class="menu">메뉴</span></div>
+        <div class="body">
+          <div class="hero"><b>의심 문자, 혼자 판단하지 마세요</b><span>카카오톡 ‘가족방패’ 채널에 붙여 넣으면 쉬운 말로 알려 드려요.</span></div>
+          <div class="btn primary">공식 번호 보기</div>
+          <div class="btn danger">이미 눌렀거나 보냈어요</div>
+          <div class="btn ghost">예시 보기</div>
+          <div class="btn ghost">오늘의 퀴즈 (연습)</div>
+          <div class="levels"><span class="d">위험</span><span class="c">주의</span><span class="k">확인 필요</span></div>
+        </div>
+      </div>
+      <div class="phone theme-c">
+        <div class="bar"><span class="logo"><i></i>가족방패</span><span class="menu">메뉴</span></div>
+        <div class="body">
+          <div class="verdict"><span class="lv"><i>!</i>위험</span><p>가족인 척하는 사기에서 자주 보이는 말이 있어요.</p></div>
+          <div class="chips"><span>딸이라고 함</span><span>새 번호</span><span>상품권 요구</span><span>통화 회피</span></div>
+          <div class="btn primary">딸에게 진짜인지 물어보기</div>
+          <div class="card"><h4>지금 할 일</h4><ul><li>링크를 누르지 마세요</li><li>돈·상품권을 보내지 마세요</li></ul></div>
+          <div class="note">이 결과는 참고용입니다. 확실하지 않으면 직접 찾은 공식 번호로 확인하세요.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<footer class="page">
+  공통: 글꼴은 Pretendard(무료, 오픈 폰트), 카드·버튼 모서리를 둥글게, 테두리 대신 옅은 배경색으로 구역을 나눔. 판정 색(위험 빨강·주의 주황·확인 필요 파랑)과 문구는 지금과 같음.<br>
+  고대비 버튼은 첫 화면과 메뉴에 두고, 고른 값은 이 기기에 기억합니다. 휴대폰의 "대비 높이기" 설정이 켜져 있으면 처음부터 고대비로 보입니다.
+</footer>
+<script>
+  document.getElementById('hc').addEventListener('change', e => document.body.classList.toggle('hc', e.target.checked));
+</script>
+</body>
+</html>
