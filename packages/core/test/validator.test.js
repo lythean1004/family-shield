@@ -110,6 +110,34 @@ describe("검증기 - 설명 문장 필터", () => {
     assert.deepEqual(result.data.signals, ["SIG_MONEY"]);
   });
 
+  // 카카오 2026-11-27: “돈을 보내라는 내용은 모두 사기입니다.” — 진짜 가족 부탁·납부 안내까지 사기로 읽힌다
+  it("사기를 단정·일반화하는 문장을 제거한다", () => {
+    for (const s of [
+      "돈을 보내라는 내용은 모두 사기입니다.",
+      "이런 문자는 무조건 사기예요.",
+      "100% 사기입니다.",
+      "전부 사기니까 무시하세요.",
+      "이 문자는 사기가 확실해요.",
+      "틀림없이 사기예요.",
+      "모든 송금 요구는 사기입니다.",
+    ]) {
+      const result = validate(base({ explanation_for_parent: [s] }));
+      assert.deepEqual(result.data.explanation_for_parent, [], s);
+    }
+  });
+
+  it("단정이 아닌 안내·사칭 설명은 남는다", () => {
+    const keep = [
+      "검찰을 사칭하여 계좌 이체를 요구하고 있어요.",
+      "링크는 절대 누르지 마세요.",
+      "모르는 주소를 누르지 마세요.",
+      "사기일 수 있으니 공식 번호로 확인하세요.",
+    ];
+    const result = validate(base({ explanation_for_parent: keep.slice(0, 3) }));
+    assert.deepEqual(result.data.explanation_for_parent, keep.slice(0, 3));
+    assert.deepEqual(validate(base({ explanation_for_parent: [keep[3]] })).data.explanation_for_parent, [keep[3]]);
+  });
+
   it("최대 3문장을 넘으면 앞 3개만 남긴다", () => {
     const result = validate(base({
       explanation_for_parent: ["첫째예요.", "둘째예요.", "셋째예요.", "넷째예요."],
