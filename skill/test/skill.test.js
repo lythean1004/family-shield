@@ -90,14 +90,14 @@ describe("tokenMatches", () => {
 });
 
 // ── handler.js ───────────────────────────────────────────────────────────────
-function fakeGateway(signals, impersonation_type = "none") {
+function fakeGateway(signals, impersonation_type = "none", explanation = undefined) {
   return async (_u, opts) => {
     const args = {
       signals,
       impersonation_type,
       impersonated_relation: null,
       evidence_card_ids: [],
-      explanation_for_parent: signals.length ? ["의심 내용이 있어요."] : ["특이 내용을 찾지 못했어요."],
+      explanation_for_parent: explanation ?? (signals.length ? ["의심 내용이 있어요."] : ["특이 내용을 찾지 못했어요."]),
     };
     return {
       ok: true, status: 200,
@@ -113,6 +113,15 @@ function fakeGateway(signals, impersonation_type = "none") {
 }
 
 const cfg = { ai: { model: "fake", apiKey: "k", timeoutMs: 1000, promptVersion: "v1", fetchImpl: fakeGateway([]) }, hmacKey: null, cards: [], webBaseUrl: null };
+
+it("AI 설명이 모두 걸러지면 판정 신호를 살리고 정해진 이유 문구를 보낸다", async () => {
+  const fetchImpl = fakeGateway(["SIG_PERSONAL_INFO"], "none", ["이상 없어요."]);
+  const r = await handleRequest({ utterance: "교육용 사례를 살펴봅니다." }, { ...cfg, ai: { ...cfg.ai, fetchImpl } });
+  const reply = r.body.template.outputs.find(o => o.simpleText).simpleText.text;
+  assert.match(reply, /주의/);
+  assert.match(reply, /감지된 신호:/);
+  assert.ok(!reply.includes("이상 없어요."));
+});
 
 describe("핸들러 - 기본", () => {
   it("빈 utterance → 200 + 안내 문구", async () => {

@@ -15,12 +15,17 @@ const SENTENCE_BLOCK_RE = [
   /www\./i,
   /안전/,
   /정상/,
+  /이상(?:이|은|도)?\s*없/u,
+  /SIG_/i,
 ];
 
-function filterExplanation(sentences) {
-  return sentences.filter(
-    (s) => !SENTENCE_BLOCK_RE.some((re) => re.test(s))
-  );
+/** 화면에 낼 수 있는 완결된 문장만 남긴다. 평문 QR·ATM 같은 약어는 한국어 안내에 쓸 수 있다. */
+export function filterExplanation(sentences) {
+  return sentences.filter(s => typeof s === "string").map(s => s.trim())
+    .filter(s => [...s].length <= 40 && /\p{Script=Hangul}/u.test(s) &&
+      !/[^\p{Script=Hangul}A-Za-z0-9 .,!?…·'"‘’“”()%-]/u.test(s) &&
+      !SENTENCE_BLOCK_RE.some(re => re.test(s)))
+    .slice(0, 3);
 }
 
 /**
@@ -75,12 +80,7 @@ export function validate(raw, allowedCardIds = new Set()) {
     return { ok: false, reason: "explanation_for_parent가 배열이 아님" };
   }
 
-  // 40자 초과 문장 자르기, 빈 문장 제거, 차단 패턴 통과, 최대 3문장
-  const explanation = filterExplanation(
-    rawExp
-      .filter((s) => typeof s === "string" && s.trim().length > 0)
-      .map((s) => s.trim().slice(0, 40))
-  ).slice(0, 3);
+  const explanation = filterExplanation(rawExp);
 
   return {
     ok: true,

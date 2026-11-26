@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { buildSync } from 'esbuild'
 import { analyze } from '../../../packages/core/src/pipeline.js'
 import { OFFICIAL_LINK_TEXT } from '../../../packages/core/src/fixed-text.js'
+import { filterExplanation } from '../../../packages/core/src/validator.js'
+import { AI_FALLBACK_TEXT } from '../data/result.js'
 import { officialLinkReviewCases } from '../../../packages/core/test/fixtures/official-link-review.js'
 
 // 실제 ResultView를 메모리에서 번들·렌더링한다. 브라우저·서버·외부 링크 호출과 임시 파일 쓰기 없음.
@@ -33,4 +35,12 @@ describe('공식 주소 안내 교차 사례 — 실제 웹 결과 화면', () =
     const label = c.level === '확인필요' ? '확인 필요' : c.level
     assert.ok(html.includes(`<span class="verdict-banner__label">${label}</span>`))
   })
+})
+
+it('검증 뒤 설명이 모두 사라져도 받은 신호와 고정 안내를 화면에 표시한다', () => {
+  const html = module.exports.render({ level: '주의', signals_final: ['SIG_PERSONAL_INFO'],
+    fallback_used: false, explanation_for_parent: filterExplanation(['이상이 없어요.']) })
+  assert.ok(html.includes('signal-list__item'))
+  assert.ok(html.includes(AI_FALLBACK_TEXT))
+  assert.ok(!html.includes('이상이 없어요.'))
 })

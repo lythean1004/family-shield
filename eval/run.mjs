@@ -3,7 +3,7 @@
  * 평가 실행기 (PRD 15장)
  *
  *   node eval/run.mjs [--model gemini-3.1-flash-lite] [--timeout 3000] [--out eval/results/x.jsonl] [--no-ai]
- *                     [--data eval/test.jsonl] [--repeat 3]
+ *                     [--data eval/test.jsonl] [--repeat 3] [--save-explanations]
  *
  * 환경 변수: AI_API_KEY(필수, --no-ai면 불필요), AI_BASE_URL(선택, 전체 chat/completions 주소)
  *
@@ -13,10 +13,11 @@
  *   code_sig_match : gold.signals_code ⊆ 예측 signals_code
  * 출력 파일에는 원문을 담지 않는다(case_id로만 연결).
  */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, dirname, resolve } from "node:path";
 import { analyze } from "../packages/core/src/pipeline.js";
+import { readSyntheticDataset } from "./synthetic-review.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -32,15 +33,19 @@ const OUT_PATH = flag("--out", null);
 const DATA_PATH = flag("--data", join(here, "dev.jsonl"));
 // 일관성(PRD 15-2): 같은 케이스를 N번 돌려 판정이 모두 같은 비율. 첫 번째 실행으로 나머지 지표를 잰다.
 const REPEAT = Math.max(1, Number(flag("--repeat", "1")));
-const API_KEY = process.env.AI_API_KEY;
-const BASE_URL = process.env.AI_BASE_URL || undefined;
+const SAVE_EXPLANATIONS = argv.includes("--save-explanations");
+if (SAVE_EXPLANATIONS && !OUT_PATH) throw new Error("설명 표본을 저장할 --out 경로가 필요합니다.");
+if (SAVE_EXPLANATIONS && existsSync(OUT_PATH)) throw new Error("설명을 저장할 새 결과 파일명을 지정하세요.");
+const synthetic = SAVE_EXPLANATIONS ? readSyntheticDataset(DATA_PATH) : null;
+const API_KEY = NO_AI ? undefined : process.env.AI_API_KEY;
+const BASE_URL = NO_AI ? undefined : process.env.AI_BASE_URL || undefined;
 
 if (!NO_AI && !API_KEY) {
   console.error("AI_API_KEY 환경 변수가 없습니다. (--no-ai로 코드 신호만 평가할 수 있음)");
   process.exit(1);
 }
 
-const cases = readFileSync(resolve(DATA_PATH), "utf8")
+const cases = (synthetic?.text ?? readFileSync(resolve(DATA_PATH), "utf8"))
   .split(/\r?\n/)
   .filter((l) => l.trim())
   .map((l) => JSON.parse(l));
@@ -98,6 +103,7 @@ for (const c of cases) {
     cost_usd: r.ai_meta?.cost_usd ?? null,
     repeat_levels: REPEAT > 1 ? repeatLevels : undefined,
     consistent: new Set(repeatLevels).size === 1,
+    ...(SAVE_EXPLANATIONS ? { explanation_for_parent: r.explanation_for_parent } : {}),
   };
   row.pass = row.level_match && row.ai_sig_recall && row.code_sig_match;
   rows.push(row);
@@ -156,6 +162,7 @@ const summary = {
   cost_usd_per_case: costKnown ? Number((cost / costKnown).toFixed(6)) : null,
   data: DATA_PATH,
   repeat: REPEAT,
+  ...(SAVE_EXPLANATIONS ? { synthetic_review: synthetic.source } : {}),
   consistency: REPEAT > 1 ? pct(rows.filter((r) => r.consistent).length, n) : null,
 };
 
@@ -172,7 +179,7 @@ if (OUT_PATH) {
   const out = resolve(OUT_PATH);
   mkdirSync(dirname(out), { recursive: true });
   const body = [JSON.stringify({ summary }), ...rows.map((r) => JSON.stringify(r))].join("\n") + "\n";
-  writeFileSync(out, body);
+  writeFileSync(out, body, { flag: SAVE_EXPLANATIONS ? "wx" : "w" });
   console.log(`저장: ${out}`);
 }
 

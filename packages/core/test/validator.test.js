@@ -95,16 +95,24 @@ describe("검증기 - 설명 문장 필터", () => {
     assert.equal(result.data.explanation_for_parent.length, 0);
   });
 
-  it("40자 초과 문장은 40자로 자른다", () => {
-    const long = "가".repeat(50);
-    const result = validate(base({ explanation_for_parent: [long] }));
-    assert.ok(result.ok);
-    assert.equal([...result.data.explanation_for_parent[0]].length, 40);
+  it("40자 경계는 유지하고 긴 문장의 일부만 표시하지 않는다", () => {
+    const limit = "가".repeat(40);
+    const result = validate(base({ explanation_for_parent: [limit + "요", limit] }));
+    assert.deepEqual(result.data.explanation_for_parent, [limit]);
+  });
+
+  it("내부 신호·무이상 단정·보이지 않는 문자를 걸러도 쉬운 안내는 남는다", () => {
+    const keep = "보낸 곳을 다시 확인해 보세요.";
+    const result = validate(base({ explanation_for_parent: [
+      "SIG_MONEY 항목이에요.", "이상이 없어요.", "이상 없습니다.", "확인\u200b해요.", keep,
+    ] }));
+    assert.deepEqual(result.data.explanation_for_parent, [keep]);
+    assert.deepEqual(result.data.signals, ["SIG_MONEY"]);
   });
 
   it("최대 3문장을 넘으면 앞 3개만 남긴다", () => {
     const result = validate(base({
-      explanation_for_parent: ["a", "b", "c", "d"],
+      explanation_for_parent: ["첫째예요.", "둘째예요.", "셋째예요.", "넷째예요."],
     }));
     assert.ok(result.ok);
     assert.equal(result.data.explanation_for_parent.length, 3);

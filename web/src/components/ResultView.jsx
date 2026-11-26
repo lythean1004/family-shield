@@ -32,6 +32,12 @@ export default function ResultView({
   const type = result.impersonation_type
   const who = familyName || result.impersonated_relation || '가족'
   const explanation = result.explanation_for_parent ?? []
+  let reasons = explanation.slice(0, 3)
+  if (key !== 'check' && (result.fallback_used || reasons.length === 0)) {
+    const fixed = result.ai_skipped === 'health' ? HEALTH_SKIPPED_TEXT
+      : result.ai_consent === false ? AI_DECLINED_TEXT : AI_FALLBACK_TEXT
+    reasons = [fixed]
+  }
 
   const askFamily = () => {
     if (demo) return navigate('/demo')
@@ -44,7 +50,7 @@ export default function ResultView({
   // F4-12 음성 읽기: 판정 + 이유(최대 3문장) + 한계 문구
   const speakText = [
     verdictDescription(result.level, type),
-    ...explanation.slice(0, 3),
+    ...reasons,
     ...(result.signals_final?.includes('SIG_SHORT_URL') ? [SHORT_URL_TEXT] : []),
     ...(key === 'check' && result.signals_final?.includes('SIG_OFFICIAL_LINK') ? [OFFICIAL_LINK_TEXT] : []),
     LIMIT_NOTICE, // 화면과 같은 project.md 문장(2026-11-11 결정 B)
@@ -65,13 +71,7 @@ export default function ResultView({
       {key !== 'check' && (
         <section aria-label="이유">
           <SignalList signals={result.signals_final} impersonatedRelation={result.impersonated_relation} />
-          {result.fallback_used ? (
-            <p className="screen-body">{result.ai_skipped === 'health' ? HEALTH_SKIPPED_TEXT : result.ai_consent === false ? AI_DECLINED_TEXT : AI_FALLBACK_TEXT}</p>
-          ) : (
-            explanation.slice(0, 3).map((s) => (
-              <p key={s} className="screen-body">{s}</p>
-            ))
-          )}
+          {reasons.map((s) => <p key={s} className="screen-body">{s}</p>)}
           {/* D48 ②: 단축 링크는 펼치지 않아 어디로 가는지 모른다 */}
           {result.signals_final?.includes('SIG_SHORT_URL') && (
             <p className="screen-body">{SHORT_URL_TEXT}</p>
