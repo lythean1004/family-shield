@@ -168,3 +168,28 @@ describe("⑥ 공식 주소 링크 안내 문장", () => {
     assert.doesNotMatch(OFFICIAL_LINK_TEXT, /안전|이상 없/);
   });
 });
+
+describe("⑦ 스킴 없는 ‘공식@가짜’(Codex 요청서 1번)", () => {
+  for (const text of [
+    "결제 확인 naver.com@pay-check.xyz/login",
+    "결제 확인 hometax.go.kr@tax-refund.invalid",
+    "확인 kbstar.com@kb-safe.invalid/a?b=1 바로",
+  ]) {
+    it(`${text} → 공식 링크 아님, 속임수 위험`, () => {
+      const r = run(text);
+      assert.ok(!r.signals.includes(SIG_OFFICIAL_LINK), String(r.signals));
+      assert.ok(r.signals.includes(SIG_DECEPTIVE_URL), String(r.signals));
+      assert.equal(r.level, "위험");
+    });
+  }
+  it("평범한 이메일은 링크·속임수가 아니다", () => {
+    for (const text of ["문의 help@example.com", "메일 john.doe@gmail.com 으로", "kim@naver.com 으로 보내 주세요"]) {
+      const r = run(text);
+      assert.ok(!r.signals.includes(SIG_DECEPTIVE_URL), text);
+      assert.ok(!r.signals.includes(SIG_LINK), text);
+    }
+  });
+  it("가짜 쪽 도메인은 평판 조회 대상에 들어간다", () => {
+    assert.deepEqual(extractCodeSignals("결제 확인 naver.com@pay-check.xyz/login").domains, ["pay-check.xyz"]);
+  });
+});

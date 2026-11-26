@@ -38,10 +38,19 @@ export const SHORTENER_DOMAINS = new Set([
   "rebrand.ly", "cutt.ly", "zrr.kr", "lrl.kr", "muz.so", "asq.kr",
 ]);
 
+// 스킴 없이 쓴 ‘공식@가짜’(naver.com@가짜.xyz/login). 브라우저는 @ 뒤로 간다(D48 ④ 보완, 2026-11-26).
+// @ 앞이 알려진 끝부분을 가진 도메인일 때만 잡는다. 평범한 이메일(help@example.com, john.doe@gmail.com)은 앞부분이 도메인이 아니라 잡지 않는다
+const DECEPTIVE_BARE_RE = /(?<![\w.\-/@:])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,})@((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?:[/?#][^\s,)'"<>\]]*)?)/gi;
+const isBareDomain = (s) => new RegExp(`^(?:${BARE_DOMAIN_RE.source})$`, "i").test(s);
+
 /** 문자 안의 링크 원문을 모두 찾는다(중복 포함, 등장 순서). */
 export function findLinks(text) {
   const found = [];
   const withoutScheme = text.replace(SCHEME_URL_RE, (m) => {
+    found.push(m);
+    return " ";
+  }).replace(DECEPTIVE_BARE_RE, (m, left) => {
+    if (!isBareDomain(left)) return m; // 이메일 등은 그대로 둔다
     found.push(m);
     return " ";
   });
