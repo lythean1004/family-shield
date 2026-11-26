@@ -13,13 +13,15 @@ export default function HomeScreen() {
   const { highContrast, toggleContrast } = useContext(ContrastContext)
   return (
     <main id="main" className="mode-parent">
-      <h1 className="screen-title">가족방패</h1>
-      <p className="screen-body">
-        의심 문자를 받으면 카카오톡 '가족방패' 채널에 붙여 넣으세요.
-      </p>
-      <p className="screen-body">
-        혼자 판단하지 말고 가족과 같이 확인해요.
-      </p>
+      <header className="home-intro">
+        <h1 className="screen-title">의심 문자, 혼자 판단하지 마세요</h1>
+        <p className="screen-body">
+          의심 문자를 받으면 카카오톡 '가족방패' 채널에 붙여 넣으세요.
+        </p>
+        <p className="screen-body">
+          혼자 판단하지 말고 가족과 같이 확인해요.
+        </p>
+      </header>
       <div className="screen-actions">
         <ActionButton variant="primary" onClick={() => navigate('/contacts')}>
           공식 번호 보기

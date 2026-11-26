@@ -437,6 +437,17 @@
   cursor: pointer;
 }
 .text-link:hover { text-decoration-thickness: 2px; }
+.home-intro {
+  padding: var(--sp-6);
+  background: var(--c-surface);
+  border: var(--card-edge) solid var(--c-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.home-intro .screen-title { margin-bottom: var(--sp-3); line-height: 1.25; }
+.home-intro .screen-body { color: var(--c-text-sub); margin: 0; }
+.home-intro .screen-body + .screen-body { margin-top: var(--sp-2); }
+
 .home-settings {
   display: flex;
   flex-wrap: wrap;
