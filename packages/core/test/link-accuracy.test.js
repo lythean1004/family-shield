@@ -134,3 +134,37 @@ describe("④ ‘공식@가짜’ 주소 속임수", () => {
     assert.notEqual(SIG_DECEPTIVE_URL, SIG_LOOKALIKE_DOMAIN);
   });
 });
+
+describe("⑤ 공식 주소만 있는 문자: R7은 코드가 찾은 재촉·돈·비밀만 본다(D49)", () => {
+  const base = [SIG_AGENCY_IMPERSONATION, SIG_LINK, SIG_OFFICIAL_LINK];
+  it("AI만 재촉·돈·비밀을 붙이면 확인 필요 그대로(카카오 2026-11-26 국세청 안내)", () => {
+    for (const ai of ["SIG_URGENCY", "SIG_MONEY", "SIG_SECRECY"]) {
+      const r = decide({ signals_final: [...base, ai], signals_code: base });
+      assert.equal(r.level, "확인필요", ai);
+    }
+  });
+  it("코드가 직접 찾은 재촉·돈 요구면 주의", () => {
+    for (const code of ["SIG_URGENCY", "SIG_MONEY"]) {
+      const s = [...base, code];
+      assert.equal(decide({ signals_final: s, signals_code: s }).level, "주의", code);
+    }
+  });
+  it("AI의 개인정보·선입금·개인 계좌 요구는 그대로 위험", () => {
+    for (const ai of [SIG_PERSONAL_INFO, "SIG_PREPAYMENT", "SIG_THIRD_PARTY_ACCOUNT"]) {
+      assert.equal(decide({ signals_final: [...base, ai], signals_code: base }).level, "위험", ai);
+    }
+  });
+  it("공식 주소가 아닌 링크면 AI 재촉으로도 지금처럼 주의", () => {
+    const code = [SIG_LINK];
+    assert.equal(decide({ signals_final: [...code, "SIG_URGENCY"], signals_code: code }).level, "주의");
+    assert.equal(decide({ signals_final: ["SIG_URGENCY"], signals_code: [] }).level, "주의");
+  });
+});
+
+describe("⑥ 공식 주소 링크 안내 문장", () => {
+  it("‘공식 주소로 보이는 링크’라고 쓰고 안전하다고 하지 않는다", async () => {
+    const { OFFICIAL_LINK_TEXT } = await import("../src/fixed-text.js");
+    assert.match(OFFICIAL_LINK_TEXT, /공식 주소로 보이는 링크/);
+    assert.doesNotMatch(OFFICIAL_LINK_TEXT, /안전|이상 없/);
+  });
+});

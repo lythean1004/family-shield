@@ -22,7 +22,7 @@ import { loadPhishingListChecker, combineCheckers } from "../../packages/core/sr
 import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
 import { readRequest, simpleText, quickReply, withImage } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
-import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT } from "../../packages/core/src/fixed-text.js";
+import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT } from "../../packages/core/src/fixed-text.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
 import { createDatabase } from './database.js';
@@ -78,6 +78,8 @@ function buildReplyText(result) {
   if (result.level === "확인필요") {
     // AI 설명은 ‘안전’으로 읽힐 수 있어 쓰지 않는다. 웹과 같은 정해 둔 문장
     lines.push(CHECK_LEVEL_TEXT);
+    // 링크가 모두 공식 주소(코드 전용 신호)면 그렇다고 알려 준다(D49)
+    if ((result.signals_final ?? []).includes("SIG_OFFICIAL_LINK")) lines.push(OFFICIAL_LINK_TEXT);
   } else if (result.explanation_for_parent?.length) {
     // 링크 규칙(R10 목록 일치, R11 공식 주소 흉내, R12 새 도메인+요구)은 AI가 모르는 이유라 AI 설명만으로는 위험한 까닭이 안 보인다.
     // 이 경우 정해 둔 신호 문구를 먼저 붙인다(2026-11-11 카카오 시험).

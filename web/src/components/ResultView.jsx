@@ -21,7 +21,7 @@ import CallButton from './CallButton.jsx'
 import MisjudgeLink from './MisjudgeLink.jsx'
 import SpeakButton from './SpeakButton.jsx'
 import { levelKey, verdictDescription, AI_FALLBACK_TEXT, AI_DECLINED_TEXT } from '../data/result.js'
-import { HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT } from '../../../packages/core/src/fixed-text.js'
+import { HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT } from '../../../packages/core/src/fixed-text.js'
 import { POLICE, sourceText } from '../data/contacts.js'
 
 export default function ResultView({
@@ -46,6 +46,7 @@ export default function ResultView({
     verdictDescription(result.level, type),
     ...explanation.slice(0, 3),
     ...(result.signals_final?.includes('SIG_SHORT_URL') ? [SHORT_URL_TEXT] : []),
+    ...(key === 'check' && result.signals_final?.includes('SIG_OFFICIAL_LINK') ? [OFFICIAL_LINK_TEXT] : []),
     LIMIT_NOTICE, // 화면과 같은 project.md 문장(2026-11-11 결정 B)
   ].join(' ')
 
@@ -55,6 +56,11 @@ export default function ResultView({
         <VerdictBanner level={key} description={verdictDescription(result.level, type)} />
         <SpeakButton text={speakText} />
       </div>
+
+      {/* D49: 확인 필요 + 링크가 모두 공식 주소면 그렇다고 알려 준다(‘안전’ 표현은 쓰지 않음) */}
+      {key === 'check' && result.signals_final?.includes('SIG_OFFICIAL_LINK') && (
+        <p className="screen-body">{OFFICIAL_LINK_TEXT}</p>
+      )}
 
       {key !== 'check' && (
         <section aria-label="이유">

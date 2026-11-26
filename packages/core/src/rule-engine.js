@@ -109,8 +109,11 @@ export function decide(context) {
   // R7: 링크, 돈, 개인정보, 재촉, 비밀 중 하나 / 또는 가족 사칭+새 번호
   // 링크가 모두 근거 카드의 공식 주소(코드가 판단)면 링크만으로는 주의를 내지 않는다(멘토링 2026-11-26, D47).
   // R2의 링크 조건(전화 받은 뒤 링크)은 공식 주소여도 그대로다
-  if ((sig.has(SIG_LINK) && !officialOnly) || sig.has(SIG_MONEY) || sig.has(SIG_PERSONAL_INFO) ||
-      sig.has(SIG_URGENCY) || sig.has(SIG_SECRECY) ||
+  // 링크가 모두 공식 주소면 재촉·돈·비밀은 코드가 찾은 것만 본다. AI가 “신고 기간입니다”에 재촉을 붙여
+  // 진짜 기관 안내가 주의로 나왔다(카카오 2026-11-26, D49). 개인정보 요구와 R6·R9 위험 조건은 AI 신호도 그대로 본다
+  const r7 = officialOnly ? new Set(signals_code ?? []) : sig;
+  if ((sig.has(SIG_LINK) && !officialOnly) || r7.has(SIG_MONEY) || sig.has(SIG_PERSONAL_INFO) ||
+      r7.has(SIG_URGENCY) || r7.has(SIG_SECRECY) ||
       (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_NEW_NUMBER))) fire("R7", "주의");
 
   // R8: 위 조건 없음 → 확인필요 (기본값이므로 별도 처리 없음)

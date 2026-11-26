@@ -623,3 +623,16 @@ describe("링크 정확성(D48)", () => {
     assert.doesNotMatch(textOf(r.body), /\[⚠️ 위험\]/);
   });
 });
+
+describe("공식 주소 링크 표시(D49)", () => {
+  const textOf = (body) => body.template.outputs.find((o) => o.simpleText)?.simpleText.text;
+  it("확인 필요 + 공식 주소만이면 ‘공식 주소로 보이는 링크’ 안내", async () => {
+    const r = await handleRequest({ utterance: "[국세청] 신고 기간입니다. www.hometax.go.kr" }, cfg);
+    assert.match(textOf(r.body), /확인 필요/);
+    assert.match(textOf(r.body), /공식 주소로 보이는 링크/);
+  });
+  it("공식 주소가 아니면 붙이지 않는다", async () => {
+    const r = await handleRequest({ utterance: "[롯데택배] 배송 예정입니다." }, cfg);
+    assert.doesNotMatch(textOf(r.body), /공식 주소로 보이는 링크/);
+  });
+});
