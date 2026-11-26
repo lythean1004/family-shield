@@ -39,6 +39,9 @@ export default function DemoScreen() {
           <p className="screen-body">
             실제 사기 문자를 바꿔 만든 예시예요. 실제 판별은 카카오톡 채널에서 해요.
           </p>
+          <p className="screen-body">
+            카카오톡으로 받은 메시지는 길게 눌러 [전달]을 누르고 ‘가족방패’ 채널을 고르면 돼요.
+          </p>
           <ul className="demo-list">
             {DEMO_SCENARIOS.map((s) => {
               const key = s.result ? levelKey(s.result.level) : 'danger'

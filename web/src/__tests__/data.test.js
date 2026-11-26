@@ -8,7 +8,7 @@ import { OFFICIAL_CONTACTS } from '../data/contacts.js'
 
 describe('데모 예시 SC1~SC4 (PRD 12-5)', () => {
   it('4개이고 id가 sc1~sc4', () => {
-    assert.deepEqual(DEMO_SCENARIOS.map((s) => s.id), ['sc1', 'sc2', 'sc3', 'sc4'])
+    assert.deepEqual(DEMO_SCENARIOS.map((s) => s.id), ['sc1', 'sc2', 'sc3', 'sc4', 'sc5', 'sc6', 'sc7', 'sc8'])
   })
 
   for (const sc of DEMO_SCENARIOS.filter((s) => s.result)) {
