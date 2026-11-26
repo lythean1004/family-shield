@@ -1,5 +1,5 @@
 {
-  "_note": "멘토링(2026-11-26) 정상 링크 오경보 대응. 문자 속 링크가 모두 공식 주소이면 '링크만으로는 주의'를 내지 않는다(판정은 '확인 필요'에 머문다, '안전' 판정 아님). 대형 포털은 블로그·카페·폼처럼 누구나 글을 올리는 하위 주소가 있어 하위 주소 전체가 아니라 여기 적은 정확한 호스트만 인정한다. 기관·회사 하위 주소는 official-domains.json 카드(status source_checked)를 쓴다. status needs_review 항목은 사람이 원문을 확인하기 전까지 코드에서 쓰지 않는다.",
+  "_note": "문자 속 모든 링크가 공식 주소로 확인되면 링크만으로 주의를 내리지 않는다. 이 카드의 적용 범위는 hosts에 적힌 호스트다. www 유무와 다른 하위 주소는 각각 명시된 경우에만 인정한다. 도메인 전체를 인정하는 범위는 official-domains.json에서 별도로 관리한다. 코드에는 source_checked 카드만 사용한다.",
   "cards": [
     {
       "id": "EV-LINK-NAVER",
@@ -62,6 +62,126 @@
       "terms_checked": false,
       "status": "source_checked",
       "check_note": "2026-11-26 https://www.google.com/ 하단에 운영 주체 이름 없이 저작권 연도만 표기. 운영 주체 근거(예: 회사 소개 페이지)를 운영자가 확인 후 source_checked로 바꾼다. → 2026-11-26 운영자 확인: naver.com·kakao.com 같은 주요 포털 첫 화면 주소는 공식(대화에서 확인). 첫 화면 정확한 호스트만 인정, 하위 주소는 계속 제외."
+    },
+    {
+      "id": "EV-LINK-KBANK",
+      "name": "케이뱅크 대표 주소",
+      "hosts": [
+        "www.kbanknow.com"
+      ],
+      "source_url": "https://www.kbanknow.com/web/web-home/home/main",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "케이뱅크 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "은행 첫 화면의 기관명과 은행소개 메뉴를 확인했다. 명부의 대표 주소에서 같은 호스트의 첫 화면으로 이동한다."
+    },
+    {
+      "id": "EV-LINK-SC",
+      "name": "SC제일은행 대표 주소",
+      "hosts": [
+        "www.standardchartered.co.kr"
+      ],
+      "source_url": "https://www.standardchartered.co.kr/np/kr/cms/cm/bi/CeoRoom.jsp?menuId=HT02000000000000&rnbStep=0",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "SC제일은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "은행장 인사말과 한국스탠다드차타드은행 운영 주체 표기를 확인했다. 은행소개 페이지의 호스트가 명부와 일치한다."
+    },
+    {
+      "id": "EV-LINK-CITI",
+      "name": "한국씨티은행 대표 주소",
+      "hosts": [
+        "www.citibank.co.kr"
+      ],
+      "source_url": "https://www.citibank.co.kr/jsp/crd/citistory/online/AliConsCnts0200.act",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "한국씨티은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "한국씨티은행의 소비자금융 이용자 보호 안내를 확인했다. 해당 페이지의 호스트가 명부와 일치한다."
+    },
+    {
+      "id": "EV-LINK-BUSAN",
+      "name": "부산은행 대표 주소",
+      "hosts": [
+        "www.busanbank.co.kr"
+      ],
+      "source_url": "https://www.busanbank.co.kr/ib20/mnu/BHPBKI384004003",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "부산은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "BNK부산은행이 경영 비전을 소개하는 페이지의 호스트가 명부와 일치한다."
+    },
+    {
+      "id": "EV-LINK-KYONGNAM",
+      "name": "경남은행 대표 주소",
+      "hosts": [
+        "www.knbank.co.kr"
+      ],
+      "source_url": "https://www.bnkfg.com/mobile/01/0602.jsp",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "경남은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "BNK금융그룹의 자회사 소개에서 경남은행 홈페이지로 연결한 주소가 명부와 일치한다."
+    },
+    {
+      "id": "EV-LINK-KWANGJU",
+      "name": "광주은행 대표 주소",
+      "hosts": [
+        "www.kjbank.com"
+      ],
+      "source_url": "https://www.kjbank.com/ib20/mnu/BHPCSCN020202",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "광주은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "광주은행이 민원 접수 절차에서 자사 홈페이지로 명시한 주소가 명부와 일치한다."
+    },
+    {
+      "id": "EV-LINK-JEONBUK",
+      "name": "전북은행 대표 주소",
+      "hosts": [
+        "www.jbbank.co.kr"
+      ],
+      "source_url": "https://www.jbbank.co.kr/cust_spkr_civi_cmpl_01.act",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "전북은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "전북은행이 금융소비자 민원 안내에서 자사 홈페이지로 명시한 주소가 명부와 일치한다."
+    },
+    {
+      "id": "EV-LINK-SUHYUP",
+      "name": "수협은행 대표 주소",
+      "hosts": [
+        "www.suhyup-bank.com"
+      ],
+      "source_url": "https://www.suhyup-bank.com/ib20/mnu/PBM00437",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "수협은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "수협은행이 카드 이용 안내에서 인터넷뱅킹 주소로 명시한 호스트가 명부와 일치한다."
     }
   ]
 }

@@ -54,6 +54,37 @@ describe("공식 주소 링크 판단", () => {
   });
 });
 
+describe("은행 카드의 대표 주소 범위", () => {
+  const hosts = [
+    "www.kbanknow.com", "www.standardchartered.co.kr", "www.citibank.co.kr", "www.busanbank.co.kr",
+    "www.knbank.co.kr", "www.kjbank.com", "www.jbbank.co.kr", "www.suhyup-bank.com",
+  ];
+
+  for (const host of hosts) {
+    it(`${host} 단독 안내는 확인 필요이고, 카드에 없는 호스트는 공식으로 인정하지 않는다`, () => {
+      const announcement = `홈페이지 안내 https://${host}/`;
+      assert.ok(extractCodeSignals(announcement).signals.includes(SIG_OFFICIAL_LINK));
+      assert.equal(level(announcement), "확인필요");
+
+      const domain = host.slice("www.".length);
+      assert.equal(isOfficialLink(`https://${domain}/`), false);
+      assert.equal(isOfficialLink(`https://m.${domain}/`), false);
+    });
+  }
+
+  it("은행 주소와 미등록 주소를 함께 안내하면 주의이며, 은행 주소만 있어도 통화 직후에는 위험이다", () => {
+    const link = `https://${hosts[0]}/`;
+    const mixed = `자료 목록 ${link} https://sample.invalid/guide`;
+    assert.ok(!extractCodeSignals(mixed).signals.includes(SIG_OFFICIAL_LINK));
+    assert.equal(level(mixed), "주의");
+
+    const signals = extractCodeSignals(link).signals;
+    const result = decide({ signals_final: signals, signals_code: signals, called_before: true });
+    assert.equal(result.level, "위험");
+    assert.ok(result.fired_rules.includes("R2"));
+  });
+});
+
 describe("판정: 공식 주소 링크만 있으면 '확인 필요'", () => {
   it("공식 택배 조회 링크만 있는 안내 문자", () => {
     const s = extractCodeSignals("[CJ대한통운] 배송 조회 https://www.cjlogistics.com/ko/tool/parcel/tracking").signals;

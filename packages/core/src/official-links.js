@@ -23,7 +23,7 @@ const HOST_FILE = join(import.meta.dirname, "..", "..", "..", "content", "eviden
 export const OFFICIAL_LINK_HOST_CARDS = JSON.parse(readFileSync(HOST_FILE, "utf8")).cards;
 
 const EXACT_HOSTS = new Set(
-  OFFICIAL_LINK_HOST_CARDS.filter((c) => c.status === "source_checked").flatMap((c) => c.hosts.map((h) => normalizeHost(h))),
+  OFFICIAL_LINK_HOST_CARDS.filter((c) => c.status === "source_checked").flatMap((c) => c.hosts.map((h) => h.toLowerCase())),
 );
 
 // 공식 도메인이어도 하위 주소를 누구나 만들 수 있는 서비스
@@ -59,7 +59,8 @@ export function isOfficialLink(link) {
     } catch { return false; }
   }
 
-  if (EXACT_HOSTS.has(host)) return true;
+  // 정확한 호스트 카드는 www까지 대조한다. 평판 목록용 normalizeHost는 www를 제거한다.
+  if (EXACT_HOSTS.has(parsed.host)) return true;
   if (SHARED_PARENTS.some((p) => isUnder(host, p))) return false; // 포털 하위 주소는 정확한 호스트만
   return SUBTREE_DOMAINS.some((d) => isUnder(host, d));
 }
