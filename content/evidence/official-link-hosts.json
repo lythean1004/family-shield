@@ -1,0 +1,49 @@
+{
+  "_note": "멘토링(2026-11-26) 정상 링크 오경보 대응. 문자 속 링크가 모두 공식 주소이면 '링크만으로는 주의'를 내지 않는다(판정은 '확인 필요'에 머문다, '안전' 판정 아님). 대형 포털은 블로그·카페·폼처럼 누구나 글을 올리는 하위 주소가 있어 하위 주소 전체가 아니라 여기 적은 정확한 호스트만 인정한다. 기관·회사 하위 주소는 official-domains.json 카드(status source_checked)를 쓴다. status needs_review 항목은 사람이 원문을 확인하기 전까지 코드에서 쓰지 않는다.",
+  "cards": [
+    {
+      "id": "EV-LINK-NAVER",
+      "name": "네이버 첫 화면",
+      "hosts": ["naver.com", "www.naver.com", "m.naver.com"],
+      "source_url": "https://www.naver.com/",
+      "checked_at": null,
+      "scope": "네이버 포털 첫 화면 주소만. blog·cafe·form·smartstore·kin 등 하위 주소는 포함하지 않음",
+      "terms_checked": false,
+      "status": "needs_review",
+      "check_note": "2026-11-26 자동 조회가 막혀 화면 하단 운영 주체(NAVER Corp.) 표기를 확인하지 못함. 운영자가 브라우저로 확인 후 source_checked로 바꾼다."
+    },
+    {
+      "id": "EV-LINK-DAUM",
+      "name": "다음 첫 화면",
+      "hosts": ["daum.net", "www.daum.net", "m.daum.net"],
+      "source_url": "https://www.kakaocorp.com/",
+      "checked_at": null,
+      "scope": "다음 포털 첫 화면 주소만. blog·cafe 등 하위 주소는 포함하지 않음",
+      "terms_checked": false,
+      "status": "needs_review",
+      "check_note": "2026-11-26 카카오 기업 누리집 하단 '관련사이트'에 다음 포털(https://www.daum.net/) 연결이 있으나 운영 주체 문장은 없음. daum.net 자체 화면의 운영 주체 표기를 운영자가 확인 후 source_checked로 바꾼다."
+    },
+    {
+      "id": "EV-LINK-KAKAOCORP",
+      "name": "카카오 기업 누리집",
+      "hosts": ["kakaocorp.com", "www.kakaocorp.com", "kakao.com", "www.kakao.com"],
+      "source_url": "https://www.kakaocorp.com/",
+      "checked_at": "2026-11-26",
+      "scope": "카카오 기업 누리집 주소만. open.kakao.com(오픈채팅)·pf.kakao.com(채널)·accounts 등 하위 주소는 포함하지 않음",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "2026-11-26 https://www.kakaocorp.com/ 하단 저작권 표기 'Kakao Corp.' 확인. https://www.kakao.com 은 같은 날 kakaocorp.com으로 이동(302) 확인. 이용조건은 개별 확인하지 않았으며 전문가 검수 전."
+    },
+    {
+      "id": "EV-LINK-GOOGLE",
+      "name": "구글 검색 첫 화면",
+      "hosts": ["google.com", "www.google.com", "google.co.kr", "www.google.co.kr"],
+      "source_url": "https://www.google.com/",
+      "checked_at": null,
+      "scope": "구글 검색 첫 화면 주소만. docs·sites·drive·forms·play 등 하위 주소는 포함하지 않음",
+      "terms_checked": false,
+      "status": "needs_review",
+      "check_note": "2026-11-26 https://www.google.com/ 하단에 운영 주체 이름 없이 저작권 연도만 표기. 운영 주체 근거(예: 회사 소개 페이지)를 운영자가 확인 후 source_checked로 바꾼다."
+    }
+  ]
+}

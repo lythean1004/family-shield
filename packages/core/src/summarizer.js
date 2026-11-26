@@ -50,7 +50,11 @@ function withRago(word) {
  * @returns {string[]}
  */
 export function summarizePhrases(signals, meta = {}) {
+  // 링크가 모두 공식 주소면 “링크 포함” 대신 공식 주소라고 적는다(그래도 안전하다는 뜻은 아님)
+  const officialOnly = signals.includes("SIG_OFFICIAL_LINK");
   const phrases = signals.flatMap((id) => {
+    if (id === "SIG_OFFICIAL_LINK") return [];
+    if (id === "SIG_LINK" && officialOnly) return ["공식 주소로 보이는 링크"];
     if (id === "SIG_FAMILY_IMPERSONATION") {
       const rel = meta.impersonated_relation;
       return rel ? [withRago(rel)] : ["가족이라고 함"];

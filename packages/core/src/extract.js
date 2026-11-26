@@ -17,9 +17,10 @@ import { findLookalikes } from "./lookalike.js";
 import {
   SIG_LINK, SIG_SHORT_URL, SIG_LOOKALIKE_DOMAIN, SIG_APP_INSTALL, SIG_MONEY,
   SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
-  SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT,
+  SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT, SIG_OFFICIAL_LINK,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
+import { allLinksOfficial } from "./official-links.js";
 
 // 같은 문장 안(마침표·물음표·느낌표·줄바꿈 전)에서 최대 n글자 사이
 const gap = (n) => `[^.!?\\n]{0,${n}}`;
@@ -128,6 +129,8 @@ export function extractCodeSignals(text, options = {}) {
     else domains.add(domain);
     if (/\.apk(?:$|[?#])/i.test(link)) signals.add(SIG_APP_INSTALL); // 설치 파일 링크
   }
+  // 링크가 모두 공식 주소면 R7(링크만으로 주의)에서 뺀다. 판정은 ‘확인 필요’에 머문다
+  if (allLinksOfficial(links)) signals.add(SIG_OFFICIAL_LINK);
   // 공식 주소를 흉내 낸 도메인(D40 ②). 단축 URL은 이름이 없으므로 대상 아님
   if (findLookalikes([...domains]).length) signals.add(SIG_LOOKALIKE_DOMAIN);
 

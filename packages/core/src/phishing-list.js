@@ -62,7 +62,7 @@ export function candidateHosts(host) {
 }
 
 /** 하위 주소까지 모두 공용으로 보는 대형 서비스(채널·블로그·카페 등은 누구나 만든다) */
-const SHARED_PARENTS = [
+export const SHARED_PARENTS = [
   "naver.com", "kakao.com", "daum.net", "google.com", "youtube.com", "facebook.com", "instagram.com",
   "apple.com", "microsoft.com", "live.com", "coupang.com",
 ];

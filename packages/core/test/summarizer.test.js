@@ -65,3 +65,11 @@ describe("요약 문구 생성", () => {
     assert.equal(result.split(" · ").length, 17);
   });
 });
+
+describe("요약 - 공식 주소 링크", () => {
+  it("공식 링크만 있으면 '공식 주소로 보이는 링크'", async () => {
+    const { summarize } = await import("../src/summarizer.js");
+    assert.equal(summarize(["SIG_LINK", "SIG_OFFICIAL_LINK"]), "공식 주소로 보이는 링크");
+    assert.equal(summarize(["SIG_LINK"]), "링크 포함");
+  });
+});

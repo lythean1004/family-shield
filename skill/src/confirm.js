@@ -1,7 +1,7 @@
 import { fail, hashToken } from './auth.js'
 import { insertCheck, LEVEL_FROM_DB } from './results.js'
 import { decide } from '../../packages/core/src/rule-engine.js'
-import { ALLOWED_RELATIONS } from '../../packages/core/src/signals.js'
+import { ALLOWED_RELATIONS, codeOnlyFrom } from '../../packages/core/src/signals.js'
 
 export const PROCESSING_VERSION='confirm-processing-2026-10-28-v1'
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -26,7 +26,7 @@ export function createConfirmService(db,receipts) {
   async function context(userId,body) {
     const result=receipts.read(body.receipt,userId)
     const next={...result}
-    const calculated=decide({signals_final:result.signals_final,signals_code:result.signals_code??[],called_before:body.calledBefore===true,family_denied:body.familyDenied===true})
+    const calculated=decide({signals_final:result.signals_final,signals_code:result.signals_code??codeOnlyFrom(result.signals_final),called_before:body.calledBefore===true,family_denied:body.familyDenied===true})
     const rank={확인필요:0,주의:1,위험:2}
     if(rank[calculated.level]>rank[result.level]){
       next.level=calculated.level

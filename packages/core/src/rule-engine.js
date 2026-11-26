@@ -18,7 +18,7 @@ import {
   SIG_MONEY, SIG_GIFTCARD, SIG_AVOID_VOICE, SIG_AGENCY_IMPERSONATION,
   SIG_PERSONAL_INFO, SIG_CALL_THIS_NUMBER, SIG_URGENCY, SIG_SECRECY,
   SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT, SIG_DELETE_APP,
-  SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN,
+  SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN, SIG_OFFICIAL_LINK,
 } from "./signals.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
@@ -101,7 +101,10 @@ export function decide(context) {
       (sig.has(SIG_MONEY) || sig.has(SIG_PERSONAL_INFO) || sig.has(SIG_APP_INSTALL))) fire("R12", "위험");
 
   // R7: 링크, 돈, 개인정보, 재촉, 비밀 중 하나 / 또는 가족 사칭+새 번호
-  if (sig.has(SIG_LINK) || sig.has(SIG_MONEY) || sig.has(SIG_PERSONAL_INFO) ||
+  // 링크가 모두 근거 카드의 공식 주소(코드가 판단)면 링크만으로는 주의를 내지 않는다(멘토링 2026-11-26, D47).
+  // 공식 링크 표시는 코드 신호만 인정한다(AI가 끼워 넣을 수 없음). R2·R6의 링크 조건은 그대로다
+  const officialOnly = (signals_code ? new Set(signals_code) : sig).has(SIG_OFFICIAL_LINK);
+  if ((sig.has(SIG_LINK) && !officialOnly) || sig.has(SIG_MONEY) || sig.has(SIG_PERSONAL_INFO) ||
       sig.has(SIG_URGENCY) || sig.has(SIG_SECRECY) ||
       (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_NEW_NUMBER))) fire("R7", "주의");
 
