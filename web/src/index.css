@@ -1,28 +1,24 @@
-/* 기본: 큰 글씨, 높은 대비 (PRD 16 접근성). 토큰은 docs/screen-spec.md 2장, 수치는 테스트 가족 확인 후 조정 [임시] */
+/* 시안 B 맑은 블루 · 색과 모양은 docs/screen-spec.md 2장과 같이 관리한다. */
 /* Q3 결정(2026-10-26): 부모님 화면은 일반 크기 150% 기준. 보호자는 일반 크기. */
 
 /* ── 색 토큰 ──────────────────────────────────────── */
 :root {
-  --c-bg:          #ffffff;
-  --c-surface:     #f5f6f8;
-  --c-bg-raised:   #eef1f5; /* 눌림·hover 배경 */
-  /* 테두리는 비텍스트 대비 3:1 이상 (WCAG 1.4.11). 이전 #d0d4da는 1.5:1 */
-  --c-border:      #7b8490;
-  --c-border-soft: #c4c9d0; /* 장식용 구분선만 */
-  --c-text:        #111418;
-  --c-text-sub:    #3f4650;
-  --c-action:      #1a56db;
+  --c-bg:          #f3f5f9;
+  --c-surface:     #ffffff;
+  --c-bg-raised:   #e8ecf3;
+  --c-border:      #7d8794; /* 입력·스위치 등 조작 경계 */
+  --c-border-soft: #e3e7ee; /* 장식용 구분선 */
+  --c-text:        #191f28;
+  --c-text-sub:    #4e5968;
+  --c-action:      #2a5bd7;
   --c-action-text: #ffffff;
-
-  /* 판정 */
-  --c-danger:      #b42318;
-  --c-danger-bg:   #fdecea;
-  --c-caution:     #9a4a00;
-  --c-caution-bg:  #fff4e5;
-  --c-check:       #1f4f99;
-  --c-check-bg:    #eaf1fb;
-
-  --c-focus:       #1a56db;
+  --c-danger:      #c0261f;
+  --c-danger-bg:   #fdecec;
+  --c-caution:     #9a5300;
+  --c-caution-bg:  #fff3e0;
+  --c-check:       #2a57c7;
+  --c-check-bg:    #e8efff;
+  --c-focus:       #2a5bd7;
 
   /* ── 간격 토큰 ─────────────────────────────────── */
   /* 참조: elayadesign landing-page-design B2 간격 표. 이 값들만 쓴다 */
@@ -37,10 +33,14 @@
   --sp-16: 64px;
 
   /* ── 모양 ──────────────────────────────────────── */
-  --radius-btn:  12px;
-  --radius-card: 16px;
-  /* 카드(16px) 안 12px 간격 요소: 16 - 12 = 4px (B3 중첩 반지름 공식) */
-  --radius-inner: 4px;
+  --radius-btn: 16px;
+  --radius-card: 22px;
+  --radius-inner: calc(var(--radius-card) - var(--sp-3));
+  --radius-pill: 999px;
+  --shadow-card: 0 2px 10px rgba(25, 31, 40, .06);
+  --card-edge: 0px;
+  --verdict-edge: 0px;
+  --chip-edge: 0px;
 
   /* ── 움직임 (B7): 감속 곡선, 200ms 이상. 위치·크기 대신 transform·opacity만 ── */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -110,7 +110,7 @@ main {
   position: absolute;
   left: var(--sp-2);
   top: -100px;
-  z-index: 10;
+  z-index: 30;
   padding: var(--sp-3) var(--sp-4);
   background: var(--c-text);
   color: var(--c-bg);
@@ -120,16 +120,35 @@ main {
 }
 .skip-link:focus { top: var(--sp-2); }
 
-/* 고대비 모드: OS 설정(Windows 고대비, 대비 높이기)을 따른다 */
-@media (prefers-contrast: more) {
-  :root {
-    --c-border:   #111418;
-    --c-text-sub: #111418;
-    --c-surface:  #ffffff;
-  }
+/* main.jsx가 첫 렌더 전에 기기 설정과 직접 선택을 이 속성 하나로 합친다. */
+[data-contrast="high"] {
+  --c-bg:          #ffffff;
+  --c-surface:     #ffffff;
+  --c-bg-raised:   #ffffff;
+  --c-border:      #111418;
+  --c-border-soft: #111418;
+  --c-text:        #000000;
+  --c-text-sub:    #111418;
+  --c-action:      #0a3fbf;
+  --c-action-text: #ffffff;
+  --c-danger:      #a00000;
+  --c-danger-bg:   #ffffff;
+  --c-caution:     #7a3d00;
+  --c-caution-bg:  #ffffff;
+  --c-check:       #0a3fbf;
+  --c-check-bg:    #ffffff;
+  --c-focus:       #0a3fbf;
+  --shadow-card: none;
+  --card-edge: 2px;
+  --verdict-edge: 3px;
+  --chip-edge: 2px;
 }
 @media (forced-colors: active) {
-  .action-btn, .call-btn, .quiz-choice, .misjudge__choice, .demo-list__btn { border: 2px solid ButtonText; }
+  :root {
+    --card-edge: 2px;
+    --verdict-edge: 3px;
+    --chip-edge: 2px;
+  }
 }
 
 /* 움직임 줄이기: 이동 대신 즉시 변경 (B7) */

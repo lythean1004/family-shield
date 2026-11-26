@@ -5,10 +5,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const css = readFileSync(new URL('../index.css', import.meta.url), 'utf8')
-const token = (name) => {
-  const m = css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))
-  if (!m) throw new Error(`token --${name} not found`)
-  return m[1]
+function colorsFor(selector) {
+  const start = css.indexOf(selector + ' {')
+  assert.notEqual(start, -1, selector)
+  const block = css.slice(start, css.indexOf('}', start))
+  return Object.fromEntries([...block.matchAll(/--(c-[\w-]+):\s*(#[\da-f]{6});/gi)]
+    .map(([, name, value]) => [name, value]))
 }
 
 function luminance(hex) {
@@ -32,7 +34,7 @@ const PAIRS = [
   ['보조 버튼 글자·글자 링크', 'c-action', 'c-bg', 4.5],
   ['번호 카드 번호', 'c-action', 'c-surface', 4.5],
   ['위험', 'c-danger', 'c-danger-bg', 4.5],
-  ['위험 버튼 글자', 'c-bg', 'c-danger', 4.5],
+  ['위험 화면 버튼 흰 글자', 'c-action-text', 'c-danger', 4.5],
   ['주의', 'c-caution', 'c-caution-bg', 4.5],
   ['확인 필요', 'c-check', 'c-check-bg', 4.5],
   ['초점 테두리', 'c-focus', 'c-bg', 3],
@@ -43,6 +45,18 @@ const PAIRS = [
   ['비활성 버튼 글자', 'c-text-sub', 'c-surface', 4.5],
   ['눌림 배경 위 보조 문구', 'c-text-sub', 'c-bg-raised', 4.5],
   ['선택된 퀴즈 답 글자', 'c-text', 'c-check-bg', 4.5],
+  ['본문(흰 카드)', 'c-text', 'c-surface', 4.5],
+  ['본문(위험 배경)', 'c-text', 'c-danger-bg', 4.5],
+  ['글자 링크(위험 배경)', 'c-action', 'c-danger-bg', 4.5],
+  ['번호·보조 링크(눌림)', 'c-action', 'c-check-bg', 4.5],
+  ['위험 예시 글자(눌림)', 'c-danger', 'c-check-bg', 4.5],
+  ['주의 예시 글자(눌림)', 'c-caution', 'c-check-bg', 4.5],
+  ['입력·스위치 경계(눌림)', 'c-border', 'c-bg-raised', 3],
+  ['스위치 손잡이(꺼짐)', 'c-text-sub', 'c-surface', 3],
+  ['스위치 손잡이(켜짐)', 'c-action-text', 'c-action', 3],
+  ['초점 테두리(카드)', 'c-focus', 'c-surface', 3],
+  ['초점 테두리(눌림)', 'c-focus', 'c-bg-raised', 3],
+  ['초점 테두리(위험 배경)', 'c-focus', 'c-danger-bg', 3],
 ]
 
 describe('어르신 화면 규칙 (참조 디자인을 적용해도 지킬 것)', () => {
@@ -76,17 +90,24 @@ describe('어르신 화면 규칙 (참조 디자인을 적용해도 지킬 것)'
   })
 
   it('고대비·움직임 줄이기 설정을 따른다', () => {
-    assert.match(css, /prefers-contrast:\s*more/)
+    const bootstrap = readFileSync(new URL('../main.jsx', import.meta.url), 'utf8')
+    assert.match(bootstrap, /prefers-contrast:\s*more/)
+    assert.match(bootstrap, /forced-colors:\s*active/)
     assert.match(css, /prefers-reduced-motion:\s*reduce/)
   })
 })
 
 describe('WCAG AA 대비', () => {
-  for (const [label, fg, bg, min] of PAIRS) {
-    it(`${label}: --${fg} / --${bg} >= ${min}:1`, () => {
-      const r = contrast(token(fg), token(bg))
-      assert.ok(r >= min, `${r.toFixed(2)}:1`)
-    })
+  for (const [mode, selector] of [['기본', ':root'], ['고대비', '[data-contrast="high"]']]) {
+    const colors = colorsFor(selector)
+    for (const [label, fg, bg, min] of PAIRS) {
+      const target = mode === '고대비' && min === 4.5 ? 7 : min
+      it(`${mode} · ${label} (≥ ${target}:1)`, () => {
+        assert.ok(colors[fg] && colors[bg], `누락된 토큰: ${fg} / ${bg}`)
+        const ratio = contrast(colors[fg], colors[bg])
+        assert.ok(ratio >= target, `${ratio.toFixed(2)}:1`)
+      })
+    }
   }
 
   it('계산 확인: 검정/흰색 = 21:1', () => {
