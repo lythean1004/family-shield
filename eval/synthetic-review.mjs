@@ -10,6 +10,7 @@ const approved = new Map([
   ["test.jsonl", "e9df033555d45f30d23820de089a26becc1aeb0e17e4209689ce238dc8ffc654"],
   ["supplement.jsonl", "b5b1e76675dda7a96f6229e96baa1bd09cf96a2932a5ea96e9b2c31208438cf8"],
   ["holdout-2026-11.jsonl", "eb193561dd1a7302acfc94e448eb45f207567d24ddb66fb230ce214e95c8fcf1"],
+  ["holdout-2026-11-v2.jsonl", "d09cc64aac100f3f00e5c3e4dd9c3d54105c64b6654e9171a7fab4ae3e18923d"],
 ]);
 
 export function verifySyntheticContents(dataset, text) {

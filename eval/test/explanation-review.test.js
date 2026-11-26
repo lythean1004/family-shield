@@ -18,6 +18,18 @@ const execRunner = (...args) => spawnSync(process.execPath, ["--import", fixture
 });
 const lines = path => readFileSync(path,"utf8").trim().split(/\r?\n/).map(s=>JSON.parse(s));
 describe("합성 평가 설명과 검수 CSV", () => {
+  it("보류 세트 2판은 1판에서 HO-B-02의 사람 기대 단계만 변경했다", () => {
+    const casesFrom = path => readSyntheticDataset(path).text.trim().split(/\r?\n/).map(line => JSON.parse(line));
+    const firstEdition = casesFrom(sourcePath);
+    const secondEdition = casesFrom(join(root, "eval", "holdout-2026-11-v2.jsonl"));
+    const courtNotice = firstEdition.find(c => c.case_id === "HO-B-02");
+    assert.equal(firstEdition.length, 60);
+    assert.equal(courtNotice.gold.level_human, "위험");
+    assert.equal(courtNotice.gold.level_rule, "확인필요");
+    courtNotice.gold.level_human = "주의";
+    assert.deepEqual(secondEdition, firstEdition);
+  });
+
   it("등록 위치와 내용을 함께 확인하고 수정된 판본·같은 이름의 외부 파일은 거절한다", () => {
     const { text, source } = readSyntheticDataset(sourcePath);
     assert.deepEqual(verifySyntheticContents(source.dataset, text.replace(/\r?\n/g,"\r\n")), source);
