@@ -6,7 +6,8 @@
  * 동의를 끄면 ResultView의 "가족에게 물어보기" 버튼이 사라진다(F5-9).
  * 서버 응답이 성공한 뒤에만 화면 상태를 바꾼다.
  */
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
+import { ContrastContext } from '../data/contrast-pref.js'
 import { useNavigate } from 'react-router-dom'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
@@ -15,6 +16,7 @@ import PushSettings from '../components/PushSettings.jsx'
 
 export default function SettingsScreen() {
   const navigate = useNavigate()
+  const { highContrast, toggleContrast } = useContext(ContrastContext)
   const [consent, setConsent] = useState(false)
   const [error,setError] = useState('')
 
@@ -42,6 +44,25 @@ export default function SettingsScreen() {
   return (
     <main id="main" className="mode-parent">
       <h1 className="screen-title">설정</h1>
+      <section className="settings-section" aria-labelledby="contrast-label">
+        <div className="settings-toggle-row">
+          <span className="settings-toggle-label" id="contrast-label">고대비로 보기</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={highContrast}
+            aria-labelledby="contrast-label"
+            aria-describedby="contrast-description"
+            className={`settings-toggle${highContrast ? ' settings-toggle--on' : ''}`}
+            onClick={toggleContrast}
+          >
+            <span className="settings-toggle__thumb" />
+          </button>
+        </div>
+        <p className="settings-note" id="contrast-description">
+          글자와 테두리를 더 진하게 보여 줘요. 이 기기에만 저장돼요.
+        </p>
+      </section>
       <PushSettings />
       {error && <p role="alert" className="screen-body">{error}</p>}
       <div className="screen-actions">

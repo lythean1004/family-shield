@@ -2,12 +2,15 @@
  * H0. 홈 /
  * 소개 + 입구 안내. 로그인 없이 공개.
  */
+import { useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ContrastContext } from '../data/contrast-pref.js'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
 
 export default function HomeScreen() {
   const navigate = useNavigate()
+  const { highContrast, toggleContrast } = useContext(ContrastContext)
   return (
     <main id="main" className="mode-parent">
       <h1 className="screen-title">가족방패</h1>
@@ -35,6 +38,9 @@ export default function HomeScreen() {
       {/* 설정은 맨 위 [메뉴]에도 있다 */}
       <p className="screen-body home-settings">
         <button type="button" className="text-link" onClick={() => navigate('/settings')}>설정</button>
+        <button type="button" className="text-link" aria-pressed={highContrast} onClick={toggleContrast}>
+          {highContrast ? '기본 화면으로 보기' : '고대비로 보기'}
+        </button>
       </p>
       <NoLinkFooter />
     </main>
