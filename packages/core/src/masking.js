@@ -19,8 +19,30 @@ import { SCHEME_URL_RE, BARE_DOMAIN_RE } from "./links.js";
 
 // ── 패턴 ────────────────────────────────────────────────────────────────────
 
-// 전화번호: 010/011/016/017/018/019-XXXX-XXXX, 02-XXXX-XXXX, 지역번호 0XX-XXX-XXXX
-const PHONE_RE = /(?<!\d)(?:0(?:1[016789]|2|[3-9]\d)[-\s]?\d{3,4}[-\s]?\d{4})(?!\d)/g;
+// 전화번호 (구분자: 하이픈·점·공백·없음)
+// - 휴대폰·지역·070: 010-XXXX-XXXX, 02-XXX-XXXX, 031-XXX-XXXX. 국가번호(+82, 82) 형식 포함
+// - 안심번호 050X-XXXX-XXXX
+// - 괄호 지역번호 (02)123-4567
+// - 대표번호 15XX·16XX·18XX-XXXX
+// 2026-11-26 멘토링: 점·국가번호·대표번호·괄호 형식이 빠져 보강
+const PHONE_SEP = "[-.\\s]?";
+const PHONE_HEAD = "(?:\\+?82[-.\\s]?\\(?0?\\)?|0)";
+const PHONE_RE = new RegExp(
+  "(?<![\\d+])(?:" +
+    `${PHONE_HEAD}50\\d${PHONE_SEP}\\d{3,4}${PHONE_SEP}\\d{4}` +
+    `|${PHONE_HEAD}(?:1[016789]|2|[3-9]\\d)${PHONE_SEP}\\d{3,4}${PHONE_SEP}\\d{4}` +
+    `|\\(0\\d{1,2}\\)\\s?\\d{3,4}${PHONE_SEP}\\d{4}` +
+    `|1[568]\\d{2}${PHONE_SEP}\\d{4}` +
+  ")(?!\\d)",
+  "g",
+);
+
+/** 같은 번호면 형식이 달라도 HMAC이 같도록 숫자만 남기고 국가번호 82를 0으로 바꾼다 */
+function normalizePhone(raw) {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("82")) digits = "0" + digits.slice(2).replace(/^0/, "");
+  return digits;
+}
 
 // 계좌번호: 숫자-숫자-숫자 형태, 총 10~14자리
 const ACCOUNT_RE = /(?<!\d)\d{2,6}-\d{2,6}-\d{2,6}(?:-\d{2,3})?(?!\d)/g;
@@ -28,8 +50,11 @@ const ACCOUNT_RE = /(?<!\d)\d{2,6}-\d{2,6}-\d{2,6}(?:-\d{2,3})?(?!\d)/g;
 // 카드번호: XXXX-XXXX-XXXX-XXXX 또는 16자리 연속
 const CARD_RE = /(?<!\d)(?:\d{4}[-\s]\d{4}[-\s]\d{4}[-\s]\d{4}|\d{16})(?!\d)/g;
 
-// 주민등록번호: XXXXXX-XXXXXXX
-const RRN_RE = /(?<!\d)\d{6}-[1-4]\d{6}(?!\d)/g;
+// 주민등록번호·외국인등록번호(뒷자리 첫 숫자 5~8)
+// - 하이픈이 있으면 날짜 검사 없이 가린다(XXXXXX-XXXXXXX).
+// - 공백·붙여 쓴 13자리는 앞 6자리가 날짜(YYMMDD)일 때만 가린다(주문번호 등 오탐 방지).
+const RRN_DATE = "\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])";
+const RRN_RE = new RegExp(`(?<!\\d)(?:\\d{6}-[1-8]\\d{6}|${RRN_DATE}\\s?[1-8]\\d{6})(?!\\d)`, "g");
 
 // 이메일
 const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
@@ -66,7 +91,7 @@ export function mask(text, options = {}) {
 
   // 계좌처럼 보이는 전화번호가 [계좌]로 바뀌지 않게 전화번호를 먼저 처리하고 HMAC을 기록한다.
   out = out.replace(PHONE_RE, (raw) => {
-    if (hmacKey) phoneHmacs.push(hmacPhone(raw.replace(/[-\s]/g, ""), hmacKey));
+    if (hmacKey) phoneHmacs.push(hmacPhone(normalizePhone(raw), hmacKey));
     return "[번호]";
   });
 
