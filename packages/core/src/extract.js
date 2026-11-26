@@ -10,6 +10,7 @@
  * - domains: 평판 조회(F4-11)에 넘길 도메인 목록. 단축 URL 도메인은 넣지 않는다.
  *
  * options.senderLast4     : 부모님이 입력한 발신 번호 끝 4자리(F4-1, 선택)
+ * options.shortUrlKeys    : 단축 주소 목록 키(시험용). 없으면 저장소 목록(content/phishing/kisa-short-urls.txt)
  * options.registeredLast4 : 사칭된 가족의 등록 번호 끝 4자리(P3에서 고른 뒤 알 수 있음)
  *   두 값이 모두 있고 다르면 SIG_NEW_NUMBER. 같아도 판정을 낮추지 않는다(발신번호 조작 가능).
  */
@@ -18,9 +19,18 @@ import {
   SIG_LINK, SIG_SHORT_URL, SIG_LOOKALIKE_DOMAIN, SIG_APP_INSTALL, SIG_MONEY,
   SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
   SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT, SIG_OFFICIAL_LINK,
+  SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
 import { allLinksOfficial } from "./official-links.js";
+import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
+
+/** 주소 앞부분(호스트 앞)에 사용자 정보(@)가 있는지. 경로의 @는 보지 않는다 */
+function hasUserinfo(link) {
+  const authority = link.replace(/^(?:https?|ftp):\/\//i, "").split(/[/?#]/)[0];
+  const at = authority.lastIndexOf("@");
+  return at > 0 && at < authority.length - 1;
+}
 
 // 같은 문장 안(마침표·물음표·느낌표·줄바꿈 전)에서 최대 n글자 사이
 const gap = (n) => `[^.!?\\n]{0,${n}}`;
@@ -128,7 +138,11 @@ export function extractCodeSignals(text, options = {}) {
     if (isShortener(domain)) signals.add(SIG_SHORT_URL);
     else domains.add(domain);
     if (/\.apk(?:$|[?#])/i.test(link)) signals.add(SIG_APP_INSTALL); // 설치 파일 링크
+    // https://공식주소@가짜주소: 브라우저는 @ 뒤로 간다. 앞부분으로 공식 주소인 척하는 속임수(D48)
+    if (hasUserinfo(link)) signals.add(SIG_DECEPTIVE_URL);
   }
+  // KISA 목록에 있던 단축 주소와 그대로 같으면 목록 일치(D48 ①). 펼치지 않고 글자만 대조한다
+  if (createShortUrlMatcher(options.shortUrlKeys ?? SHORT_URL_KEYS)(links)) signals.add(SIG_MALICIOUS_URL);
   // 링크가 모두 공식 주소면 R7(링크만으로 주의)에서 뺀다. 판정은 ‘확인 필요’에 머문다
   if (allLinksOfficial(links)) signals.add(SIG_OFFICIAL_LINK);
   // 공식 주소를 흉내 낸 도메인(D40 ②). 단축 URL은 이름이 없으므로 대상 아님

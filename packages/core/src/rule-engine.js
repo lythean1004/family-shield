@@ -19,6 +19,7 @@ import {
   SIG_PERSONAL_INFO, SIG_CALL_THIS_NUMBER, SIG_URGENCY, SIG_SECRECY,
   SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT, SIG_DELETE_APP,
   SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN, SIG_OFFICIAL_LINK,
+  SIG_DECEPTIVE_URL,
 } from "./signals.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
@@ -81,9 +82,14 @@ export function decide(context) {
   // R5: 가족이 "보낸 적 없어요" 확인
   if (family_denied) fire("R5", "위험");
 
+  // 링크가 모두 근거 카드의 공식 주소인지(코드가 판단). 공식 링크 표시는 코드 신호만 인정한다(AI가 끼워 넣을 수 없음)
+  const officialOnly = (signals_code ? new Set(signals_code) : sig).has(SIG_OFFICIAL_LINK);
+
   // R6: 기관 사칭 + (링크, 앱 설치, 개인정보, 문자 속 번호로 전화 유도 중 하나)
+  // 링크가 모두 공식 주소면 링크만으로는 R6를 켜지 않는다(실제 기관 안내 “[국세청] … hometax.go.kr”, D48).
+  // 앱 설치·개인정보·전화 유도가 함께 있으면 그대로 위험이다
   if (sig.has(SIG_AGENCY_IMPERSONATION) &&
-      (sig.has(SIG_LINK) || sig.has(SIG_APP_INSTALL) ||
+      ((sig.has(SIG_LINK) && !officialOnly) || sig.has(SIG_APP_INSTALL) ||
        sig.has(SIG_PERSONAL_INFO) || sig.has(SIG_CALL_THIS_NUMBER))) fire("R6", "위험");
 
   // R9: 고립 요구, 선입금 요구, 개인 계좌 입금, 앱 삭제 지시
@@ -93,8 +99,8 @@ export function decide(context) {
   // R10: 악성 URL
   if (sig.has(SIG_MALICIOUS_URL) || sig.has(SIG_SB_UNSAFE_URL)) fire("R10", "위험");
 
-  // R11: 공식 주소를 흉내 낸 링크(D40 ②)
-  if (sig.has(SIG_LOOKALIKE_DOMAIN)) fire("R11", "위험");
+  // R11: 공식 주소를 흉내 낸 링크(D40 ②), 주소 앞부분을 공식 주소처럼 꾸민 링크(https://공식@가짜, D48)
+  if (sig.has(SIG_LOOKALIKE_DOMAIN) || sig.has(SIG_DECEPTIVE_URL)) fire("R11", "위험");
 
   // R12: 만든 지 30일 안 된 링크 도메인 + (돈, 개인정보, 앱 설치 요구 중 하나). 재촉은 정상 광고와 겹쳐 뺌(D41)
   if (sig.has(SIG_NEW_DOMAIN) &&
@@ -102,8 +108,7 @@ export function decide(context) {
 
   // R7: 링크, 돈, 개인정보, 재촉, 비밀 중 하나 / 또는 가족 사칭+새 번호
   // 링크가 모두 근거 카드의 공식 주소(코드가 판단)면 링크만으로는 주의를 내지 않는다(멘토링 2026-11-26, D47).
-  // 공식 링크 표시는 코드 신호만 인정한다(AI가 끼워 넣을 수 없음). R2·R6의 링크 조건은 그대로다
-  const officialOnly = (signals_code ? new Set(signals_code) : sig).has(SIG_OFFICIAL_LINK);
+  // R2의 링크 조건(전화 받은 뒤 링크)은 공식 주소여도 그대로다
   if ((sig.has(SIG_LINK) && !officialOnly) || sig.has(SIG_MONEY) || sig.has(SIG_PERSONAL_INFO) ||
       sig.has(SIG_URGENCY) || sig.has(SIG_SECRECY) ||
       (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_NEW_NUMBER))) fire("R7", "주의");

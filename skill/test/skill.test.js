@@ -601,3 +601,25 @@ describe("경고 이미지", () => {
     assert.ok(r.body.template.outputs[0].simpleText);
   });
 });
+
+describe("링크 정확성(D48)", () => {
+  const textOf = (body) => body.template.outputs.find((o) => o.simpleText)?.simpleText.text;
+  it("단축 링크가 있으면 단축 링크 전용 안내를 붙인다", async () => {
+    const r = await handleRequest({ utterance: "택배 주소 확인 han.gl/ZzZz99" }, cfg);
+    assert.match(textOf(r.body), /단축 링크/);
+    assert.match(textOf(r.body), /누르지 마세요/);
+  });
+  it("단축 링크가 없으면 안내를 붙이지 않는다", async () => {
+    const r = await handleRequest({ utterance: "확인 부탁 http://x.invalid/a" }, cfg);
+    assert.doesNotMatch(textOf(r.body), /단축 링크/);
+  });
+  it("‘공식@가짜’ 주소는 위험이고 이유를 보여 준다", async () => {
+    const r = await handleRequest({ utterance: "결제 확인 https://naver.com@pay-check.invalid/login" }, cfg);
+    assert.match(textOf(r.body), /위험/);
+    assert.match(textOf(r.body), /공식 주소처럼 꾸민 가짜 링크/);
+  });
+  it("기관 이름 + 공식 주소만 있는 안내는 위험이 아니다", async () => {
+    const r = await handleRequest({ utterance: "[국세청] 종합소득세 신고 기간입니다. 홈택스(www.hometax.go.kr)에서 신고하세요." }, cfg);
+    assert.doesNotMatch(textOf(r.body), /\[⚠️ 위험\]/);
+  });
+});

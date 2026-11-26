@@ -139,7 +139,7 @@ describe("파이프라인 - URL 평판 조회 (F4-11, R10)", () => {
 
   it("국내 목록의 단축 서비스면 SIG_SHORT_URL 을 더한다(위험으로 올리지 않음, D40)", async () => {
     const r = await analyze({
-      text: "확인 go9.co/SWh",
+      text: "확인 go9.co/ZzQq81", // 지어낸 주소(목록 일치 대조와 겹치지 않게, D48)
       urlReputation: async () => ({ ok: true, malicious: [], shortened: ["go9.co"] }),
     });
     assert.ok(r.signals_code.includes("SIG_SHORT_URL"));

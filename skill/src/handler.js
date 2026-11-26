@@ -22,7 +22,7 @@ import { loadPhishingListChecker, combineCheckers } from "../../packages/core/sr
 import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
 import { readRequest, simpleText, quickReply, withImage } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
-import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT } from "../../packages/core/src/fixed-text.js";
+import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT } from "../../packages/core/src/fixed-text.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
 import { createDatabase } from './database.js';
@@ -58,7 +58,7 @@ const LEVEL_TEXT = {
  * 확인 필요는 정해 둔 문장, 그 밖에는 explanation이 있으면 붙이고, 없으면 신호 요약을 쓴다.
  */
 /** 링크 규칙과 그 신호: 규칙이 실제로 위험을 냈을 때만 AI 설명과 별개로 이유를 보여 준다 */
-const LINK_RULE_SIGNALS = { R10: ["SIG_MALICIOUS_URL", "SIG_SB_UNSAFE_URL"], R11: ["SIG_LOOKALIKE_DOMAIN"], R12: ["SIG_NEW_DOMAIN"] };
+const LINK_RULE_SIGNALS = { R10: ["SIG_MALICIOUS_URL", "SIG_SB_UNSAFE_URL"], R11: ["SIG_LOOKALIKE_DOMAIN", "SIG_DECEPTIVE_URL"], R12: ["SIG_NEW_DOMAIN"] };
 /** Google Safe Browsing 이용 규칙: Google 경고에는 출처 표시와 안내 링크를 붙인다(다른 출처 경고에는 붙이지 않는다) */
 const GOOGLE_ATTRIBUTION = "Advisory provided by Google";
 const GOOGLE_ADVISORY_URL = "https://developers.google.com/safe-browsing/v4/advisory";
@@ -89,6 +89,8 @@ function buildReplyText(result) {
     lines.push(`감지된 신호: ${result.summary}`);
   }
 
+  // 단축 링크 전용 안내(D48 ②): 속 주소를 모르니 누르지 말고 직접 확인
+  if ((result.signals_final ?? []).includes("SIG_SHORT_URL")) lines.push(SHORT_URL_TEXT);
   // 작업 ⑦: 건강 관련 안내라 해외 AI로 보내지 않은 경우
   if (result.ai_skipped === "health") lines.push(HEALTH_SKIPPED_TEXT);
   if (hasGoogleWarning(result)) lines.push(GOOGLE_ATTRIBUTION);

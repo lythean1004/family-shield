@@ -21,7 +21,7 @@ import CallButton from './CallButton.jsx'
 import MisjudgeLink from './MisjudgeLink.jsx'
 import SpeakButton from './SpeakButton.jsx'
 import { levelKey, verdictDescription, AI_FALLBACK_TEXT, AI_DECLINED_TEXT } from '../data/result.js'
-import { HEALTH_SKIPPED_TEXT } from '../../../packages/core/src/fixed-text.js'
+import { HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT } from '../../../packages/core/src/fixed-text.js'
 import { POLICE, sourceText } from '../data/contacts.js'
 
 export default function ResultView({
@@ -45,6 +45,7 @@ export default function ResultView({
   const speakText = [
     verdictDescription(result.level, type),
     ...explanation.slice(0, 3),
+    ...(result.signals_final?.includes('SIG_SHORT_URL') ? [SHORT_URL_TEXT] : []),
     LIMIT_NOTICE, // 화면과 같은 project.md 문장(2026-11-11 결정 B)
   ].join(' ')
 
@@ -64,6 +65,10 @@ export default function ResultView({
             explanation.slice(0, 3).map((s) => (
               <p key={s} className="screen-body">{s}</p>
             ))
+          )}
+          {/* D48 ②: 단축 링크는 펼치지 않아 어디로 가는지 모른다 */}
+          {result.signals_final?.includes('SIG_SHORT_URL') && (
+            <p className="screen-body">{SHORT_URL_TEXT}</p>
           )}
         </section>
       )}

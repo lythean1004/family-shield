@@ -10,7 +10,8 @@ export const SIG_MALICIOUS_URL      = "SIG_MALICIOUS_URL";    // KISA 피싱 목
 export const SIG_SB_UNSAFE_URL      = "SIG_SB_UNSAFE_URL";    // Google Safe Browsing 의심 목록(Google 출처 표시 필요)
 export const SIG_LOOKALIKE_DOMAIN   = "SIG_LOOKALIKE_DOMAIN"; // 공식 주소를 흉내 낸 링크(D40 ②)
 export const SIG_NEW_DOMAIN         = "SIG_NEW_DOMAIN";       // 만든 지 30일 안 된 링크 도메인(D41)
-export const SIG_OFFICIAL_LINK      = "SIG_OFFICIAL_LINK";    // 링크가 모두 근거 카드의 공식 주소(멘토링 2026-11-26). 위험 신호가 아니라 R7 예외용
+export const SIG_OFFICIAL_LINK      = "SIG_OFFICIAL_LINK";    // 링크가 모두 근거 카드의 공식 주소(멘토링 2026-11-26). 위험 신호가 아니라 R7·R6 링크 예외용
+export const SIG_DECEPTIVE_URL      = "SIG_DECEPTIVE_URL";    // 주소 앞부분을 공식 주소처럼 꾸민 링크(https://공식@가짜, D48)
 
 // 코드 + AI 공용
 export const SIG_APP_INSTALL        = "SIG_APP_INSTALL";
@@ -35,6 +36,7 @@ export const SIG_AVOID_VOICE        = "SIG_AVOID_VOICE";
 /** 코드만 만드는 신호. AI 출력에서는 걸러지므로 저장된 signals_final 안에 있으면 코드가 만든 것이다 */
 export const CODE_ONLY_SIGNALS = new Set([
   SIG_LINK, SIG_SHORT_URL, SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN, SIG_OFFICIAL_LINK,
+  SIG_DECEPTIVE_URL,
 ]);
 
 /** signals_code가 없는 저장 기록(영수증)에서 코드 전용 신호만 되살린다. 공용 신호(재촉 등)는 출처를 알 수 없어 넣지 않는다 */

@@ -27,6 +27,7 @@ const SIGNAL_PHRASE = {
   // Google 경고는 단정 표현 금지(Safe Browsing 이용 규칙), 출처 표시는 화면·카카오에서 따로 붙인다
   SIG_SB_UNSAFE_URL:        "Google이 위험할 수 있다고 표시한 링크",
   SIG_LOOKALIKE_DOMAIN:     "공식 주소를 흉내 낸 링크",
+  SIG_DECEPTIVE_URL:        "공식 주소처럼 꾸민 가짜 링크",
   SIG_NEW_DOMAIN:           "만든 지 얼마 안 된 링크 주소",
   // SIG_FAMILY_IMPERSONATION은 relation과 함께 동적으로 처리
 };

@@ -68,9 +68,9 @@ describe("판정: 공식 주소 링크만 있으면 '확인 필요'", () => {
   it("모르는 주소만 있으면 지금처럼 주의", () => {
     assert.equal(level("확인 https://evil.invalid/a"), "주의");
   });
-  it("기관 사칭 + 공식 주소 링크는 R6(위험) 그대로", () => {
+  it("기관 사칭 + 공식 주소 링크만으로는 R6를 켜지 않는다(D48, 전에는 위험)", () => {
     const s = [SIG_LINK, SIG_OFFICIAL_LINK, "SIG_AGENCY_IMPERSONATION"];
-    assert.equal(decide({ signals_final: s, signals_code: s }).level, "위험");
+    assert.equal(decide({ signals_final: s, signals_code: s }).level, "확인필요");
   });
   it("전화 받은 뒤 공식 주소 링크도 R2(위험) 그대로", () => {
     const s = [SIG_LINK, SIG_OFFICIAL_LINK];

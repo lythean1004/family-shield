@@ -8,7 +8,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { buildKeys, hostKey, registrableDomain } from "../../packages/core/src/phishing-list.js";
+import { buildKeys, hostKey, registrableDomain, normalizeHost } from "../../packages/core/src/phishing-list.js";
+import { toDomain, isShortener } from "../../packages/core/src/links.js";
+import { shortUrlKey } from "../../packages/core/src/short-urls.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
@@ -69,5 +71,29 @@ writeFileSync(join(here, "kisa-shorteners.txt"), [
   ...services.map((x) => hostKey(x.host)).sort(),
 ].join("\n") + "\n");
 writeFileSync(join(root, "data", "kisa", "services.json"), JSON.stringify(services, null, 1));
+
+// 단축 주소 전체 대조(D48 ①): 단축 서비스(알려진 22곳 + 위에서 서비스로 본 곳)의 주소를 서비스+경로 그대로 키로.
+// 경로 없는 서비스 첫 화면은 키를 만들지 않는다. 문자 속 같은 단축 주소만 맞는다
+const serviceHosts = new Set(services.map((x) => x.host));
+const shortKeys = new Set();
+let shortRows = 0;
+for (const u of urls) {
+  const host = normalizeHost(toDomain(String(u ?? "").trim()));
+  if (!host || !(isShortener(host) || serviceHosts.has(host))) continue;
+  shortRows++;
+  // 코드가 1~2글자인 주소(“/a”)는 잘린 항목이거나 흔한 별칭일 수 있어 뺀다(2026-11-26, 83개)
+  const path = String(u).trim().replace(/^(?:https?|ftp):\/\//i, "").replace(/^[^/?#]*/, "").split(/[?#]/)[0].replace(/\/+$/, "");
+  if (path.length < 4) continue;
+  const k = shortUrlKey(String(u).trim());
+  if (k) shortKeys.add(k);
+}
+writeFileSync(join(here, "kisa-short-urls.txt"), [
+  "# 가족방패 KISA 목록의 단축 주소(서비스+경로) 키 (D48 ①). 일치하면 KISA 목록 일치(R10)",
+  "# 원본 URL은 저장하지 않고 정규화한 ‘호스트+경로’의 SHA-256 앞 16자리만 둔다. 단축 주소는 펼치지 않는다(D11)",
+  `# 탐지 기간: ${first} ~ ${last}, 만든 날: ${new Date().toISOString().slice(0, 10)}`,
+  `# 단축 서비스 행 ${shortRows}, 키 ${shortKeys.size}개`,
+  ...[...shortKeys].sort(),
+].join("\n") + "\n");
+console.log(`단축 주소 키 ${shortKeys.size}개 (단축 서비스 행 ${shortRows}) → content/phishing/kisa-short-urls.txt`);
 console.log(header.join("\n"));
 console.log(`서비스로 본 도메인 ${services.length}개 → data/kisa/services.json`);
