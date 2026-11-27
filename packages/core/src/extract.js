@@ -343,7 +343,7 @@ function extractRawCodeSignals(text, options) {
   if (options.inputComplete !== false) addReportedContactRestrictions(input, signals);
   addReportedProtectedRequests(input, signals, unverifiedLink, inspection, options);
   for (const signal of reportedRequestSignals(input, options)) signals.add(signal);
-  if (reportsReceivedInstallation(input)) signals.add(SIG_APP_INSTALL);
+  if (reportsReceivedInstallation(input, options)) signals.add(SIG_APP_INSTALL);
   addReportedFamilySignals(input, signals);
   addFamilyRequestContextSignals(input, signals, { numberMismatch });
   const directRequest = directFamilyRequest(input);
