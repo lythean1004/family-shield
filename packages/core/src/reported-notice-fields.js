@@ -36,6 +36,11 @@ const PUBLIC_AUTHORITY = /(?:공공[가-힣\s]{0,14}기관|행정(?:\s*기관)?|
 const MUNICIPAL_REPLY = /(?:^|[\s,])(?<sender>(?:시|군|구|도)청|관청|관공서)(?:의|에서\s*온)?\s*민원\s*(?:답신|회신|답장)(?:이라고|이라는|라고|으로)\s*(?:표시|적혀|떠|나와|안내|내용|문서|글)/;
 const NOTICE_LINK_FIELD = /(?:배정(?:\s*확인)?|접수|등록|신청|이의\s*제기)(?:\s*(?:업무|확인|절차))?(?:에|을\s*위해|하려면)\s*(?:쓰라(?:는|고\s*적은)|이용하라(?:는|고\s*적은)|사용하라(?:는|고\s*적은)|사용해야\s*할|이용해야\s*할)\s*(?:안내\s*)?(?:링크(?:\s*표시)?|(?:페이지\s*)?주소)(?:는|가|이|[:：])\s*(?<token>\S+)/g;
 const ORDINARY_LOOKUP = /(?:도서관|도서\s*대출|열람실|병원|진료|검진|접종|의료|공연\s*좌석|관람|전시)/;
+const schoolOffice = /^[\p{L}\p{N}· -]{0,24}학교\s*(?:행정실|회계실)(?:입니다|이에요|이라고\s*표시)/u;
+const outstandingFee = /(?:학비|급식비|교재비|교육비|수강료|등록금|공과금|보험료|세금)(?:가|이)?\s*(?:미납|체납|연체)/u;
+const paymentAddress = /(?:납부|결제)\s*(?:(?:요청|전용)\s*)?(?:(?:주소|링크)(?:는|가|[:：])?|바랍니다)\s+(?<token>\S+)/gu;
+const feeContinuation = /^(?:(?:(?:금일|오늘|당일|기한)(?:\s*(?:중|내|까지))?|(?:미납액|미납금|해당\s*(?:금액|요금))(?:을|은)?)\s*){0,2}(?:납부|결제)/u;
+const instructionalExample = /(?:예시|예문).{0,24}(?:수업|교육|교재)|(?:교재|수업|교육).{0,24}(?:예시|예문)/u;
 const MUNICIPAL_PRIVATE_FIELD = /(?<owner>(?:제|저의|민원인의|수신자의)\s+)?(?:신상\s*(?:자료|정보)|신분증(?:\s*(?:사진|사본))?|가족관계\s*증명서|주민\s*등록\s*번호)(?:은|는|을|를)?\s*(?:이|같은|해당|현재)\s*(?:대화|채팅|문자|메시지)(?:로|으로|에)\s*(?:(?<direction>받아|보내|넣어|올려)야|(?:제출|첨부|전송)해야)\s*(?:민원\s*)?(?:접수|처리)(?:가|를)?\s*(?:끝|마무리|마치|완료|진행)/;
 
 const MUNICIPAL_ANONYMOUS_FILE = /(?:비식별(?:화)?|가명\s*처리|익명\s*처리|(?:개인정보|신상\s*(?:자료|정보))(?:를|가)?\s*(?:제거|삭제|가림)|(?:개인정보|신상\s*정보)(?:가)?\s*없는)/;
@@ -67,9 +72,9 @@ function noticeSender(clause, previous) {
   return "";
 }
 
-function hasDesignatedNoticeLink(clause, domainContext, unverifiedLinks) {
-  if (unverifiedLinks.size === 0 || ORDINARY_LOOKUP.test(domainContext)) return false;
-  return [...clause.matchAll(NOTICE_LINK_FIELD)].some(field => {
+function hasDesignatedLink(clause, fieldPattern, unverifiedLinks) {
+  if (unverifiedLinks.size === 0) return false;
+  return [...clause.matchAll(fieldPattern)].some(field => {
     const { candidates, complete } = inspectLinkCandidates(field.groups.token);
     const candidate = candidates[0];
     // 한 필드의 전체 토큰을 다시 확인해 상위 추출에서 얻은 후보와 같은 원문만 인정한다.
@@ -77,6 +82,19 @@ function hasDesignatedNoticeLink(clause, domainContext, unverifiedLinks) {
       ["http:", "https:"].includes(candidate.protocol) &&
       unverifiedLinks.has(candidate.raw) && !isOfficialLink(candidate.raw);
   });
+}
+
+function demandsFeeAtLink(clauses, index, unverifiedLinks) {
+  if (!unverifiedLinks.size) return false;
+  let outstanding = false;
+  for (const [offset, clause] of clauses.slice(index, index + 3).entries()) {
+    if (SUBJECT_CHANGE.test(clause) || startsOtherOrganizer(clause) || NO_REQUEST.test(clause) || EDUCATION.test(clause) ||
+        instructionalExample.test(clause) || (offset && noticeSender(clause, ""))) break;
+    const sameFee = outstandingFee.test(clause);
+    if (sameFee) outstanding = true;
+    if (outstanding && (sameFee || feeContinuation.test(clause)) && hasDesignatedLink(clause, paymentAddress, unverifiedLinks)) return true;
+  }
+  return false;
 }
 
 function privateFields(clause) {
@@ -116,6 +134,10 @@ export function addReportedNoticeFields(text, signals, { unverifiedLinks = [] } 
     const previous = clauses[index - 1] ?? "";
     if (EDUCATION.test(previous) || EDUCATION.test(clause) || SUBJECT_CHANGE.test(clause)) continue;
     const sender = noticeSender(clause, previous);
+    if ((sender || schoolOffice.test(clause)) && demandsFeeAtLink(clauses, index, outside)) {
+      signals.add(SIG_AGENCY_IMPERSONATION);
+      signals.add(SIG_LINK);
+    }
     if (!sender) continue;
     const boundClauses = [clause];
     const next = clauses[index + 1];
@@ -127,7 +149,7 @@ export function addReportedNoticeFields(text, signals, { unverifiedLinks = [] } 
         signals.add(SIG_AGENCY_IMPERSONATION);
         signals.add(signal);
       }
-      if (PUBLIC_AUTHORITY.test(sender) && hasDesignatedNoticeLink(body, clause + " " + body, outside)) {
+      if (PUBLIC_AUTHORITY.test(sender) && !ORDINARY_LOOKUP.test(clause + " " + body) && hasDesignatedLink(body, NOTICE_LINK_FIELD, outside)) {
         signals.add(SIG_AGENCY_IMPERSONATION);
         signals.add(SIG_LINK);
       }

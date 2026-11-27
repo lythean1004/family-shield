@@ -9,6 +9,25 @@ import { SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_LI
 const knownContact = OFFICIAL_DOMAIN_CARDS.find(card => card.status === "source_checked" && card.callback_contact?.numbers.length)
   .callback_contact.numbers[0];
 
+test("납부처로 지목한 주소와 단순 참고 주소를 구분한다", async () => {
+  const external = "https://classroom.invalid/pay";
+  const samples = [
+    [true, "학교 행정실입니다. 방과후 교재비 미납 안내. 납부 요청 주소: " + external],
+    [true, "보낸 곳: 교육 기관\n수강료 미납 고지\n납부 바랍니다 " + external],
+    [true, "체험학교 행정실입니다. 급식비 미납 내역을 알리는 문서. 납부 링크는 " + external],
+    [false, "학교 행정실입니다. 체험 일정을 안내하는 자료입니다. 일정표 주소: " + external],
+    [false, "학교 행정실입니다. 급식비 미납 고지. 창구 방문 납부 바랍니다. 독서회 일정 " + external],
+    [false, "학교 행정실입니다. 교재비 미납 안내. 체육 동호회의 회비 납부 바랍니다 " + external],
+    [false, "학교 행정실입니다. 교재비 미납 예시를 수업에서 읽었어요. 납부 요청 주소: " + external],
+    [false, "학교 행정실입니다. 교재비 정산이 전부 끝났습니다. 행사 자료 " + external],
+    [false, "보낸 곳: 교육 기관\n수강료가 미납되었다는 안내\n납부 요청 주소: https://www.gov.kr/ · 축제 사진 " + external],
+  ];
+  for (const [danger, text] of samples) {
+    const result = await analyze({ text });
+    assert.equal(result.fired_rules.includes("R6"), danger, text);
+  }
+});
+
 const riskCases = [
   ["binds adjacent form fields without a narrator", SIG_APP_INSTALL,
     "발행처: 장학 기관\n열람 전 필수 조건: 외부 프로그램 설치"],
