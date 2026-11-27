@@ -42,7 +42,24 @@ function currentlyReported(text) {
   return REPORTED.test(text) && !UP_TO_USER.test(text) && !CLOSED_REQUEST.test(text);
 }
 
+const recipientOffersPayment = new RegExp(
+  "(?<![\\p{L}\\p{N}])(?:제가|내가|수신자(?:가|는))\\s*(?:(?:먼저|스스로|자발적으로)\\s*)?" + MONEY_OBJECT.source +
+  "(?:을|를)?\\s*(?:(?:납부|입금|송금|이체|지불)(?:를|을)?|(?:내겠|보내겠|입금하겠|납부하겠)다고)" +
+  "\\s*(?:먼저\\s*)?(?:제안|제의)했", "u");
+const sellerDisclaimsAdvancePayment = new RegExp(
+  "^(?:판매자|매도인|거래\\s*상대|상대(?:방)?)(?:은|는|이|가)\\s*(?:아직(?:은)?\\s*)?" +
+  "(?:(?:물건|매물|물품|상품|실물|거래\\s*조건)(?:의\\s*상태)?(?:을|를)?\\s*)?(?:확인|검토)(?:하기)?\\s*전(?:에|에는)?\\s*" +
+  "(?:받을|걷을|청구할)\\s*" + MONEY_OBJECT.source + "(?:은|는|이|가)?\\s*(?:따로\\s*)?없(?:다고|다는)\\s*" +
+  "(?:답했|말했|설명했|밝혔|알렸|했)(?:다|습니다|어요|음)[.!?。]?\\s*$", "u");
+
+function containsDeclinedRecipientOffer(text) {
+  const [offer, reply, extra] = text.trim().split(SENTENCES);
+  return Boolean(reply && !extra && recipientOffersPayment.test(offer) && sellerDisclaimsAdvancePayment.test(reply));
+}
+
 function paymentBeforeOutcome(text) {
+  // 두 절을 이어 볼 때 수신자의 자발적 제안과 발신자의 명시적 선납 부인은 지급 요구로 결합하지 않는다.
+  if (containsDeclinedRecipientOffer(text)) return false;
   if (!currentlyReported(text) || NO_PAYMENT.test(text) || CONFIRMATION_FIRST.test(text) || !(MONEY_OBJECT.test(text) || /(?:입금|송금|납부|이체|지불)(?:하(?:고|면|여야)|한\s*(?:뒤|후)|해야|부터|이후)/u.test(text))) return false;
   for (const action of text.matchAll(PAY_STEM)) {
     const before = text.slice(Math.max(0, action.index - 64), action.index);
