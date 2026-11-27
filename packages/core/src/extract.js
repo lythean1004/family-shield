@@ -33,7 +33,7 @@ import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.j
 import { addReportedProtectedRequests, hasCredentialDisclosure, hasDocumentBundle } from "./protected-requests.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover, hasLoanCashPickup } from "./cash-handover.js";
 import { ACCOUNT_NUMBER, hasAmountObjectAsk, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
-import { reportedRequestSignals } from "./reported-requests.js";
+import { acceptsDirectInstallation, reportedRequestSignals } from "./reported-requests.js";
 import { addReportedContactRestrictions } from "./reported-contact-restrictions.js";
 import { addReportedFamilySignals } from "./reported-family.js";
 import { addFamilyRequestContextSignals } from "./family-request-context.js";
@@ -296,8 +296,9 @@ function extractRawCodeSignals(text, options) {
   // 요구 키워드
   for (const [signal, patterns] of Object.entries(PATTERNS)) {
     if (signal === SIG_CALL_THIS_NUMBER) continue;
+    const accepts = signal === SIG_APP_INSTALL ? acceptsDirectInstallation : undefined;
     const found = signal === SIG_PERSONAL_INFO || signal === SIG_APP_INSTALL
-      ? hasSensitiveRequest(input, patterns) : patterns.some(re => re.test(input));
+      ? hasSensitiveRequest(input, patterns, accepts) : patterns.some(re => re.test(input));
     if (found) signals.add(signal);
   }
 
@@ -357,7 +358,7 @@ function extractRawCodeSignals(text, options) {
   addInstitutionRequestContext(input, signals);
   addInstitutionReportFrames(input, signals, {
     unverifiedLinks,
-    installFromDirectPatterns: clause => hasSensitiveRequest(clause, PATTERNS[SIG_APP_INSTALL]),
+    installFromDirectPatterns: clause => hasSensitiveRequest(clause, PATTERNS[SIG_APP_INSTALL], acceptsDirectInstallation),
   });
   return {
     signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }),

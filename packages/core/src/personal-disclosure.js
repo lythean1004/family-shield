@@ -23,11 +23,11 @@ const CODE_ON_ARRIVAL = new RegExp(code + "(?:가|는|를)?\\s*(?:하나\\s*)?(?
 const NEGATED = /^\s*(?:서\s*)?(?:(?:보내|전달|전송|제출|알려)\s*)?(?:해\s*)?(?:주|하)?지\s*(?:마|말|않)/;
 const CITED = /^\s*(?:해\s*)?(?:줘|주세요|하십시오|하세요|바랍니다|부탁)?[.!?\s]*[’”"'」]\s*(?:라는|라고|같은|처럼)/;
 
-export function hasSensitiveRequest(text, patterns) {
+export function hasSensitiveRequest(text, patterns, accepts) {
   return patterns.some(pattern => {
     for (const match of text.matchAll(new RegExp(pattern.source, pattern.flags + "g"))) {
       const tail = text.slice(match.index + match[0].length, match.index + match[0].length + 42);
-      if (!NEGATED.test(tail) && !CITED.test(tail)) return true;
+      if (!NEGATED.test(tail) && !CITED.test(tail) && (!accepts || accepts(text, match))) return true;
     }
     return false;
   });

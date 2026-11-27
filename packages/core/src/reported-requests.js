@@ -43,6 +43,29 @@ const receivingPerson = /^(?:나|저|제|내|수신자|신고인|신고자)$/u;
 const closedInstall = /(?:그|이|해당|당시)?\s*(?:설치\s*)?(?:요구|요청|지시)(?:가|이|는|은|을|를)?\s*(?:(?:이미|그날|곧바로|결국)\s*)?(?:철회|거절|취소|종결)/u;
 const quotedOrPastInstall = /(?:가상|허구|가정한|연극|예문|연습용|대본|역할극)|(?:예전에|지난달에|작년에)|(?:받았다는|받았다고\s*(?:가정|상상|전해\s*들))/u;
 
+const requestSentenceEnd = /(?<=[.!?。])\s+|[\r\n]+/u;
+const otherInstaller = /(?:(?:다른\s*사람|전산\s*기사|직원|본인|자신)(?:이|가|은|는))\s*(?:(?:자기|제|내)\s*)?(?:(?:업무용|직원용)\s*)?(?:(?:기기|단말기|폰|휴대폰|컴퓨터)에\s*)?(?:(?:새|지정된)\s*)?$/u;
+const internalWorkstation = /(?:팀|부서|직원|상대|발신자|업체)(?:[은는이가]|들은|들이)\s+[^.!?,，\n]{0,75}(?:업무용|직원용|시험)\s*(?:컴퓨터|기기|단말기?)에\s*(?:새\s*)?$/u;
+const addressedInstaller = /(?:에게|한테|더러|보고|제게|내게|제가|내가|수신자(?:가|는)|제\s*(?:폰|휴대폰|기기))/u;
+const receiverAddressedStaff = /(?:제가|내가|저는|나는|수신자(?:가|는))\s*(?:접수\s*)?(?:그\s*)?(?:담당자|발신자|상대)(?:에게|한테)\s*(?:(?:제|내)\s*(?:기기|단말기|폰|휴대폰)에\s*)?$/u;
+const separateStatement = /[,，]|(?:밝혔|알렸|안내했|전했|설명했|요구했|말했|했|하였)(?:고|으며|는데|지만)\s+/u;
+const conditionNotRequired = /(?:다는\s*(?:뜻|조건|요건|내용|말)(?:이|은|는)?\s*(?:아니|없)|(?:있는|되는|하는)\s*것(?:이|은|는)?\s*아니|(?:있는지|하는지|조건인지|요건인지|(?:할|하는)\s*것인지)(?:였|\s*(?:물|묻|질문|문의)))/u;
+const receiverToldStaff = /(?:다고|라고)\s*(?:말했|전했|알렸|설명했|안내했)/u;
+const senderRetracted = /^(?:(?:발신자|상대(?:방)?|보낸\s*사람)(?:가|이|는|은)\s*)?(?:(?:그|해당|이|같은)\s+)?설치\s*(?:요구|요청|조건|지시)(?:가|이|는|은|을|를)?\s*(?:이미\s*)?(?:철회|취소)/u;
+
+// ‘설치해야’도 ‘설치해’와 일치하므로 실제 설치 주체와 그 조건이 확정됐는지 확인한다.
+export function acceptsDirectInstallation(text, match) {
+  const end = match.index + match[0].length;
+  if (!match[0].endsWith("설치해") || text[end] !== "야") return true;
+
+  const before = text.slice(0, match.index).split(requestSentenceEnd).at(-1);
+  const [after, next = ""] = text.slice(end).split(requestSentenceEnd, 2);
+  const condition = after.split(separateStatement, 1)[0];
+  if (otherInstaller.test(before) || internalWorkstation.test(before) && !addressedInstaller.test(before)) return false;
+  if (receiverAddressedStaff.test(before) && receiverToldStaff.test(condition)) return false;
+  return !conditionNotRequired.test(condition) && !senderRetracted.test(next.trimStart());
+}
+
 function receivedSoftwareDirective(clause, following) {
   const order = receivedInstallOrder.exec(clause);
   if (!order || notReceived.test(clause) || quotedOrPastInstall.test(clause)) return false;
