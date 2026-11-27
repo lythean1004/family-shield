@@ -1,7 +1,36 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { extractCodeSignals } from "../src/extract.js";
-import { SIG_FAMILY_IMPERSONATION, SIG_NEW_NUMBER } from "../src/signals.js";
+import { SIG_AVOID_VOICE, SIG_FAMILY_IMPERSONATION, SIG_NEW_NUMBER } from "../src/signals.js";
+
+describe("빌린 휴대폰으로 직접 연락했고 그 기기로 통화하기 어렵다는 설명", () => {
+  for (const text of [
+    "누나, 나 친구 휴대폰을 빌려서 문자 보내요. 전화는 빌린 폰이라 받을 수가 없어요.",
+    "어머니, 제가 동료 폰 빌려서 연락드려요. 통화는 동료 거라 못 받아요.",
+    "형, 내다. 지인 폰 빌려 문자 보낸다. 전화는 남의 폰이라 몬 받는다.",
+  ]) it(text, () => {
+    const { signals } = extractCodeSignals(text);
+    assert.ok(signals.includes(SIG_FAMILY_IMPERSONATION) && signals.includes(SIG_AVOID_VOICE));
+  });
+  for (const text of [
+    "누나, 나 친구 휴대폰을 빌려서 문자 보내요. 이따가 다시 통화해.",
+    "형, 내가 친구 폰 빌려서 문자 보낸다. 어제는 전화가 친구 거라 못 받았어.",
+    "엄마, 나 동료 폰 빌려서 연락드려요. 동료는 전화가 빌린 폰이라 못 받아요.",
+    "형, 나 친구 폰으로 사진 봤어. 전화는 남의 폰이라 못 받아.",
+    "어머니, 제가 지인 폰 빌려서 연락드려요. ‘전화는 친구 거라 못 받아’라는 문구가 있네요.",
+    "누나, 나 친구 휴대폰을 빌려서 문자 보내요. 전화는 빌린 폰이라 받을 수가 없어요?",
+  ]) it(text, () => {
+    const { signals } = extractCodeSignals(text);
+    assert.ok(!(signals.includes(SIG_FAMILY_IMPERSONATION) && signals.includes(SIG_AVOID_VOICE)));
+  });
+  it("첫머리 길이 제한에서 끊긴 질문을 통화 거절로 판정하지 않는다", () => {
+    const question = "전화는 친구 거라 못 받아요";
+    const introduction = "나 친구 폰 빌려 문자 보낸다.";
+    const opening = introduction.padEnd(100 - question.length, " ") + question;
+    const { signals } = extractCodeSignals("누나, " + opening + "?");
+    assert.ok(!signals.includes(SIG_AVOID_VOICE));
+  });
+});
 
 describe("발신자가 지금 쓰는 번호를 설명하는 말", () => {
   for (const text of [

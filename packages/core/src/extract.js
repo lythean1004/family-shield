@@ -71,6 +71,8 @@ const SAVE_CONTACT = /이\s*번호(?:를|로)?\s*저장(?:해|하세)/;
 const OWN_DEVICE_EVENT = /(?:휴대폰|핸드폰|폰)(?:이|가|을)?\s*(?:떨어뜨려|떨어트려|잃어버려|물에\s*빠[져졌지]|배터리(?:가)?\s*(?:나가|방전))|새\s*(?:휴대폰|핸드폰|폰)\s*개통\s*(?:전이라|중이|하는데)/;
 const ACTIVATING_ELSEWHERE = /새\s*(?:휴대폰|핸드폰|폰)\s*개통\s*(?:전이라|중이라)[^.!?\n]{0,16}이\s*번호로\s*(?:문자|보내)(?!\s*(?:주|줘|달))/;
 const CONFIRMS_CALL = /^(?:방금|아까|조금\s*전(?:에)?)\s*(?:전화|통화)(?:드린|한)\s*(?:사람|거|건|게)?\s*(?:나|저)(?:야|예요|\s*맞(?:아|습니다))/;
+const SENDING_FROM_LOANED_PHONE = /(?:친구|동료|지인|동생)\s*(?:휴대폰|핸드폰|폰)(?:을)?\s*빌(?:려(?:서)?|리가)\s*(?:(?:문자|메시지)(?:를)?\s*)?(?:보낸다|보내요|보냅니다|연락(?:드려요|해요))(?=[\s,.!~]|$)/;
+const LOANED_PHONE_NO_CALL = /^(?:지금(?:은)?\s*)?(?:전화|통화)(?:는|가|를|도)?\s*(?:빌린|남의|친구|동료|지인)\s*(?:휴대폰|핸드폰|폰|거|꺼)(?:이?라(?:서)?|여서)\s*(?:(?:못|몬)\s*받(?:는다|아요?|습니다)|받을\s*수(?:가)?\s*없(?:어요?|습니다))[\s.!~]*$/;
 
 function senderStatement(opening) {
   if (!OWN_OPENING.test(opening)) return "";
@@ -85,13 +87,22 @@ function addFamilySignals(input, signals) {
   if (!greeting) return;
   const opening = input.slice(greeting[0].length, greeting[0].length + 100);
   const statement = senderStatement(opening);
+  // 발신자가 다른 사람의 기기를 빌려 연락했다는 설명과, 그 기기로는 통화하지 못한다는 자기 진술이 모두 있어야 한다.
+  const openingClauses = opening.match(/[^.!?\n]+[.!?]?/g) ?? [];
+  const cutMidClause = input.length > greeting[0].length + opening.length && !/[.!?\n]$/.test(opening);
+  const completeClauses = cutMidClause ? openingClauses.slice(0, -1) : openingClauses;
+  if (SENDING_FROM_LOANED_PHONE.test(statement) &&
+      completeClauses.some(clause => LOANED_PHONE_NO_CALL.test(clause.trim()))) {
+    signals.add(SIG_FAMILY_IMPERSONATION);
+    signals.add(SIG_AVOID_VOICE);
+  }
   if (!/번호(?:는|가)?\s*(?:그대로|같아)/.test(opening) &&
       (NEW_CONTACT.test(statement) || USING_BORROWED.test(statement) || ACTIVATING_ELSEWHERE.test(statement) ||
        (REPLACED_DEVICE.test(statement) && SAVE_CONTACT.test(statement)))) {
     signals.add(SIG_FAMILY_IMPERSONATION);
     signals.add(SIG_NEW_NUMBER);
   }
-  const clauses = (opening.match(/[^.!?\n]+[.!?]?/g) ?? []).slice(0, 2);
+  const clauses = openingClauses.slice(0, 2);
   const first = clauses[0]?.trim() ?? "";
   if (OWN_DEVICE_EVENT.test(statement) || (CONFIRMS_CALL.test(first) &&
       !REPORTED_SPEECH.test(first) && !/라고\s*(?:적힌|쓰인)/.test(first))) signals.add(SIG_FAMILY_IMPERSONATION);
