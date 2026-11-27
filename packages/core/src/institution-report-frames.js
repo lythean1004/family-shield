@@ -50,23 +50,94 @@ function* narrativeFrames(text, unverifiedLinks) {
 const recordedNotice = /(?:수신|받은|받았)|(?:문자|안내|알림|통지|수신함)\s*[^.!?\n]{0,18}(?:항목|분류|미리보기|요약|기록)/u;
 const issuerField = /^(?:(?:발신(?:자|처)?(?:가\s*(?:주장|내세운|밝힌)(?:한)?\s*(?:소속|역할|기관))?|발행처|보낸\s*(?:곳|이|사람))(?:\s*(?:표기|표시|소개|주장))?)(?:\s*[|:：]\s*|[ \t]+)(?<value>\S.*)$/u;
 const relevantField = /^(?<label>받은\s*(?:요청|요구)|(?:요청|요구)\s*(?:항목|사항|내용)|해야\s*할\s*일|(?:처리\s*)?목적|용도|(?:대출\s*)?상환\s*(?:수단|방식|방법)|(?:수거|회수|납부)\s*(?:방식|방법))(?:\s*[|:：]\s*|[ \t]+)(?<value>\S.*)$/u;
-function* structuredFrames(text) {
-  const lines = receivedFieldLines(text);
-  for (const [index, line] of lines.entries()) {
-    const heading = lines[index - 1] ?? "";
+const requestStatusField = /^(?:요청|요구|지시)\s*(?:(?:최종|처리)\s*)?상태(?:\s*[:：|]\s*|[ \t]{2,}|\t|\u3000+)(?<value>\S.*)$/u;
+const finalCancelledRequest = /^(?:(?:그|해당|같은)\s*(?:요청|요구|지시)(?:은|는|이|가|을|를)?\s*)?(?:최종\s*)?(?:취소|철회)(?:\s*(?:완료|확정|됨|됐(?:음|다|습니다)|되었(?:음|다|습니다)|했(?:음|다|습니다)|하였(?:음|다|습니다)))?\s*[.!。]?$/u;
+const nominalCashRequest = /^대면\s*(?:현금|현찰)\s*(?:인계|전달|교부)\s*(?:요구|요청|지시)\s*[.!。]?$/u;
+const requestLabel = /^(?:받은\s*(?:요청|요구)|(?:요청|요구)\s*(?:항목|사항|내용)|해야\s*할\s*일)$/u;
+const recordDateField = /^(?:기록|작성)\s*(?:일자|날짜)\s*[:：]\s*\d{4}[-.]\d{1,2}[-.]\d{1,2}\.?$/u;
+
+function hasSingleCashRequest(value) {
+  const demand = receivedCashDemand.exec(value);
+  return demand ? /^(?:내용|요구|요청|지시|기록)?\s*[.!。]?$/u.test(value.slice(demand[0].length).trim()) :
+    nominalCashRequest.test(value);
+}
+
+function finalCashRequestClosed(rows) {
+  const body = rows.at(-1) === "" ? rows.slice(2, -1) : rows.slice(2);
+  const [request, ...statusRows] = body;
+  const field = relevantField.exec(request ?? "")?.groups;
+  if (!field || !requestLabel.test(field.label) || !hasSingleCashRequest(field.value) || !statusRows.length) return false;
+  const statuses = statusRows.filter(row => !recordDateField.test(row)).map(row => requestStatusField.exec(row)?.groups.value);
+  return statuses.length > 0 && statuses.every(Boolean) && finalCancelledRequest.test(statuses.at(-1));
+}
+
+const sameRequestSubject = /^(?:(?:최종\s*)?(?:재확인(?:\s*(?:결과|에서))?|정정(?:\s*기록에서)?)\s*[:：,，]?\s*)?(?:그|해당|같은|앞(?:의|선))\s*(?:(?<cash>현금\s*인계)\s*)?(?:요청|요구)(?:은|는|이|가|을|를)?\s*/u;
+const activeRequestStatus = /^(?:(?:현재(?:도)?|여전히|다시)\s*)?(?:유효(?:함|하다|합니다|하다고\s*확인함)?|유지(?:됨|한다|합니다|한다고\s*확인함)?|재개(?:됨|됐다|됐습니다|\s*확정)?)\s*[.!。]?$/u;
+
+function latestActiveRequest(rows) {
+  const last = rows.findLast(row => requestStatusField.test(row) || sameRequestSubject.test(row));
+  if (!last) return null;
+  const value = requestStatusField.exec(last)?.groups.value ?? last;
+  const subject = sameRequestSubject.exec(value);
+  if (!activeRequestStatus.test(value.slice(subject?.[0].length ?? 0))) return null;
+  return { sameRequest: Boolean(subject), cashHandover: Boolean(subject?.groups.cash) };
+}
+
+function followingRequestStatus(next, issuer) {
+  if (!next || next.some(row => requestLabel.test(relevantField.exec(row)?.groups.label ?? ""))) return null;
+  const otherIssuer = issuerField.exec(next[1] ?? "")?.groups.value;
+  if (otherIssuer) {
+    // 발신처가 다시 적힌 문단은 별도 기록이다. 상태 행에서 앞선 현금 요구를 직접 가리켜야 한다.
+    if (otherIssuer !== issuer || !/정정|재확인/u.test(next[0])) return null;
+    const fields = next.slice(2);
+    const status = latestActiveRequest(fields);
+    if (status?.cashHandover) return "reopened";
+    // 무엇을 정정했는지 적지 않은 후속 상태만 있으면 새로 취소를 확정할 수 없다.
+    if (status && fields.every(row => requestStatusField.test(row) || recordDateField.test(row))) return "unclear";
+    return null;
+  }
+  return latestActiveRequest(next)?.sameRequest ? "reopened" : null;
+}
+
+function structuredRecordBlocks(text) {
+  const blocks = text.split(/\r?\n[ \t]*\r?\n/u).map(body => ({ body, rows: receivedFieldLines(body) }))
+    .filter(block => block.rows.length);
+  return blocks.map((block, index) => {
+    const [heading, issuer, ...fields] = block.rows;
+    const sender = issuerField.exec(issuer ?? "")?.groups.value;
+    const requests = fields.map(row => relevantField.exec(row)?.groups).filter(field => field && requestLabel.test(field.label));
+    const singleCashRequest = requests.length === 1 && hasSingleCashRequest(requests[0].value);
+    const following = singleCashRequest ? followingRequestStatus(blocks[index + 1]?.rows, sender) : null;
+    const reopened = singleCashRequest && Boolean(latestActiveRequest(fields) || following === "reopened");
+    const cashClosed = !reopened && !following && recordedNotice.test(heading) && Boolean(sender) && finalCashRequestClosed(block.rows);
+    return { ...block, reopened, cashClosed };
+  });
+}
+
+function* structuredFrames(blocks) {
+  const lines = blocks.flatMap(block => block.rows.map(line => ({ line, block })));
+  for (const [index, { line, block }] of lines.entries()) {
+    const heading = lines[index - 1]?.line ?? "";
     if (!recordedNotice.test(heading) || notCurrent.test(heading)) continue;
     const sender = issuerField.exec(line)?.groups.value;
     const issuer = sender && issuerLabel.exec(sender)?.groups.role;
     if (!issuer) continue;
     const fields = [];
-    for (const row of lines.slice(index + 1, index + 5)) {
+    const rows = lines.slice(index + 1, index + 5);
+    for (const { line: row } of rows) {
       const field = relevantField.exec(row);
       if (!field || notCurrent.test(row) || anotherTopic.test(row)) break;
       fields.push(field.groups);
     }
-    const latestStatus = lines[index + 1 + fields.length] ?? "";
-    if (fields.length && !closedRemainder.test(latestStatus.replace(dispositionField, ""))) {
-      yield { issuer, sender, heading, fields };
+    if (!fields.length) continue;
+    const status = lines[index + 1 + fields.length];
+    const legacyClosed = closedRemainder.test((status?.line ?? "").replace(dispositionField, ""));
+    const sameRecord = lines[index - 1]?.block === block && rows.slice(0, fields.length).every(row => row.block === block);
+    // 다른 문단의 상태나 이후의 명시적 재확인 때문에 R15만 다시 판단할 수 있다.
+    const cashOnly = legacyClosed && sameRecord && investigator.test(issuer) &&
+      (status?.block !== block || block.reopened);
+    if (!legacyClosed || cashOnly) {
+      yield { issuer, sender, heading, fields, cashOnly, cashClosed: sameRecord && block.cashClosed };
     }
   }
 }
@@ -510,10 +581,9 @@ const cashRecordHeading = /(?:받은|수신|발췌|문자\s*일부|문자\s*상�
 const cashRecordRow = /^(?<key>[가-힣 ]{1,34}?)(?:\s*[|:：]\s*|[ \t]{2,}|\u3000+)(?<value>\S.*)$/u;
 const cashRecordAction = /(?:수단|방식|방법|요구|요청|인계|수거|받는|받으러|받기로|수취|상환|준비|항목|용도)/u;
 
-function* cashRecordFacts(text) {
-  for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
+function* cashRecordFacts(blocks) {
+  for (const { body: record, rows: fieldLines, cashClosed } of blocks) {
     if (!openDirectedReport(record) || !roleBelongsToReportedSource(record)) continue;
-    const fieldLines = receivedFieldLines(record);
     const [heading, ...lines] = fieldLines.length === 1 ? fieldLines[0].split(summarySplit).map(line => line.trim()) : fieldLines;
     if (!cashRecordHeading.test(heading ?? "") || lines.length < 2 || lines.length > 5) continue;
     const sources = [heading, ...lines].map(line => {
@@ -529,11 +599,11 @@ function* cashRecordFacts(text) {
     const actionRows = fields.map(field => field.value);
     const proceduralLine = lines.find(line => !cashRecordRow.test(line) && /(?:직접\s*)?(?:건네|넘기|인계하|전달하)는\s*방식(?:으로)?\s*(?:적|기록|표시)/u.test(line));
     if (proceduralLine) actionRows.push(proceduralLine);
-    yield { source: source.name, heading, fields, action: actionRows.join(" ") };
+    yield { source: source.name, heading, fields, action: actionRows.join(" "), cashClosed };
   }
 }
 
-export function* cashEventSignals(text) {
+export function* cashEventSignals(text, blocks = structuredRecordBlocks(text)) {
   for (const { role, unit, action, source, speakerHere, previous, next } of currentCashReports(text, couldDescribeCashTransaction, alternateCashSource)) {
     if (!openDirectedReport(action) || hasClosedCashPickupPlan(next)) continue;
     const branchPickup = speakerHere ? pendingBranchPickup(action, source, previous, next) : "";
@@ -546,18 +616,18 @@ export function* cashEventSignals(text) {
     if (evidence === "investigative_handover") yield SIG_CASH_HANDOVER;
     if (evidence === "staff_loan_pickup") yield SIG_LOAN_CASH_PICKUP;
   }
-  const records = [...structuredFrames(text)].map(({issuer, sender, heading, fields}) => ({
-    source: issuer, sender, heading, fields: fields.map(({label, value}) => ({key: label, value})),
+  const records = [...structuredFrames(blocks)].map(({ issuer, sender, heading, fields, cashOnly, cashClosed }) => ({
+    source: issuer, sender, heading, cashOnly, cashClosed, fields: fields.map(({label, value}) => ({key: label, value})),
     action: fields.map(field => field.value).join(" "),
   }));
-  for (const { source, sender = source, heading, fields, action } of [...records, ...cashRecordFacts(text)]) {
+  for (const { source, sender = source, heading, fields, action, cashOnly, cashClosed } of [...records, ...cashRecordFacts(blocks)]) {
     const structuredLoan = /(?:대출|융자|상환)/u.test(heading) ||
       fields.some(field => /상환/.test(field.key) || attributedLoan.test(field.value));
     const structuredReceiver = fields.some(field =>
       /받으러|수취인|수령인/.test(field.key) && /직원|담당자|경찰|수사관|수거인/u.test(field.value));
     const evidence = cashEventEvidence(action, {
-      investigative: investigator.test(source),
-      financialStaff: /(?:금융\s*(?:회사|기관|사)|은행)$/u.test(source) && (structuredLoan || /직원|담당/u.test(sender)),
+      investigative: !cashClosed && investigator.test(source),
+      financialStaff: !cashOnly && /(?:금융\s*(?:회사|기관|사)|은행)$/u.test(source) && (structuredLoan || /직원|담당/u.test(sender)),
       loanFromSource: loanRoleContext.test(sender),
       sourceInClause: false,
       structuredLoan,
@@ -1026,11 +1096,12 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     else signals.add(signal);
   }
   for (const signal of reportedCashTransfers(text)) signals.add(signal);
-  for (const signal of cashEventSignals(text)) signals.add(signal);
+  const blocks = structuredRecordBlocks(text);
+  for (const signal of cashEventSignals(text, blocks)) signals.add(signal);
   if (hasStructuredInstallation(text)) addAgencyAction(SIG_APP_INSTALL);
-  for (const { issuer, sender, heading, fields } of structuredFrames(text)) {
-    if (financialIssuer.test(issuer) && reportsLoanCollection(fields, sender, heading)) signals.add(SIG_LOAN_CASH_PICKUP);
-    if (investigator.test(issuer) && fields.some(({ label, value }) => /요청|요구/u.test(label) &&
+  for (const { issuer, sender, heading, fields, cashOnly, cashClosed } of structuredFrames(blocks)) {
+    if (!cashOnly && financialIssuer.test(issuer) && reportsLoanCollection(fields, sender, heading)) signals.add(SIG_LOAN_CASH_PICKUP);
+    if (!cashClosed && investigator.test(issuer) && fields.some(({ label, value }) => /요청|요구/u.test(label) &&
         receivedCashDemand.test(value) && !cashReturn.test(value) && !notCurrent.test(value))) {
       signals.add(SIG_CASH_HANDOVER);
     }
