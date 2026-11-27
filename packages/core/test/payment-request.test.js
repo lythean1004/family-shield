@@ -4,6 +4,23 @@ import { extractCodeSignals } from "../src/extract.js";
 import { SIG_MONEY, SIG_GIFTCARD, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "../src/signals.js";
 
 const has = (text, id) => extractCodeSignals(text).signals.includes(id);
+describe("줄인 금액 뒤에 붙은 송금처 또는 상환 약속", () => {
+  for (const text of [
+    "기입 연습 / 2만 좀 보내 줘. 계좌 XXX-XX-XXXX",
+    "연습 항목 / 3천 보내 주세요 / 통장 번호 XXX-XX-XXXX",
+    "차용 예문 / 카드값이 막혀서 2만 내일 바로 드릴게요.",
+    "차용 예문 / 통장이 묶여서 3천 주말에 돌려줄게.",
+  ]) it(text, () => assert.ok(has(text, SIG_MONEY)));
+  for (const text of [
+    "엽서 2만 장 보내 줘. 계좌 XXX-XX-XXXX",
+    "파일 2만 보내 주세요. 계좌 XXX-XX-XXXX",
+    "2만 보내 줬어. 계좌 XXX-XX-XXXX",
+    "카드값이 막혔대. 예전 일이고 서류 2만 장 내일 드릴게요.",
+    "통장이 묶여서 3만 걸었어. 내일 돌려줄게.",
+    "카드값이 막혀서 내일 다시 만날게.",
+    "‘카드값이 막혀서 2만 내일 바로 드릴게요’라는 교육용 예시",
+  ]) it(text, () => assert.ok(!has(text, SIG_MONEY)));
+});
 describe("사용할 수 없는 원래 계좌와 대체 수취인", () => {
   for (const text of [
     "회계 연습표 / 공용 통장이 점검 중이라 제 개인 계좌로 부탁드립니다.",

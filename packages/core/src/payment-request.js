@@ -5,6 +5,12 @@ const accountDigits = "[0-9Xx*○●]";
 export const ACCOUNT_NUMBER = "(?:" + accountDigits + "{2,6}(?:-" + accountDigits + "{2,6}){2,3}|" + accountDigits + "{9,16})";
 const shortAmount = new RegExp("(?:이체|송금|통장|계좌)[^,.!?\\n]{0,24}?\\d+\\s*(?:천|만)(?:만)?\\s*(?:좀\\s*)?보내\\s*" + polite + end);
 const nonMoneyItem = /(?:파일|서류|사진|우편|엽서|자료|물품)/;
+const shortUnit = "\\d+\\s*(?:만|천)(?:\\s*원)?(?:만)?";
+const sendAmount = new RegExp(shortUnit + "\\s*(?:좀\\s*)?보내\\s*" + polite + end);
+const accountValue = new RegExp("(?:통장|계좌)(?:\\s*번호)?\\s*[:：]?\\s*" + ACCOUNT_NUMBER);
+const repayment = new RegExp("(?:카드값|통장|계좌)(?:이|가)?\\s*(?:막혀|묶여|동결)[가-힣]{0,4}\\s*" +
+  shortUnit + "\\s*(?:오늘|내일|모레|주말)(?:\\s*(?:아침|오후|저녁))?(?:에)?\\s*(?:바로\\s*)?" +
+  "(?:드릴게요?|갚을게요?|돌려줄게요?)" + end);
 const borrow = new RegExp("(?:돈|금액|[가-힣]{1,6}비|\\d+\\s*(?:만|천)?\\s*원)(?:을|를|만)?\\s*(?:좀\\s*)?빌려\\s*" +
   "(?:" + polite + "|줄\\s*수\\s*있(?:나|나요|을까요))" + end);
 const owner = "(?:(?:우리|내|제)[ \\t]*)?(?:딸|아들|동생|형|언니|누나|오빠|친구|가족|동료|지인)(?:의)?[ \\t]*";
@@ -52,28 +58,24 @@ export function requestedPayments(text) {
   let money = false;
   let gift = false;
   let thirdPartyAccount = false;
-  let precedingLoanRequest = false;
-  let precedingAccountRequest = false;
-  let precedingSubstitution = false;
+  let previous = null;
   for (const clause of text.split(/[.!?\n]/)) {
     if (!clause.trim()) continue;
     if (reported.test(clause)) {
-      precedingLoanRequest = false;
-      precedingAccountRequest = false;
-      precedingSubstitution = false;
+      previous = null;
       continue;
     }
     const loanRequest = borrow.test(clause);
     // 대여할 물건과 받는 계좌가 따로 언급될 수 있어, 금전 차용을 부탁한 같은 절이나 바로 다음 절만 본다.
-    if ((loanRequest || precedingLoanRequest) && namedAccount.test(clause)) thirdPartyAccount = true;
+    if ((loanRequest || previous?.loanRequest) && namedAccount.test(clause)) thirdPartyAccount = true;
     const blocked = unavailable.test(clause);
     const accountRequest = requestedAccount.test(clause);
     if ((blocked && substitute.test(clause)) ||
-        ((accountRequest || precedingAccountRequest) && separateHolder.test(clause)) ||
-        (((blocked && accountRequest) || precedingSubstitution) && relatedPayeeField.test(clause))) thirdPartyAccount = true;
-    precedingAccountRequest = accountRequest;
-    precedingSubstitution = blocked && accountRequest;
-    precedingLoanRequest = loanRequest;
+        ((accountRequest || previous?.accountRequest) && separateHolder.test(clause)) ||
+        (((blocked && accountRequest) || previous?.substitution) && relatedPayeeField.test(clause))) thirdPartyAccount = true;
+    const sendShortAmount = !nonMoneyItem.test(clause) && sendAmount.test(clause);
+    if (((sendShortAmount || previous?.sendShortAmount) && accountValue.test(clause)) || repayment.test(clause)) money = true;
+    previous = { loanRequest, accountRequest, substitution: blocked && accountRequest, sendShortAmount };
     if (toAccount.test(clause) || oneTransfer.test(clause) || (remit.test(clause) && !mail.test(clause)) ||
         (shortAmount.test(clause) && !nonMoneyItem.test(clause))) money = true;
     const product = voucher.exec(clause);
