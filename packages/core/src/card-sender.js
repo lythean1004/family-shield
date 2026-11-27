@@ -16,6 +16,7 @@ const senderCards = new Map(
 const callbackNumbers = new Set(checkedCards.flatMap(card => card.callback_contact?.numbers ?? [])
   .map(number => number.replace(/\D/g, "")));
 
+export const isCardSenderService = name => services.has(compactName(name));
 export const isCardSenderName = name => senderCards.has(compactName(name));
 export const isCardCallbackNumber = number => typeof number === "string" && callbackNumbers.has(number.replace(/\D/g, ""));
 
