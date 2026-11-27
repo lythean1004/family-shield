@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { createSignalMetrics, analyzeCounted } from '../src/signal-metrics.js';
 import { handleAnalyze, handleRequest, makeHandler } from '../src/handler.js';
 import { storedResult, createReceipts } from '../src/results.js';
+import { decide } from '../../packages/core/src/rule-engine.js';
 
 test('daily counts accept only known IDs and numbers, never request data', () => {
   const metrics = createSignalMetrics({ clock: () => Date.parse('2026-11-11T10:00:00Z') });
@@ -91,16 +92,29 @@ test('pipeline failures are counted without storing exception text', async () =>
   assert.equal(day.elapsed_ms.count, 1);
 });
 
-test('handler exposes only an internal metrics object and retains R11/R12 in receipts', async () => {
+test('handler exposes only an internal metrics object', async () => {
   const metrics = createSignalMetrics();
   const handler = makeHandler({ ai: {}, signalMetrics: metrics, phishingList: null });
   assert.equal(handler.signalMetrics, metrics);
   await handler.close();
-  // R13(가족 사칭+돈, D45)까지 알려진 규칙. 모르는 이름(R14·secret)은 버린다
-  const r = { level: '위험', signals_final: ['SIG_NEW_DOMAIN'], fired_rules: ['R10', 'R11', 'R12', 'R13', 'R14', 'secret'] };
-  assert.deepEqual(storedResult(r).fired_rules, ['R10', 'R11', 'R12', 'R13']);
+});
+
+test('결과 보관·서명은 판정기가 낸 R14~R19를 순서대로 보존한다', () => {
+  const signals = ['SIG_FAMILY_IMPERSONATION', 'SIG_NEW_NUMBER', 'SIG_APP_INSTALL', 'SIG_CASH_HANDOVER',
+    'SIG_CREDENTIAL_DISCLOSURE', 'SIG_DOCUMENT_BUNDLE', 'SIG_LOAN_CASH_PICKUP', 'SIG_FOREIGN_PAYMENT_CALLBACK'];
+  const verdict = decide({ signals_final: signals, signals_code: signals });
+  for (const id of ['R14', 'R15', 'R16', 'R17', 'R18', 'R19']) assert.ok(verdict.fired_rules.includes(id));
+  const result = { ...verdict, signals_final: signals, fired_rules: [...verdict.fired_rules, 'R20', 'unknown', ['R3']] };
+  assert.deepEqual(storedResult(result).fired_rules, verdict.fired_rules);
   const receipts = createReceipts('local-test-only');
-  assert.deepEqual(receipts.read(receipts.issue(r), null).fired_rules, ['R10', 'R11', 'R12', 'R13']);
+  assert.deepEqual(receipts.read(receipts.issue(result), null).fired_rules, verdict.fired_rules);
+});
+
+test('일일 집계는 현재 규칙 19개를 각각 한 번 세고 정의되지 않은 값은 버린다', () => {
+  const metrics = createSignalMetrics();
+  const expected = Array.from({ length: 19 }, (_, i) => 'R' + (i + 1));
+  metrics.record({ rules: [...expected, 'R19', 'R0', 'R20', ['R3'], '확인 메모'] });
+  assert.deepEqual(metrics.snapshot()[0].rules, Object.fromEntries(expected.map(id => [id, 1])));
 });
 
 test('HTTP web and Kakao routes share counts, closing emits a sanitized daily fragment', async () => {

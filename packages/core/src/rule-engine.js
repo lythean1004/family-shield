@@ -25,6 +25,12 @@ import {
 import { AGENCY_ACTION_SIGNALS } from "./agency-request-scope.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
+const RULE_IDS = new Set(Array.from({ length: 19 }, (_, i) => `R${i + 1}`));
+
+/** 결과 보관과 집계에는 이 판정기가 정의한 규칙 번호만 사용한다. */
+export function isKnownRuleId(id) {
+  return RULE_IDS.has(id);
+}
 
 /** 부모 화면의 확인값은 불리언이나 그 직렬화 값으로 들어온다. */
 export function isAffirmativeParentAnswer(value) {

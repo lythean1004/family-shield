@@ -1,9 +1,9 @@
 // Fixed-schema, per-process daily counts. Never retain request/result objects.
 import * as signalIds from '../../packages/core/src/signals.js';
 import { analyze } from '../../packages/core/src/pipeline.js';
+import { isKnownRuleId } from '../../packages/core/src/rule-engine.js';
 
 const SIGNALS = new Set(Object.entries(signalIds).filter(([k]) => k.startsWith('SIG_')).map(([,v]) => v));
-const RULES = new Set(Array.from({ length: 13 }, (_, i) => `R${i + 1}`));
 const LOOKUPS = ['url_reputation', 'domain_age'];
 const RDAP = ['network_success', 'network_failure', 'cache_hit', 'unsupported', 'no_targets', 'date_known', 'date_unknown'];
 const dayKey = ms => new Date(ms + 9 * 3600000).toISOString().slice(0, 10);
@@ -36,7 +36,7 @@ export function createSignalMetrics({ clock = Date.now, emit = null } = {}) {
       if (status === 'failure') day.failed++;
       else { day.completed++; if (status === 'fast_path') day.fast_path++; }
       for (const id of new Set(signals)) if (SIGNALS.has(id)) day.signals[id] = (day.signals[id] ?? 0) + 1;
-      for (const id of new Set(rules)) if (RULES.has(id)) day.rules[id] = (day.rules[id] ?? 0) + 1;
+      for (const id of new Set(rules)) if (isKnownRuleId(id)) day.rules[id] = (day.rules[id] ?? 0) + 1;
       addLatency(day.elapsed_ms, elapsedMs);
       for (const key of LOOKUPS) {
         const value = lookups[key], to = day.lookups[key];

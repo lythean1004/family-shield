@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { hashToken, fail } from './auth.js'
 import { createResultToken, isTokenFormat } from '../../packages/core/src/result-token.js'
 import { summarize } from '../../packages/core/src/summarizer.js'
+import { isKnownRuleId } from '../../packages/core/src/rule-engine.js'
 import * as signals from '../../packages/core/src/signals.js'
 
 export const LEVEL_TO_DB = {위험:'danger',주의:'caution',확인필요:'check'}
@@ -12,7 +13,7 @@ export function storedResult(result) {
   const relation=signals.ALLOWED_RELATIONS.has(result.impersonated_relation)?result.impersonated_relation:null
   return {
     level:LEVEL_TO_DB[result.level] ? result.level : '확인필요',
-    fired_rules:(result.fired_rules||[]).filter(r=>/^R([1-9]|1[0-3])$/.test(r)),
+    fired_rules:(result.fired_rules||[]).filter(isKnownRuleId),
     signals_final:validSignals,
     impersonation_type:signals.IMPERSONATION_TYPES.has(result.impersonation_type)?result.impersonation_type:'unknown',
     impersonated_relation:relation,
