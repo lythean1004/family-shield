@@ -51,6 +51,52 @@ function hasForeignPaymentCallback(text, targets) {
   });
 }
 
+const paymentMemoFields = [
+  ["origin", /^(?:발신(?:\s*(?:출처|구분|표기|표시|형태|위치|지역))?|발신지|전송\s*출처|출처)$/u],
+  ["status", /^(?:카드\s*)?(?:결제|거래|승인)\s*(?:상태|결과)$/u],
+  ["condition", /^(?:(?:결제|거래)\s*)?취소\s*(?:조건|대상|접수\s*대상)$/u],
+  ["number", /^(?:(?:결제|거래)\s*)?취소\s*(?:(?:접수|전용|문의|상담)\s*)?(?:전화(?:번호)?|번호|연락처|문의처|창구)$/u],
+];
+const memoRow = /^(?<label>[가-힣 \t]{1,24})\s*[|:：]\s*(?<value>\S.*)$/u;
+const foreignOrigin = /^(?:해외|국외|국제)(?:\s*발신)?$/u;
+const completedMemoApproval = /^(?:(?:카드\s*)?(?:결제|거래)\s*)?(?:(?:승인\s*)?완료(?:됨|됐음|되었음)?|승인(?:됨|됐음|되었음))$/u;
+const memoPaymentOwner = /^(?:본인|수신자|(?:카드\s*)?명의자|제|저|나|내)(?:이|가|의)?\s*(?:(?:직접\s*)?(?:결제|승인|사용|신청|요청)?하지\s*않(?:은|았던)\s*(?:결제|거래)(?:\s*건)?\s*(?:만|인\s*경우)?|(?:결제|승인|사용|신청|요청)?한\s*(?:결제|거래)(?:\s*건)?(?:가|이)?\s*(?:아닌(?:\s*경우)?|아닐\s*(?:때|경우|시)))$/u;
+const onlyMemoNumber = new RegExp(`^(?:${NUMBER.source})$`, "u");
+const memoExample = /(?:피싱|사기|사칭|예방)\s*(?:사례|예시|교육|수업)|(?:교육|훈련|비교|가상|모의)\s*(?:자료|예시|기록|연습|문구|거래)|(?:예시|가정)\s*(?:표|기록|안내|결제|거래)|^(?:작성\s*)?(?:예시|견본)(?:입니다)?[.!]?$/u;
+const memoWithdrawn = /^(?:(?:그|해당|같은|이)\s*)?(?:(?:결제|거래)\s*)?(?:취소\s*(?:요청|안내|절차|접수|지시|상태|결과))(?:(?:은|는|이|가|을|를)?\s*|\s*[|:：]\s*)(?:이미\s*)?(?:철회|거절|취소|종료|완료)(?:했|됐|하였|되었|함)?/u;
+
+function matchesForeignMemo(fields) {
+  if (!foreignOrigin.test(fields.get("origin") ?? "") || !completedMemoApproval.test(fields.get("status") ?? "") ||
+      !memoPaymentOwner.test(fields.get("condition") ?? "")) return false;
+  const number = fields.get("number") ?? "";
+  return onlyMemoNumber.test(number) && digits(number).length >= 8 && !official.has(digits(number));
+}
+
+function hasReportedForeignPaymentCallback(text, targets) {
+  if (teaching.test(text) || !targets.some(target => target.long && !target.known)) return false;
+
+  // 같은 연속 기록 안에서만 역할을 결합한다. 빈 줄이나 별개 안내를 넘어서 필드를 보충하지 않는다.
+  const fields = new Map();
+  let previous = "";
+  let duplicate = false;
+  for (const row of [...text.split(/\r\n|[\r\n;；]/u), ""]) {
+    const line = row.trim();
+    const field = memoRow.exec(line);
+    const key = field && paymentMemoFields.find(([, label]) => label.test(field.groups.label.trim()))?.[0];
+    if (key) {
+      if (fields.has(key)) duplicate = true;
+      fields.set(key, field.groups.value);
+      continue;
+    }
+    if (!duplicate && !memoExample.test(previous) && !memoExample.test(line) && !memoWithdrawn.test(line) &&
+        matchesForeignMemo(fields)) return true;
+    fields.clear();
+    duplicate = false;
+    previous = line;
+  }
+  return false;
+}
+
 function hasConstrainedCallback(text, { start, end }) {
   const prior = text.slice(Math.max(0, start - 160), start).split(callbackStatementBreak);
   const before = prior.at(-1);
@@ -79,7 +125,7 @@ export function classifyCallback(text, legacyPatterns) {
     return { start: m.index, end: m.index + m[0].length, known: official.has(number), long: number.length >= 8 };
   });
   // R19는 별도의 로컬 근거다. 기존 회신·기관 신호를 바꾸거나 해외 AI 전송 대상을 늘리지 않는다.
-  const foreignPayment = hasForeignPaymentCallback(text, targets);
+  const foreignPayment = hasForeignPaymentCallback(text, targets) || hasReportedForeignPaymentCallback(text, targets);
   const directed = targets.some(t => {
     if (t.known || !t.long) return false;
     const before = text.slice(Math.max(0, t.start - 48), t.start);
