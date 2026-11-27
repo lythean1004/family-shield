@@ -7,12 +7,17 @@ const services = new Map(JSON.parse(readFileSync(serviceFile, "utf8")).cards
   .filter(c => c.status === "source_checked").map(c => [c.name, c]));
 
 const compactName = (name) => name.replace(/\s+/g, "").toLowerCase();
+const checkedCards = [...OFFICIAL_DOMAIN_CARDS, ...OFFICIAL_LINK_HOST_CARDS]
+  .filter(card => card.status === "source_checked");
 const senderCards = new Map(
-  [...OFFICIAL_DOMAIN_CARDS, ...OFFICIAL_LINK_HOST_CARDS]
-    .filter(card => card.status === "source_checked")
-    .flatMap(card => (card.sender_names ?? card.name.split("(")[0].replace(/\s+(?:대표 주소|첫 화면)$/, "").split("·"))
+  checkedCards.flatMap(card => (card.sender_names ?? card.name.split("(")[0].replace(/\s+(?:대표 주소|첫 화면)$/, "").split("·"))
       .map(name => [compactName(name), card])),
 );
+const callbackNumbers = new Set(checkedCards.flatMap(card => card.callback_contact?.numbers ?? [])
+  .map(number => number.replace(/\D/g, "")));
+
+export const isCardSenderName = name => senderCards.has(compactName(name));
+export const isCardCallbackNumber = number => typeof number === "string" && callbackNumbers.has(number.replace(/\D/g, ""));
 
 // 조회·배송 완료와 구분할 수 있는 주소 정정, 결제 취소 등의 처리 요구.
 const SERVICE_CHANGE = /(?:배송지|수령지|주소|결제|승인)[^.!?\n]{0,12}?(?:수정|정정|변경|취소)\s*(?:신청|양식|접수|요청|부탁|필요|해\s*(?:주|줘)|하(?:세|십|시)|바랍|후\s*재배송)(?!\s*(?:(?:하)?지\s*(?:마|말|않)|(?:은|는|이|가)\s*(?:사칭|사기|피싱)))/;

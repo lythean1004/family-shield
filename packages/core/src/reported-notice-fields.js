@@ -1,14 +1,7 @@
-import { OFFICIAL_DOMAIN_CARDS } from "./lookalike.js";
+import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
-import { isOfficialLink, OFFICIAL_LINK_HOST_CARDS } from "./official-links.js";
+import { isOfficialLink } from "./official-links.js";
 import { SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_LINK, SIG_PERSONAL_INFO } from "./signals.js";
-
-const compact = value => value.replace(/\s+/g, "").toLowerCase();
-const cards = [...OFFICIAL_DOMAIN_CARDS, ...OFFICIAL_LINK_HOST_CARDS].filter(card => card.status === "source_checked");
-const cardNames = new Set(cards.flatMap(card => (card.sender_names ??
-  card.name.split("(")[0].replace(/\s+(?:대표 주소|첫 화면)$/, "").split("·")).map(compact)));
-const officialNumbers = new Set(cards.flatMap(card => card.callback_contact?.numbers ?? [])
-  .map(number => number.replace(/\D/g, "")));
 
 // 역할 명칭은 문서가 표시한 발신자에 대한 주장이다. 연락처 검증에는 출처 확인 카드만 사용한다.
 const INSTITUTION_ROLE = /(?:기관|회사|보험사|카드사|발급사|은행|방송국|(?:시|군|구|도)청|우체국|공단|공사|민원\s*창구|관공서|학교|도서관|병원|보건소)$/;
@@ -31,6 +24,7 @@ const RECEIVED_NOTICE = /(?:받(?:은|았|았다|았어|았습|아본)|수신한
 const CALLBACK_REPORTED = /(?:적혀|써\s*있|쓰여|표시|명시|(?:라|다)는\s*(?:내용|설명|조건)|한다는|된다고|기재|필수(?:라고|라는)|라고\s*(?:했|해|답했)|하도록\s*안내)/;
 const EXCLUSIVE_CALLBACK = /(?:전용|지정(?:된)?)\s*번호(?:로|으로|에)만/;
 const OTHER_ORGANIZER = /^(?!(?:이|그|해당|같은)\s)(?:[\p{L}\p{N}·-]{1,12}\s+){0,2}(?:동아리|모임|협회|학회)\s*(?:담당자|운영자|직원)(?:는|가|이|은)(?=\s)/u;
+export const startsOtherOrganizer = clause => OTHER_ORGANIZER.test(clause);
 const PRIVATE_FIELD = /(?:신분\s*(?:증|자료)|주민\s*등록\s*번호|여권\s*(?:번호|사본)|개인\s*(?:신상|정보)|비공개\s*(?:신상\s*)?(?:서류|자료|정보)|(?:개인|비공개)\s*가족관계\s*(?:자료|서류)|가족관계\s*증명서|카드\s*번호|계좌\s*번호|인증\s*번호|비밀\s*번호)/gu;
 const REDACTED_FIELD = /^(?:이|가|은|는)?\s*(?:(?:제거|삭제|마스킹|비식별(?:화)?|익명화)(?:\s*처리)?\s*(?:된|한|됐|했)|가려진)/;
 const SENSITIVE_COPY = /^\s*(?:(?:사진|사본|원본|자료)(?:을|를|은|는)?|(?:을|를|은|는))?\s*/;
@@ -57,7 +51,7 @@ function requiresMunicipalDisclosure(clause) {
 
 function institutionName(value) {
   const name = value.trim().replace(/(?:이?라고\s*(?:적혀|표시돼|나와|써\s*있).*$|(?:이에요|예요|입니다)$)/, "");
-  return cardNames.has(compact(name)) || INSTITUTION_ROLE.test(name) ? name : "";
+  return isCardSenderName(name) || INSTITUTION_ROLE.test(name) ? name : "";
 }
 
 function noticeSender(clause, previous) {
@@ -101,9 +95,9 @@ function actionIn(clause, previous, attributionContext) {
   }
   const callback = DOCUMENT_NUMBER.exec(clause);
   if (callback) {
-    const number = callback.groups.number?.replace(/\D/g, "");
+    const number = callback.groups.number;
     const after = clause.slice(callback.index + callback[0].length);
-    if (!officialNumbers.has(number) && !CALLBACK_QUESTION.test(after) &&
+    if (!isCardCallbackNumber(number) && !CALLBACK_QUESTION.test(after) &&
         (!CALLBACK_TEMPLATE.test(clause) && (number || CALLBACK_REPORTED.test(after) && (RECEIVED_NOTICE.test(attributionContext) || EXCLUSIVE_CALLBACK.test(callback[0]))))) return SIG_CALL_THIS_NUMBER;
   }
   for (const secret of privateFields(clause)) {

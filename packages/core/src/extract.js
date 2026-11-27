@@ -36,6 +36,7 @@ import { reportedRequestSignals } from "./reported-requests.js";
 import { addReportedFamilySignals } from "./reported-family.js";
 import { addFamilyRequestContextSignals } from "./family-request-context.js";
 import { addReportedNoticeFields } from "./reported-notice-fields.js";
+import { addInstitutionRequestContext } from "./institution-request-context.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
 /** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
@@ -299,6 +300,7 @@ export function extractCodeSignals(text, options = {}) {
   addReportedFamilySignals(input, signals);
   addFamilyRequestContextSignals(input, signals);
   addReportedNoticeFields(input, signals, { unverifiedLinks: outside.map(candidate => candidate.raw) });
+  addInstitutionRequestContext(input, signals);
   return {
     signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }),
     // 수신자가 옮겨 적은 요구는 로컬 판정에만 보탠다. 기존 건강정보 전송 판단에는 직접 검출한 신호를 사용한다.
