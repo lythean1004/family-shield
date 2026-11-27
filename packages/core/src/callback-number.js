@@ -134,6 +134,31 @@ function reportsDirectedCancellation(prefix, afterNumber) {
   return origin !== null && !unrelatedReceipt.test(context) && reportedPayment.test(context.slice(origin.index + origin[0].length));
 }
 
+const compactReceiptHeader = /^(?:수신\s*(?:경위|기록|내역|문자|알림)|받은\s*(?:문자|알림|안내|연락))(?:에서)?\s*(?:발췌|요약|메모|기록)(?:\s*[:：]\s*|$)/u;
+const compactForeignOrigin = /^(?:국외|해외|국제)\s*(?:발신|발송|전송)(?:으로)?\s*표(?:시|기)(?:됨|됐음|되었음)?$/u;
+const compactApprovedPayment = /^(?:(?:카드\s*)?(?:결제|거래)(?:가|이)?\s*(?:이미\s*)?(?:승인|완료)(?:됐|되었)다는\s*(?:내역|기록|통지)|(?:이미\s*)?(?:승인|완료)(?:됐|되었)다는\s*(?:카드\s*)?(?:결제|거래)\s*(?:내역|기록|통지)|(?:카드\s*)?(?:결제|거래)\s*(?:승인|결제)\s*완료\s*(?:내역|기록|통지))$/u;
+const compactCancelAction = /^\s*(?:으로|로|에)(?:만)?\s*(?:(?:결제|승인|거래)\s*)?취소\s*(?:문의|연락|전화|접수|신청)(?:을|를)?\s*(?:하라(?:는|고)|하도록|해야(?!\s*(?:하는지|하는\s*건지|할지|할\s*필요)))/u;
+
+function reportsCompactCancellation(prefix, assignment) {
+  if (!compactCancelAction.test(assignment) || unrelatedReceipt.test(assignment) ||
+      revokedContactRequest.test(assignment)) return false;
+  const tail = prefix.at(-1) ?? "";
+  const inlineHeader = compactReceiptHeader.exec(tail);
+  const heading = prefix.at(-2) ?? "";
+  if (!inlineHeader && compactReceiptHeader.exec(heading)?.[0] !== heading) return false;
+  const body = inlineHeader ? tail.slice(inlineHeader[0].length) : tail;
+  const parts = body.split(/[,，;；|｜]/u).map(part => part.trim());
+  if (parts.length !== 3) return false;
+  const [first, second, route] = parts;
+  const isOrigin = part => summaryOrigin.test(part) || compactForeignOrigin.test(part);
+  const isApproved = part => approvalReport.test(part) || compactApprovedPayment.test(part);
+  if (!(isOrigin(first) && isApproved(second) || isOrigin(second) && isApproved(first))) return false;
+  const condition = disownedPayment.exec(route);
+  if (condition?.index !== 0) return false;
+  const targetRole = route.slice(condition[0].length).trim();
+  return !targetRole || summaryCancelRole.test(targetRole);
+}
+
 function hasForeignReceiptSummary(text, targets) {
   if (teaching.test(text) || memoExample.test(text)) return false;
   return targets.some(({ start, end, known, long }) => {
@@ -144,7 +169,7 @@ function hasForeignReceiptSummary(text, targets) {
     const [assignment, following = ""] = after.split(reportClauseBreak, 2);
     const next = following.trimStart();
     if (memoWithdrawn.test(next) || summaryStepClosed.test(next) || revokedContactRequest.test(next) || memoExample.test(next)) return false;
-    if (reportsDirectedCancellation(prefix, assignment)) return true;
+    if (reportsDirectedCancellation(prefix, assignment) || reportsCompactCancellation(prefix, assignment)) return true;
     if (prefix.length < 3 || prefix.length > 4) return false;
 
     // 요약의 발신 표시, 승인 사실, 취소 연락처를 같은 수신 항목에서만 연결한다.
