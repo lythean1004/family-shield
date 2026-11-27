@@ -219,9 +219,40 @@ function hasWrittenOnlyResponse(context, hasClaimantEvidence) {
   });
 }
 
+const voiceNoteHeading = /^(?:상담|신고|(?:문자\s*)?수신|받은\s*(?:연락|문자|메시지)|연락|통화)\s*(?:메모|기록|요약|정리)[.!。]?$/u;
+const voiceNoteSender = new RegExp(
+  "^(?:발신(?:자|인)|보낸\\s*(?:사람|이))(?:의)?\\s*(?:관계\\s*)?" +
+  "(?:자기\\s*소개|자칭|주장|소개|관계|역할)\\s*[:：]\\s*" + CLAIMED_RELATION +
+  "(?:이?라고|이야|야|이에요|입니다)?[.!。]?$", "u");
+const voiceNoteDeclined = /^(?:(?:음성\s*)?(?:통화|전화|확인)|목소리\s*확인)(?:의)?\s*(?:제안|권유|요청|시도)(?:은|는|을|를)?\s*(?:(?:명확히|분명히|바로)\s*)?(?:거절(?:함|했|하였)|(?:받아들이|응하)지\s*않았)/u;
+const voiceNoteTextOnly = /^(?:(?:연락|대화|회신|응답|통신)(?:은|는|을|를)?\s*)?(?:문자|채팅|메시지|글)(?:로|으로)만\s*(?:(?:연락|회신|답장|응답|대화)(?:을|를)?\s*)?(?:해야(?:만)?\s*(?:한다(?:고|는)|된(?:다고|다는))|하라고\s*(?:요구|부탁|지시|했|함)|하기로\s*강요)/u;
+const closedVoiceNote = /(?:(?:그|같은|해당|이)\s*)?(?:요구|요청|결정|제한)(?:를|을|은|는|이|가)?\s*(?:이미\s*)?(?:철회|취소)|(?:예시|가정)(?:였|이었)|거절한\s*(?:적|일)(?:이|은)?\s*없/u;
+const voiceNoteInquiry = /(?:했|았|었|하였)는지(?:를)?|(?:하는|하라는)\s*(?:건지|것인지)|(?:말|뜻|의미)(?:은|는|이|가)?\s*아니|(?:말한|요구한|지시한)\s*(?:게|건|것은)\s*아니/u;
+
+function hasRecordedVoiceDecision(text) {
+  for (const block of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    if (HYPOTHETICAL.test(block) || DENIAL.test(block) || closedVoiceNote.test(block) ||
+        VERIFIED_FAMILY.test(block) || temporaryVoiceLimit.test(block) ||
+        laterVoiceOffer.test(block) || completedIdentityCall.test(block)) continue;
+    const [heading, sender, refusal, response] = (block.replace(/[;；]/gu, "\n").match(CLAUSE) ?? [])
+      .map(clause => clause.trim());
+    if (!voiceNoteHeading.test(heading ?? "") || !voiceNoteSender.test(sender ?? "") ||
+        !refusal || !response || refusal.endsWith("?") || response.endsWith("?") ||
+        hasOtherSource(refusal) || hasOtherSource(response) ||
+        voiceNoteInquiry.test(refusal) || voiceNoteInquiry.test(response)) continue;
+    if (voiceNoteDeclined.test(refusal.replace(replyFromClaimant, "")) &&
+        voiceNoteTextOnly.test(response.replace(replyFromClaimant, ""))) return true;
+  }
+  return false;
+}
+
 /** 같은 연락에 묶인 가족 발신 주장과 현재 요구를 기존 판정 규칙에 전달한다. */
 export function addReportedFamilySignals(text, signals) {
   if (typeof text !== "string" || SPURIOUS_REPORT.test(text)) return;
+  if (hasRecordedVoiceDecision(text)) {
+    signals.add(SIG_FAMILY_IMPERSONATION);
+    signals.add(SIG_AVOID_VOICE);
+  }
   const clauses = (text.match(CLAUSE) ?? []).map(clause => clause.trim()).filter(Boolean);
   for (let i = 0; i < clauses.length; i++) {
     const claim = clauses[i];
