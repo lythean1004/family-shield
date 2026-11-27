@@ -30,8 +30,8 @@ const LEVELS = new Set(["위험", "주의", "확인필요"]);
 const GROUPS = new Set(["A", "B", "C", "D1", "D2", "E"]);
 const TARGET = { A: 35, B: 45, C: 25, D1: 50, D2: 35, E: 10 };
 const MESSAGE_TARGET = { A: 16, B: 18, C: 16, D1: 50, E: 20 };
-// 문자형 세트: 1판(Codex, 가림 표시라 측정에 쓰지 않음·보관)과 2판(2026-11-27 Claude 독립 에이전트)
-const MESSAGE_DATASETS = new Set(["./messages-2026-11.jsonl", "./messages-2026-11-v2.jsonl"].map((p) => fileURLToPath(new URL(p, import.meta.url))));
+// 문자형 세트: 1판(Codex, 가림 표시라 측정에 쓰지 않음·보관), 2판(개발 세트), 3판(최종 측정용, 커밋 안 함)
+const MESSAGE_DATASETS = new Set(["./messages-2026-11.jsonl", "./messages-2026-11-v2.jsonl", "./holdout-private/messages-2026-11-v3.jsonl"].map((p) => fileURLToPath(new URL(p, import.meta.url))));
 const isMessageDataset = (file) => MESSAGE_DATASETS.has(resolve(file));
 const homeHosts = new Set(OFFICIAL_LINK_HOST_CARDS.filter(c => c.status === "source_checked").flatMap(c => c.hosts));
 for (const card of OFFICIAL_DOMAIN_CARDS.filter(c => c.status === "source_checked")) {
