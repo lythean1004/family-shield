@@ -486,13 +486,17 @@ const submitsThePair = /^(?:을|를)?\s*(?:(?:함께|같이|둘\s*다|모두|한
 const documentFieldStatement = /^(?:이?라고\s*(?:적혀|표시|써|기록)|입니다|(?:이|가)\s*(?:필수|요구))/u;
 const closedSubmission = /^(?:그|해당|같은|이)\s*(?:서류\s*)?(?:요구|요청|지시)(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:철회|취소)/u;
 
+const deniesSubmissionInstruction = /^\s*(?:(?:한|말한|요구한|지시한)\s*적(?:이|은)?\s*없|(?:뜻|말|요구|지시)(?:은|는|이|가)?\s*(?:아니|없))/u;
+const submissionInstructionIsExample = /^(?:그|이|해당|같은|앞(?:의|선)|위(?:의)?)\s*(?:(?:서류|제출|첨부)\s*)?(?:요구|요청|지시|문구|안내)(?:은|는|이|가)\s*(?:(?:실제|현재)\s*(?:요구|요청|지시|안내|절차)(?:가|이)?\s*아니라\s*)?(?:교육(?:용)?|훈련(?:용)?|작성)\s*(?:예시|사례)(?:였(?:습니다|어요|다)|입니다|이다|예요)[.!?。]?$/u;
+
 function specifiesJointSubmission(text) {
   const pair = jointSubmissionPair.exec(text);
   if (!pair) return false;
   const before = text.slice(0, pair.index);
   const after = text.slice(pair.index + pair[0].length).replace(theSameSubmissionForm, " ").trimStart();
-  return submitsThePair.test(after) ||
-    requiredDocumentField.test(before) && documentFieldStatement.test(after);
+  const instruction = submitsThePair.exec(after);
+  if (instruction) return !deniesSubmissionInstruction.test(after.slice(instruction[0].length));
+  return requiredDocumentField.test(before) && documentFieldStatement.test(after);
 }
 
 function immediatelyPrecedesDestination(text) {
@@ -537,7 +541,7 @@ function reportsJointSubmissionInApplication(clause, previous, next, afterNext) 
   }
 
   return labelledAddress && !formBoundary.test(next) && !inactiveReport.test(next) &&
-    !mereFormReference.test(next) && !closedSubmission.test(afterNext) &&
+    !mereFormReference.test(next) && !closedSubmission.test(afterNext) && !submissionInstructionIsExample.test(afterNext) &&
     submitsToTheSameForm(next);
 }
 
