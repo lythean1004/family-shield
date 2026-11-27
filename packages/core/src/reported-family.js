@@ -11,7 +11,7 @@ const REPORTED_CLAIM = new RegExp(
   `${CLAIMED_RELATION}(?:(?:이?라(?:고|는|며|면서)|인\\s*)` +
   `(?:[‘’“”"'」』]\\s*)?\\s*(?:스스로\\s*)?` +
   `(?:소개|주장|자처|밝|말|했|해|적|썼|쓴|보내|하더|하는|하네|하며|하면서|합니다|하고|한\\s*(?:뒤|다음|발신|사람)|연락|문자|메시지|발신|쪽지|사람)|` +
-  `(?:이?래(?:요|서)|이?라(?:면서|며)(?=\\s)|을?\\s*자처|인\\s*척|\\s*행세))`,
+  `(?:이?래(?:요|서)|이?라(?:면서|며)(?=\\s)|(?:[을를]\\s*)?자처|[을를]\\s*(?:사칭|가장)|인\\s*척|\\s*행세))`,
   "gu",
 );
 const ROLE_SETTING = /(?:낭독극|연극|역할극|대본|극본|시나리오)(?:에서(?:는)?|\s*속(?:에서|의)?)[^,，.!?\n]{0,20}$/u;
@@ -32,6 +32,7 @@ const SELF_CLAIM = new RegExp(
   "u",
 );
 const SPURIOUS_REPORT = /(?:피해|사기|피싱)\s*(?:사례|예방|교육)|예방\s*(?:안내|자료|강의|교육)|교육\s*(?:자료|용)|(?:예시|가정|가상)\s*(?:문장|문자|상황|사례)|수업에서\s*(?:읽|배)|(?:사례|예시)(?:를|로)\s*(?:읽|소개|다뤘|배)|지난\s*(?:사건|사례|해|달|주|번)|(?:작년|재작년|예전)\s*(?:에|이야기)|(?:신고|사건\s*처리)(?:를)?\s*마쳤/u;
+const HYPOTHETICAL = /(?:이?라|다)고\s*(?:(?:한번|잠시|단순히)\s*)?(?:가정|상상)(?:하|했|해)|(?:가정|상상)(?:한|하는)\s*(?:문장|문자|상황|예시)/u;
 const CLOSED_REQUEST = /(?:요구|요청|부탁)(?:을|를|은|는|에)?\s*(?:이미\s*)?(?:거절(?:했|하고)|(?:취소|철회)(?:했|됐|되었))|(?:저는|제가|나는|내가)\s*(?:그\s*)?(?:거절했|응하지\s*않)/u;
 const VERIFIED_FAMILY = /(?:본인|실제\s*가족)(?:임|이\s*맞는지|이었다는\s*것)(?:을|를)?\s*(?:직접\s*)?확인(?:했|했습니다)|(?:원래|평소(?:에)?\s*쓰던|기존)\s*(?:번호|연락처)로\s*(?:전화|통화|연락)(?:해(?:서)?|했)[^.!?\n]{0,24}확인(?:했|했습니다)/u;
 const OTHER_ACTOR = new RegExp(
@@ -57,11 +58,13 @@ const closedVoiceRecord = /(?:당시|그때)[^,，.!?\n]{0,48}(?:그|해당)\s*(
 const independentVoiceChallenge = /^(?!(?:그|해당|같은|내가|저는|제가|발신자가|상대가)\s)(?:[\p{L}\p{N}·-]{1,16}\s+)?(?:안내\s*데스크|안내\s*창구|접수\s*창구|고객\s*센터)(?:에서|가|는)\s/u;
 const VOICE_REFUSAL = /거절(?:해|하|했)|(?:회피|피하|피했|피해)|(?:응하지|답하지)\s*않|(?:확인|전화|통화|답변)(?:을|를)?\s*(?:하지|해\s*주지)\s*않|(?:문자|채팅|메시지)(?:로|만|로만)\s*(?:하자고\s*)?(?:고집|강요)|(?:통화|전화|음성)(?:로|으로)?\s*(?:(?:신원|본인)\s*)?확인(?:은|을|하는\s*(?:것|건|일))?\s*(?:안\s*(?:하겠|돼|된)|하지\s*않겠다)/u;
 const SECRET = /(?:비밀로\s*(?:해|하|남겨|두)|(?:알리지|말하지|얘기하지|전하지|공유하지)\s*(?:말|마)|(?:알리면|말하면|전하면)\s*안\s*된)(?:라는|다고|라고|달라|리라|\s*(?:요구|요청|부탁))|(?:알리|말하|전하|공유하)지\s*(?:않는|않을|말라는)\s*(?:것|걸)(?:을)?\s*(?:조건|전제)|숨기(?:라고|라는|래(?:요|서)|는\s*(?:(?:것|걸)(?:을)?\s*)?(?:조건|전제))/u;
-const PRESSURE = /재촉(?:해|하|했|하며|한다|도)|(?:반복|거듭)\s*(?:독촉|재촉)|기다(?:려|릴)\s*(?:주지\s*않|수\s*없)/u;
+const PRESSURE = /재촉(?:해|하|했|하며|한다|도)|(?:재촉|독촉)(?:이|가)\s*(?:(?:또|다시(?:금)?|더|잇따라|연달아|거듭|반복해서|한\s*(?:번|차례)(?:\s*더)?|곧바로|바로|이어|뒤이어|계속|곧|금세)\s+){0,2}(?:왔|들어왔|이어졌|계속됐)|(?:반복|거듭)\s*(?:독촉|재촉)|기다(?:려|릴)\s*(?:주지\s*않|수\s*없)/u;
+const receivedVoiceChallenge = /^(?:제가|내가|수신자(?:는|가)|받은\s*사람(?:은|이))\s*[^,，.!?\n]{0,13}(?:통화|전화|음성|목소리)[^,，.!?\n]{0,16}(?:자고\s*(?:했|말했|제안했)(?:더니|는데|지만)?|(?:요청|제안)했(?:더니|는데|지만)|(?:확인하|묻)자|물었더니)/u;
 
 const PROHIBITED_ACTION = /(?:(?:보내|부치|빌리|사|받|내|깔|넘기|주|공유하|제출하|작성하|전달하|결제하|구매하|송금하|입금하|이체하|설치하)지|(?:송금|입금|이체|결제|구매|설치|제출|공유)(?:은|는|을|를)?\s*하지)\s*(?:말|않)/u;
 const RECIPIENT_REQUEST = /(?:^|[\s,，])(?:제가|내가|수신자가)\s*(?:(?!(?:발신자|그\s*사람|요구|요청|부탁|받(?:은|았|고)|보낸|읽은|전한))[^,，.!?\n]){0,26}(?:요구|요청|부탁)(?:하[가-힣]{0,3}|해[가-힣]{0,2}|했|합)$/u;
-const REQUEST = "(?:요구|요청|부탁)(?:하(?:고|여|면서|는|며|더|니|네요|는데|기)|해(?:요|서|도)?|했|합|이|도|을|은|만|\\s*(?:내|문|메|쪽|부|했|있|뿐|사|이|담|적)|(?=[.!?\\s]|$))";
+const receivedRequest = "(?:요구|요청|부탁)(?:(?:을|를)?\\s*받(?:았|은|아|고)|(?:이|가)\\s*(?:왔|있었|들어왔|담겼))";
+const REQUEST = "(?:요구|요청|부탁)(?:하(?:고|여|면서|는|며|더|니|네요|는데|기)|해(?:요|서|도)?|했|합|이|도|을|은|만|\\s*(?:내|문|메|쪽|부|했|있|뿐|사|이|담|적)|(?=[.!?\\s]|$))" + "|" + receivedRequest;
 const ASK_ENDING = "(?:[으이]?라(?:고|는|며)|달(?:라(?:고|는|며)?|랬)|줘야\\s*(?:한|한다며))";
 const PAYMENT = "(?:송금|입금|이체|결제|돈|금전|현금|비용|금액)";
 const GIFT_ITEM = "(?:상품권|기프트\\s*카드|기프티콘|교환권|충전\\s*카드)";
@@ -96,7 +99,7 @@ function describesRole(clause, match) {
 }
 
 function isClaim(clause) {
-  if (DENIAL.test(clause) || RECORD_LABEL.test(clause) || clause.endsWith("?")) return false;
+  if (DENIAL.test(clause) || HYPOTHETICAL.test(clause) || RECORD_LABEL.test(clause) || clause.endsWith("?")) return false;
   if (/(?:극본|대본)\s*속(?:의|에서)?\s*(?:발신인|발신자|등장인물)/u.test(clause)) return false;
   if (ATTRIBUTED_CLAIM.test(clause) || SELF_CLAIM.test(clause)) return true;
 
@@ -125,6 +128,17 @@ function hasCurrentRequest(clause, signal, pattern) {
 function hasVoiceRefusal(clause) {
   return VOICE.test(clause) && VERIFY.test(clause) && VOICE_REFUSAL.test(clause) &&
     !RECIPIENT_REFUSAL.test(clause);
+}
+
+// 수신자가 먼저 본인 확인을 제안한 보고에서, 이어지는 발신자의 거절을 확인한다.
+export function reportedFamilyVoiceResponse(clause) {
+  const challenge = receivedVoiceChallenge.exec(clause);
+  if (!challenge || SPURIOUS_REPORT.test(clause) || DENIAL.test(clause) || HYPOTHETICAL.test(clause) ||
+      CLOSED_REQUEST.test(clause) || !hasVoiceRefusal(clause)) return false;
+  const response = clause.slice(challenge[0].length);
+  return VOICE_REFUSAL.test(response) && !hasOtherSource(response.trimStart()) &&
+    !RECIPIENT_REFUSAL.test(response) && !temporaryVoiceLimit.test(response) &&
+    !laterVoiceOffer.test(response) && !closedVoiceRecord.test(response);
 }
 
 function hasWrittenOnlyResponse(context) {
@@ -156,7 +170,7 @@ export function addReportedFamilySignals(text, signals) {
     }
     if (context.some(clause => VERIFIED_FAMILY.test(clause) || (CLOSED_REQUEST.test(clause) && !hasVoiceRefusal(clause)))) continue;
 
-    const active = context.filter(clause => !DENIAL.test(clause) && !clause.endsWith("?"));
+    const active = context.filter(clause => !DENIAL.test(clause) && !HYPOTHETICAL.test(clause) && !clause.endsWith("?"));
     const newContact = active.some(clause => NEW_CONTACT.test(clause)) &&
       !active.some(clause => NEGATED_CONTACT.test(clause));
     const requested = new Set(REQUESTS.filter(([signal, pattern]) =>

@@ -1,10 +1,11 @@
 import {
-  SIG_APP_INSTALL, SIG_CREDENTIAL_DISCLOSURE, SIG_DELETE_APP, SIG_FAMILY_IMPERSONATION,
+  SIG_APP_INSTALL, SIG_AVOID_VOICE, SIG_CREDENTIAL_DISCLOSURE, SIG_DELETE_APP, SIG_FAMILY_IMPERSONATION,
   SIG_GIFTCARD, SIG_ISOLATION, SIG_MONEY, SIG_NEW_NUMBER, SIG_PERSONAL_INFO,
   SIG_PREPAYMENT, SIG_SECRECY, SIG_THIRD_PARTY_ACCOUNT, SIG_URGENCY,
 } from "./signals.js";
 import { hasAmountObjectAsk } from "./payment-request.js";
 import { receivedFieldLines } from "./received-message.js";
+import { reportedFamilyVoiceResponse } from "./reported-family.js";
 
 const relation = "(?:(?:큰|작은|맏|막내|첫째|둘째|친|외|사촌|여|남)\\s*)?" +
   "(?:아들|딸|손자|손녀|손주|엄마|어머니|아빠|아버지|할머니|할아버지|할매|할배|동생|언니|오빠|형님|형|누나|누님|배우자|남편|아내|삼촌|숙모|이모|고모|조카|사촌|친척|자매|형제|막내)";
@@ -338,6 +339,13 @@ export function addFamilyRequestContextSignals(text, signals, { numberMismatch =
       context.push(clause);
     }
     if (context.some(clause => illustrative.test(clause) || verified.test(clause) || closed.test(clause))) continue;
+
+    // 발신 표시와 거절은 같은 수신 보고 안에서만 대응시킨다.
+    const followup = clauses[index + 1];
+    if (context.includes(followup) && reportedFamilyVoiceResponse(followup)) {
+      signals.add(SIG_FAMILY_IMPERSONATION);
+      signals.add(SIG_AVOID_VOICE);
+    }
 
     const heading = recipientField.test(previous) ? clauses[index - 2] ?? "" : previous;
     const fieldContext = senderField.test(start) && documentaryField.test(heading);
