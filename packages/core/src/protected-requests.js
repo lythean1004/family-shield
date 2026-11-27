@@ -573,6 +573,42 @@ function addRequirementsAtUnconfirmedAddress(text, signals, inspection) {
   }
 }
 
+const receiptOfApplicationNotice = /(?:받은|수신한|전달받은)\s*[^.!?\n]{0,30}(?:문자|메시지|안내(?:문)?|통지)|(?:문자|메시지|안내(?:문)?|통지)(?:를|을)?\s*(?:받았|전달받았|봤|보았|읽었|확인했)/u;
+const applicationIntake = new RegExp(program + "(?:의)?\\s*(?:신청|접수|모집|등록|채용|참여)", "u");
+const assignedSubmissionAddress = /^(?:(?:이|그|해당|같은)\s*)?(?:신청|접수|제출)\s*(?:주소|링크)(?:로는|으로는|가|는|은|이)?\s*[:：]?\s*$/u;
+const addressRecorded = /^(?:\s*(?:이|가|으로|로)\s+)?(?:붙어|적혀|기록돼|기재돼|명시돼|표시돼)\s*있(?:음|었(?:고|습니다|어요|다)|고)[.!?。]?\s*$/u;
+const submissionRecorded = /^(?:(?:적혀|쓰여|써|명시돼|기재돼|안내돼)\s*있(?:음|었(?:고|습니다|어요|다)|고)|(?:요구|요청|지시)(?:를|을)?\s*(?:받았|했|하였)(?:고|음|습니다|어요|다))[.!?。]?\s*$/u;
+
+function reportsPairedDocumentRequirement(part) {
+  const pair = jointSubmissionPair.exec(part);
+  if (pair?.index !== 0) return false;
+  const predicate = part.slice(pair[0].length);
+  const action = submitsThePair.exec(predicate);
+  if (!action) return false;
+  const reporting = predicate.slice(action[0].length).trimStart().replace(/^(?:한다고|는)\s+/u, "");
+  return submissionRecorded.test(reporting);
+}
+
+function bindsPairedDocumentsToRecordedAddress(clause, previous, next, inspection) {
+  if (!inspection?.complete || inspection.candidates.length !== 1 || !hasApplicationPurpose(previous) ||
+      !(receiptOfApplicationNotice.test(previous) && applicationIntake.test(previous) || reportedApplicationPurpose(previous))) return false;
+  if (formNotInUse.test(previous + " " + clause) || inactiveReport.test(previous + " " + clause) ||
+      mereFormReference.test(clause) || topicBoundary.test(clause) || closedAddressRequirement.test(next)) return false;
+  const [address] = inspection.candidates;
+  if (!address.complete || !explicitWebAddress.test(address.raw) ||
+      isOfficialLink(address.raw) || isOfficialLink(address.host)) return false;
+
+  // 같은 수신 문장의 두 절에서 한쪽은 제출 요구, 다른 쪽은 그 접수처 지정이어야 한다.
+  const parts = clause.split(/[,，;；]\s*/u);
+  if (parts.length !== 2) return false;
+  return parts.some((part, index) => {
+    const token = [...part.matchAll(/\S+/gu)].find(match => match[0] === address.raw);
+    if (!token || !assignedSubmissionAddress.test(part.slice(0, token.index))) return false;
+    const tail = part.slice(token.index + token[0].length);
+    return (!tail.trim() || addressRecorded.test(tail)) && reportsPairedDocumentRequirement(parts[1 - index]);
+  });
+}
+
 export function addReportedProtectedRequests(text, signals, hasUnverifiedLink, inspection) {
   if (hasReceivedCredentialRequest(text, hasUnverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
   if (hasUnverifiedLink) {
@@ -585,7 +621,8 @@ export function addReportedProtectedRequests(text, signals, hasUnverifiedLink, i
     if (hasCurrentReportedRelay(clause)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
     if (!hasUnverifiedLink) continue;
     if (reportsPairedSubmissionAtAddress(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "") ||
-        reportsJointSubmissionInApplication(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "", clauses[index + 2] ?? "")) {
+        reportsJointSubmissionInApplication(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "", clauses[index + 2] ?? "") ||
+        bindsPairedDocumentsToRecordedAddress(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "", inspection)) {
       signals.add(SIG_DOCUMENT_BUNDLE);
     }
     const pair = documentPair.exec(clause);
