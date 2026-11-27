@@ -159,10 +159,6 @@ function readBody(req) {
 export async function handleRequest(params, cfg) {
   const { utterance, parentInputs = {} } = params;
 
-  if (!utterance || utterance.trim().length < 2) {
-    return { status: 200, body: simpleText(FIXED.TOO_SHORT) };
-  }
-
   // R1 빠른 경로: 통화 중이면 AI 없이 즉시 반환
   if (isAffirmativeParentAnswer(parentInputs.call_in_progress)) {
     cfg.signalMetrics?.record({ rules: ['R1'], status: 'fast_path', elapsedMs: 0 });
@@ -171,6 +167,10 @@ export async function handleRequest(params, cfg) {
       // F4-4 끊기 안내가 첫 줄, F4-8 한계 문구는 빠른 경로에도 붙인다
       body: simpleText(FIXED.CALL_IN_PROGRESS + FIXED.DISCLAIMER, [quickReply.message("도움이 필요해요", "도움이 필요해요")]),
     };
+  }
+
+  if (!utterance || utterance.trim().length < 2) {
+    return { status: 200, body: simpleText(FIXED.TOO_SHORT) };
   }
 
   let result;
