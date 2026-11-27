@@ -35,6 +35,23 @@ const protectionApp = /(?:보호|보안|안전|백신)\s*(?:앱|어플|프로그
 const harmfulApp = /(?:사칭|가짜|악성|감염된|위조된)\s*(?:보호|안전|보안|백신)|(?:보호|안전|보안|백신)\s*(?:앱|프로그램)(?:을|를)?\s*사칭/;
 const installMessage = /(?:앱|어플|프로그램)(?:을|를)?\s*설치하라는\s*(?:문자|메시지|쪽지|연락|요청)(?:을|를|이|가)?\s*(?:(?:제가|제게|저한테)\s*)?(?:받았|받은|왔)/;
 const notReceived = /받은\s*(?:적|기억)(?:이|은)?\s*없|(?:이미|바로)\s*거절|거절했|보낸\s*적(?:이)?\s*없/;
+// 명사형 설치 지시도 수신자가 실제 요구를 받았다고 서술한 경우에만 읽는다.
+const receivedInstallOrder = /(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를)?\s*설치(?:를|하도록|하라는)?\s*(?:지시|요청|요구)(?:(?:하는|한)\s*(?:글|안내문?|문서|쪽지|연락|메시지|문자|통지))?(?:를|을)\s*(?:직접\s*)?(?:전달)?받았(?:습니다|어요|다|고|는데|지만)(?=\s|[,，.!?]|$)/u;
+const otherInstallRecipient = /(?:직원|담당자|전산\s*기사|친구|지인|가족|자녀|자원봉사자|운영자)(?:에게|한테|가|이|는|은)\s|(?:직원용|업무용|운영용|전시용)\s*(?:기기|단말|컴퓨터)/u;
+const installParticipant = /(?:^|[\s,，])(?<person>[가-힣]+?)(?:에게|한테|께서|이|가|은|는)\s+(?:(?:그|새|새로운|지정된|별도(?:의)?)\s+)?$/u;
+const receivingPerson = /^(?:나|저|제|내|수신자|신고인|신고자)$/u;
+const closedInstall = /(?:그|이|해당|당시)?\s*(?:설치\s*)?(?:요구|요청|지시)(?:가|이|는|은|을|를)?\s*(?:(?:이미|그날|곧바로|결국)\s*)?(?:철회|거절|취소|종결)/u;
+const quotedOrPastInstall = /(?:가상|허구|가정한|연극|예문|연습용|대본|역할극)|(?:예전에|지난달에|작년에)|(?:받았다는|받았다고\s*(?:가정|상상|전해\s*들))/u;
+
+function receivedSoftwareDirective(clause, following) {
+  const order = receivedInstallOrder.exec(clause);
+  if (!order || notReceived.test(clause) || quotedOrPastInstall.test(clause)) return false;
+  const before = clause.slice(0, order.index);
+  const participant = installParticipant.exec(before)?.groups.person;
+  const sameOrder = /^\s*(?:(?:그|해당|이|같은)\s+(?:설치\s*)?|설치\s*)(?:요구|요청|지시)/u.test(following);
+  return (!participant || receivingPerson.test(participant)) && !otherInstallRecipient.test(before) &&
+    !closedInstall.test(clause) && !(sameOrder && closedInstall.test(following));
+}
 
 function hasCurrentAdvance(topic) {
   if (negatedFee.test(topic) || noObligation.test(topic)) return false;
@@ -62,9 +79,10 @@ function hasAlternateAccountRequest(topic) {
 
 function addConditions(passage, signals) {
   const clauses = passage.split(/\.(?=\s|$)|[!?\n]+|(?:끝났|완료됐|완료했|마쳤|처리됐)(?:고|지만|는데)\s+/u);
-  for (const clause of clauses) {
+  for (const [index, clause] of clauses.entries()) {
     if (negatedRequest.test(clause)) continue;
     if (installMessage.test(clause) && !notReceived.test(clause)) signals.add(SIG_APP_INSTALL);
+    if (receivedSoftwareDirective(clause, clauses[index + 1] ?? "")) signals.add(SIG_APP_INSTALL);
 
     const topics = clause.split(independentTopic);
     if (topics.some(hasCurrentAdvance)) signals.add(SIG_PREPAYMENT);
