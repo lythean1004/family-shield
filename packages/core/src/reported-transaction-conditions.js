@@ -110,6 +110,38 @@ function paymentBeforeBasicInformation(clause, context) {
     showsOrDiscloses.test(after);
 }
 
+const itemUnderInspection = "(?:물건|물품|상품|매물|실물|거래\\s*조건)(?:의\\s*(?:상태|진위))?(?:을|를)?\\s*";
+const transactionInspection = new RegExp(itemUnderInspection + "(?:보여\\s*주|확인하|검토하|살펴보|보)기", "u");
+const inspectionFirst = /^\s*(?:전(?:에|에는)?|에\s*앞서|전까지)\s*[,，]?\s*/u;
+const inspectionMadeAvailable = new RegExp(itemUnderInspection +
+  "(?:보여\\s*(?:준다고|주겠다고|준다는|줄\\s*수\\s*있다고)|(?:확인|검토)할\\s*수\\s*있다고)", "u");
+const sellerImposesPayment = new RegExp("^(?:먼저\\s*)?" + MONEY_OBJECT.source +
+  "(?:을|를)?\\s*(?:먼저\\s*)?(?:입금|납부|송금|이체|지불|결제)(?:하라(?:고|는)|해\\s*달라(?:고|는))" +
+  "\\s*(?:부탁|요청|요구|지시|했|말했|적|기록|설명)", "u");
+const sellerMakesContact = /(?:판매자|매도인|거래\s*상대)(?:(?:이|가|은|는)\s*|(?:와|과|에게서|한테서)\s*(?:[^,，.!?\n]{0,18}?\s*)?(?:채팅|대화|문자|연락|통화|답장))/u;
+const voluntaryDeposit = /(?:제가|내가|수신자가)\s*(?:제안|먼저\s*요청|스스로\s*납부)|(?:선택|자발적)(?:으로|인)|(?:비용|돈|금액|예약금|보증금)(?:이|가|은|는)?\s*(?:선택|선택사항)/u;
+
+function sellerDemandsPaymentBeforeInspection(clause, context, next) {
+  if (!currentlyReported(context) || NO_PAYMENT.test(context) || CONFIRMATION_FIRST.test(context) ||
+      establishedPrice.test(context) || ordinaryInvoice.test(context) || !sellerMakesContact.test(context) ||
+      SWITCH.test(clause) || voluntaryDeposit.test(context) || samePaymentDemandEnded.test(next)) return false;
+  const inspection = transactionInspection.exec(clause);
+  if (inspection) {
+    const tail = clause.slice(inspection.index + inspection[0].length);
+    const beforeViewing = inspectionFirst.exec(tail);
+    if (beforeViewing && sellerImposesPayment.test(tail.slice(beforeViewing[0].length))) return true;
+  }
+
+  // 지불을 먼저 서술한 경우에도 확인을 미루는 의무 표현과 거래 상대의 보고를 함께 확인한다.
+  const access = inspectionMadeAvailable.exec(clause);
+  if (!access) return false;
+  const blockedInspection = clause.slice(0, access.index);
+  const payment = obligationBefore.exec(blockedInspection);
+  if (!withholding.test(blockedInspection.slice(payment?.index ?? blockedInspection.length)) &&
+      !/(?:서야|나야|에만)$/u.test(payment?.[0] ?? "")) return false;
+  return Boolean(payment && MONEY_OBJECT.test(blockedInspection.slice(0, payment.index)));
+}
+
 const currentPaymentDirective = /(?:비용|돈|금액|대금|요금|수수료)(?:을|를)?\s*(?:입금|납부|송금|이체|지불|결제)(?:하라는|하라고|하도록|할\s*것을|해\s*달라는|해야\s*한다는)[^.!?\n]{0,16}(?:요구|요청|안내|통보|설명|내용)|(?:입금|납부|송금|이체|지불|결제)(?:하라는|하라고|하도록|해\s*달라는)[^.!?\n]{0,12}(?:요구|요청|통보)|(?:비용|금액|대금|요금|수수료)(?:의)?\s*(?:입금|납부|송금|이체|지불|결제)(?:를|을|의)?\s*(?:요구|요청|지시)/u;
 const namedPaymentAccount = /(?:입금|납부|송금|이체|지불|수납)할\s*(?:계좌|통장|곳)|(?:비용|돈|대금|요금|금액)(?:을|를)?\s*(?:받을|받는)\s*(?:계좌|통장)|(?:입금처|수납처|납부처|수취\s*계좌)|(?:그|해당)\s*(?:계좌|예금주)/u;
 const displayedDifferentHolder = /(?:업체|회사|사업자|판매자)(?:로|가|의)?[^.!?\n]{0,18}(?:표시|기재|적힌)[^.!?\n]{0,16}(?:다른\s*사람|다른\s*개인)(?:의)?\s*(?:명의|이름)(?:의|로)?\s*(?:계좌|통장)/u;
@@ -288,7 +320,8 @@ export function addReportedTransactionConditions(text, signals) {
     if (EXAMPLE.test(context) || EXAMPLE.test(next) && !SWITCH.test(next)) continue;
     if (paymentBeforeOutcome(clause) || paymentBeforeOutcome(context) || bindsPaymentBeforeCounterpartyCheck(prior, clause, context, next) ||
         reportedUpfrontGate(context) || demandsPaymentBeforeVerification(clause) || paymentBeforeBasicInformation(clause, context) ||
-        workerPaysBeforeAssignment(clause, context) || requiresVerificationFeeBeforeContinuing(clause, context, next)) {
+        workerPaysBeforeAssignment(clause, context) || requiresVerificationFeeBeforeContinuing(clause, context, next) ||
+        sellerDemandsPaymentBeforeInspection(clause, context, next)) {
       signals.add(SIG_PREPAYMENT);
     }
     if (routedToOtherParty(clause) || bindsOtherOwnerToPayment(prior, clause, context, next) ||
