@@ -409,12 +409,54 @@ const documentForOwnUse = /(?:직접|각자|본인(?:이|은|만)?)\s*(?:지참|
 
 const issuedContact = "(?:(?:처음\\s*보는|낯선|모르는|다른|새(?:로운)?|바뀐)\\s*" +
   contact + "(?:로|에서)\\s*)";
+const namedFamilyOrigin = "(?:의)?\\s*(?:명의|이름)(?:로|으로)\\s*";
 const issuedFamilyName = new RegExp(
-  "^(?<precedingContact>" + issuedContact + ")?" + relation + "(?:의)?\\s*(?:명의|이름)(?:로|으로)\\s*" +
+  "^(?<precedingContact>" + issuedContact + ")?" + relation + namedFamilyOrigin +
   "(?<followingContact>" + issuedContact + ")?(?:온|도착한|받은|수신한)\\s*" + message +
   "(?:에는|에서는|에|에서)(?=\\s|$)\\s*", "u",
 );
-const continuingReceipt = new RegExp("^(?:같은|그|해당)\\s*" + message + "(?:에는|에서는|에|에서|은|는|이|가)\\s*", "u");
+const continuingReceipt = new RegExp("^(?:같은|그|해당)\\s*" + message + "(?:에는|에서는|에서|에|은|는|이|가)\\s*", "u");
+const namedDisclosureReceipt = new RegExp(
+  String.raw`^(?:(?:부모|수신자|받은\s*사람)(?:의)?\s*(?:설명|진술)에\s*따르면[,，]?\s*)?(?:` +
+  relation + "|자녀)" + namedFamilyOrigin + String.raw`(?:온|도착한|받은|수신한)\s*(?:첫(?:\s*번째)?\s*)?` +
+  message + String.raw`(?:에는|에서는|에|에서)(?=\s|$)\s*`, "u",
+);
+const changedByNamedSender = new RegExp(
+  String.raw`^(?:(?:` + source + String.raw`)(?:가|이|는)\s*)?(?:(?:자신|자기|본인)(?:의)?\s*)?(?:` +
+  contact + String.raw`(?:를|을|가|는)?\s*(?:변경(?:했|됐|되었|을)|바꿨|바뀌었|바뀌|바뀐)(?:다(?:고|는))?|(?:새(?:로운)?|바뀐)\s*` +
+  contact + String.raw`(?:를|을|로|으로)\s*(?:쓰|사용한|쓴)다(?:고|는))\s*` +
+  String.raw`(?:알렸|알렸으며|알리고|주장했|말했|설명했)(?:으며|고|습니다|다|음)?(?=$|[\s,，])`, "u",
+);
+const consecutivePrivateDemand = /^\s*[,，]?\s*(?:뒤이은|이어진|계속된)\s*(?:대화|채팅|연락)(?:에서는|에서)\s*/u;
+const familyDocument = String.raw`(?:신분증|여권|주민등록증)\s*(?:사진|사본|이미지)`;
+const namedRecipientRequest = new RegExp(
+  String.raw`^(?:(?:` + source + String.raw`)(?:가|이|는)\s*)?(?:(?:수신자(?:의)?|제|내)\s*)?` + familyDocument +
+  String.raw`(?:을|를)\s*(?:(?:답장|회신)(?:으로|로)\s*)?(?:(?:보내|첨부하|전달하|내)라(?:고|는)\s*(?:했|말했|요구했|요청했)|(?:요구|요청)(?:했|하였)|보내\s*달라(?:고|는)\s*(?:했|말했|요청했))(?:습니다|어요|다는\s*기록(?:입니다|이다)|다|음)$`, "u",
+);
+const namedReplyClosed = /^(?:그\s*)?(?:발신자|보낸\s*사람|상대(?:방)?)(?:가|이|는)\s*(?:그|해당|같은)\s*(?:자료\s*)?(?:요구|요청)(?:을|를)\s*(?:철회|취소)/u;
+
+function addNamedContactDisclosure(start, next, after, signals) {
+  const receipt = issuedFamilyName.exec(start) ?? namedDisclosureReceipt.exec(start);
+  if (!receipt || receipt.groups?.precedingContact || receipt.groups?.followingContact) return;
+  const contents = start.slice(receipt[0].length);
+  const change = changedByNamedSender.exec(contents);
+  if (!change) return;
+  const tail = contents.slice(change[0].length);
+  const inline = consecutivePrivateDemand.exec(tail);
+  const continuation = inline ? tail.slice(inline[0].length) : continuingReceipt.test(next) ? next.replace(continuingReceipt, "") : "";
+  if (!inline && tail.trim()) return;
+  const followup = inline ? next : after;
+  if (namedReplyClosed.test(followup) || [start, continuation, followup].some(part =>
+    closed.test(part) || verified.test(part) || illustrative.test(part) || documentaryPast.test(part) ||
+    sameContact.test(part) || unchangedContactField.test(part))) return;
+  if (isOtherSource(continuation) || shiftedReport.test(continuation) || identifiesReportedThirdPerson(continuation) ||
+      recipientAsks.test(continuation) || askerIsReporter.test(continuation) || actionNegation.test(continuation) ||
+      documentForOwnUse.test(continuation) || !namedRecipientRequest.test(continuation)) return;
+  signals.add(SIG_FAMILY_IMPERSONATION);
+  signals.add(SIG_NEW_NUMBER);
+  signals.add(SIG_PERSONAL_INFO);
+}
+
 const receivedPaymentObject = new RegExp("^" + money + "(?=$|[\\s을를이가은는])", "u");
 const pairedMoneyPressure = /(?:요구|요청|부탁)(?:와|과|도)\s*(?:재촉|독촉)(?:이|도|과|까지)?\s*(?:함께|같이|동시에)\s*(?:담|적|실|왔|들어)/u;
 const reportedImmediateDeadline = /^(?:(?:이어|그리고|또)\s*)?(?:지금\s*)?(?:당장|즉시|곧바로)이?라(?:고|며|면서)/u;
@@ -542,6 +584,10 @@ export function addFamilyRequestContextSignals(text, signals, { numberMismatch =
   for (const [index, start] of clauses.entries()) {
     const previous = clauses[index - 1] ?? "";
     if (identifiesReportedThirdPerson(start) || illustrative.test(previous) || exampleReceiptHeading.test(previous)) continue;
+    if (!segments[index].endsWith("?") && !historicHeading.test(previous) && !documentaryPast.test(previous)) {
+      const next = segments[index + 1]?.endsWith("?") ? "" : clauses[index + 1] ?? "";
+      addNamedContactDisclosure(start, next, clauses[index + 2] ?? "", signals);
+    }
     const actor = attributedSpeaker(start);
     if (actor && !segments[index].endsWith("?") && !documentaryPast.test(previous) &&
         !(actor.namedReceipt && historicHeading.test(previous))) {
