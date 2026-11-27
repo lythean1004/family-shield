@@ -908,7 +908,7 @@ function* sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPa
   }
 }
 
-export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [], outsideCandidates = [], installFromDirectPatterns } = {}) {
+export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [], outsideCandidates = [], inputComplete = true, installFromDirectPatterns } = {}) {
   const addAgencyAction = signal => {
     signals.add(SIG_AGENCY_IMPERSONATION);
     signals.add(signal);
@@ -931,6 +931,7 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
   for (const signal of recognizedIssuedNoticeActions(text)) addAgencyAction(signal);
   const recipientActions = recognizedRecipientActions(text, {
     outsideCandidates,
+    inputComplete,
     telecomSender: clause => roleBelongsToReportedSource(clause) ? introducedTelecomSender.exec(clause) : null,
   });
   for (const signal of recipientActions) addAgencyAction(signal);

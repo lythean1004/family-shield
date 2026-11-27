@@ -26,8 +26,9 @@ const sameNoticeCallback = new RegExp(
 const nonCurrentRoute = /(?:참고(?:로|용)?|가상|대체|예시|견본|예방|교육|훈련|별개로|다른\s*(?:발신자|업체|단체|문자|안내|요구|번호))|(?:할지|할\s*필요|(?:하|했|받았)는지|(?:요청|지시|내용)(?:인지|이었는지)|하라는\s*뜻(?:은|이)?\s*아니)/u;
 const inactiveDemand = /(?:요구|요청|지시)(?:은|는|이|가|을|를)?\s*(?:(?:이미|그\s*뒤|나중에)\s*)?(?:철회|취소|없|아니)|(?:하라|해\s*달라)(?:고|는)\s*(?:한\s*적|말|뜻)(?:이|은|는|도)?\s*(?:없|아니)/u;
 const actorWithdrawal = /^(?:발신자|상대(?:방)?|보낸\s*사람)(?:가|이)\s*(?:그|이|해당|같은)\s*(?:(?:전화|연락|자료|서류|제출)\s*)?(?:요구|요청|지시)(?:를|을)?\s*(?:취소|철회)/u;
+const publicInstitution = "(?:공공|행정|복지)\\s*기관";
 const fundingOrigin = new RegExp(
-  "^(?:(?:받은|수신한|도착한)\\s*)?(?:(?:지원금|보조금|복지)\\s*(?:담당|접수|지급|심사)\\s*기관|(?:공공|행정|복지)\\s*기관)" +
+  "^(?:(?:받은|수신한|도착한)\\s*)?(?:(?:지원금|보조금|복지)\\s*(?:담당|접수|지급|심사)\\s*기관|" + publicInstitution + ")" +
   "(?:을|를)\\s*(?:내세운|자처한|자칭한)\\s*" + artifact + "(?:에서|에는|에)(?=\\s|$)\\s*", "u",
 );
 const protectedMaterial = "(?:(?:주민등록증|신분증|여권)\\s*(?:사진|사본)|통장\\s*사본|주민등록번호(?:\\s*(?:전체|전부))?|(?:계좌|통장|카드)\\s*(?:번호|비밀번호))";
@@ -97,7 +98,23 @@ function addressAssignedToNotice(body, next, outsideCandidates) {
     candidate.protocol === address.protocol && candidate.port === address.port && candidate.rest === address.rest);
 }
 
-export function* recognizedRecipientActions(text, { outsideCandidates, telecomSender }) {
+const publicSenderClaim = new RegExp(
+  "^" + publicInstitution + "(?:을|를)\\s*(?:자처한|자칭한)\\s*" +
+  "(?:(?:한\\s*)?(?:발신자|보낸\\s*사람)(?:가|이|는|은)|" + artifact + "(?:에서|에는))\\s+" +
+  "(?:(?:제게|저에게|수신자에게)\\s+)?" +
+  "(?:(?:급여|자격|소득|본인|신원|가입|접수)(?:\\s*(?:여부|상태))?\\s*확인(?:을)?\\s*(?:이유로|위해|목적으로)\\s+)?", "u");
+const replyAddress = "(?:같은|그|해당|이)\\s*" + artifact + "(?:의\\s*|에\\s*|\\s+)(?:답장|회신)(?:란)?(?:에|으로|로)\\s*";
+const personalMaterial = "(?:(?:제|내|수신자의)\\s*)?(?:개인\\s*정보|" + protectedMaterial + ")(?:을|를)?\\s+";
+const affirmativeReply = new RegExp(
+  "^(?:" + replyAddress + personalMaterial + "|" + personalMaterial + replyAddress + ")" +
+  "(?:적으|쓰|기재하|적어\\s*보내|써서\\s*보내|첨부하|전달하|제출하|전송하)라고\\s*" +
+  "(?:(?:요구|요청|지시|말)(?:했|하였)|했)(?:습니다|어요|다(?:고\\s*한다)?|음)[.!。]?$", "u");
+
+export function* recognizedRecipientActions(text, { outsideCandidates, telecomSender, inputComplete = true }) {
+  // 명의를 자처한 화자가 같은 답장에 실제 자료를 요구했다는 완결 문장에서 읽는다.
+  const record = text.trim();
+  const sender = inputComplete && publicSenderClaim.exec(record);
+  if (sender && affirmativeReply.test(record.slice(sender[0].length))) yield SIG_PERSONAL_INFO;
   const isIssuer = clause => publicNoticeIssuer.test(clause) || Boolean(telecomSender(clause));
   for (const report of text.split(/\r?\n[ \t]*\r?\n/u)) {
     for (const { body, previous, next } of currentReceivedRequests(report, isIssuer, clause => addressPresentInNotice.test(clause))) {

@@ -361,6 +361,7 @@ function extractRawCodeSignals(text, options) {
   addInstitutionReportFrames(input, signals, {
     unverifiedLinks,
     outsideCandidates: outside,
+    inputComplete: options.inputComplete !== false,
     installFromDirectPatterns: clause => hasSensitiveRequest(clause, PATTERNS[SIG_APP_INSTALL], acceptsDirectInstallation),
   });
   return {
