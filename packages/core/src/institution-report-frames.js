@@ -700,6 +700,51 @@ const continuedDemand = /(?:요구|요청|지시)(?:를|을|가|이|는|은)(?:\
 const otherEventActor = /^(?:(?:이웃|지인|친구|동료|가족|배우자)(?:이|가|은|는)(?=\s)|(?:제가|내가|저는|수신자가|기록자가)\s*(?:먼저|직접)\s*[^.!?\n]{0,22}(?:요청|문의|부탁|제안))/u;
 const questionedDemand = /(?:해야|하라|달라|하도록)\s*(?:하는지|할지|하는\s*건지)|(?:할\s*필요가\s*있는지|해야\s*하는지를)\s*(?:물|문의)/u;
 
+const selfClaimedArtifact = new RegExp(
+  "^(?:(?:받은|수신한)\\s*)?(?:" + reportedRole + "|건강\\s*보험\\s*기관)\\s*" +
+  "(?:(?:(?!아닌(?:\\s|$)|없는(?:\\s|$)|사칭\\s*예시)[가-힣]{1,10}\\s+){0,3}[가-힣]{0,8}(?:팀|담당(?:자|부서)?|센터|창구|직원)\\s*)?" +
+  "(?:[을를]\\s*(?:자처|자칭)한|이?라고\\s*(?:(?:자신|자기)[을를]\\s*)?(?:소개(?:한|된)|밝힌|설명(?:한|된)|표시(?:한|된)))\\s*" +
+  "(?:문자|메시지|안내(?:문)?|통지(?:문)?|알림|쪽지)(?:[이가은는]|(?:였|이었|입니다|예요|이라고))(?=\\s|[.!?]|$)", "u");
+const directedLinkObject = /(?:(?:읽으|보|들어가)라|(?:열람|확인|조회|접속)하라)(?:고|는)\s*(?:안내한\s*)?(?:링크|주소)(?=\s|[을를은는])/u;
+const addressSentByNotice = /^(?:\s+\S+\s*)?(?:을|를)\s*(?:보냈|전달했|첨부했|붙여\s*보냈|보내\s*왔)/u;
+const displayedNoticeAddress = /^(?:(?:(?:그|이|해당|받은)\s*)?(?:문자|메시지|안내문?|통지|알림|화면|본문)(?:에|에서)\s*)?(?:표시|기재|표기)(?:된|돼\s*있던)\s*(?:주소|링크)(?:은|는|가|이)?(?:\s*[:：])?\s+/u;
+const printedContactPrefix = /^(?:(?:(?:그|이|같은|해당|받은)\s*)?(?:문자|메시지|안내문?|통지|알림|본문)(?:의\s*본문)?)(?:에|에는|\s*속에)\s*(?:적힌|실린|기재된|표시된|나온)\s*$/u;
+const requiredBodyCallback = /^\s*(?:으로|로|에)(?:만)?\s*(?:(?:다시|직접|먼저)\s*)?(?:전화|통화|회신|연락)(?:을|를)?\s*(?:하라(?:고|는)|하도록|해야)(?!\s*(?:했는지|해야\s*하는지|하는지|하는\s*건지|하는\s*것인지|건지|할지|할\s*필요))/u;
+const requestQuotedAsExample = /(?:라는|다는)\s*(?:인용|예시|가정|설명문)/u;
+
+function hasClaimedArtifact(clause) {
+  return selfClaimedArtifact.test(clause) && openDirectedReport(clause) &&
+    !anotherTopic.test(clause) && roleBelongsToReportedSource(clause);
+}
+
+function asksToUseSentLink(action) {
+  const object = directedLinkObject.exec(action);
+  return Boolean(object && addressSentByNotice.test(action.slice(object.index + object[0].length))) &&
+    !informationalAddress.test(action) && !requestQuotedAsExample.test(action);
+}
+
+function hasBodyContactDemand(action) {
+  const numbers = [...action.matchAll(actualPhone)];
+  if (numbers.length !== 1 || optionalRoute.test(action) || excludedReply.test(action) ||
+      asksIfRequired.test(action) || requestQuotedAsExample.test(action)) return false;
+  const [number] = numbers;
+  return !isCardCallbackNumber(number[0]) && printedContactPrefix.test(action.slice(0, number.index)) &&
+    requiredBodyCallback.test(action.slice(number.index + number[0].length));
+}
+
+function onlyUnverifiedNoticeAddress(record, action, unverifiedLinks) {
+  if (!unverifiedLinks.length || informationalAddress.test(action) || linkFromReporter.test(action)) return false;
+  const { candidates, complete } = inspectLinkCandidates(record);
+  const target = candidates[0];
+  if (!complete || candidates.length !== 1 || !target.host || !unverifiedLinks.includes(target.raw)) return false;
+  const display = displayedNoticeAddress.exec(action);
+  const object = directedLinkObject.exec(action);
+  const label = display ?? object;
+  if (!label) return false;
+  const token = action.slice(label.index + label[0].length).trimStart().split(/\s/u, 1)[0];
+  return isUnverifiedAddressToken(token, unverifiedLinks);
+}
+
 function issuerOfReceivedEvent(clause) {
   if (!openDirectedReport(clause) || !roleBelongsToReportedSource(clause) || !arrivalContext.test(clause)) return false;
   return Boolean(directRoleReceipt.test(clause) || issuerForCurrentReport(clause) || claimedIssuer(clause));
@@ -717,17 +762,24 @@ function localUnverifiedLink(action, unverifiedLinks) {
 
 // 기관 역할과 각 행동은 같은 수신 문장의 현재 범위에서 확인한다.
 function* sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPatterns) {
-  const hasAction = clause => localUnverifiedLink(clause, unverifiedLinks) ||
+  const hasAction = clause => localUnverifiedLink(clause, unverifiedLinks) || asksToUseSentLink(clause) || hasBodyContactDemand(clause) ||
     installFromDirectPatterns(clause) || personalDisclosure(clause, { recordedReply: true }).reply ||
     classifyCallback(clause, [], { includeReportedDirective: true }).directed;
   const requiresRecipientApp = clause => !staffInstallation.test(clause) && !noInstallation.test(clause) &&
     !questionedDemand.test(clause) && (requiresRecipientInstallation(clause) || installFromDirectPatterns(clause));
 
   for (const report of text.split(/\r?\n[ \t]*\r?\n/u)) {
-    for (const { body, previous, next } of currentReceivedRequests(report, issuerOfReceivedEvent, hasAction)) {
+    const reportedIssuer = clause => issuerOfReceivedEvent(clause) || hasClaimedArtifact(clause);
+    for (const { body, previous, next } of currentReceivedRequests(report, reportedIssuer, hasAction)) {
       const action = body.split(quoteBoundary, 1)[0];
       if (!openDirectedReport(action) || !roleBelongsToReportedSource(action) || closedRemainder.test(next) ||
           questionedDemand.test(action)) continue;
+      // 소개된 발신 문서와 같은 수신 기록 안에서만 명시된 목적지를 결합한다.
+      const here = hasClaimedArtifact(action);
+      const prior = !otherEventActor.test(action) && hasClaimedArtifact(previous);
+      if ((here && asksToUseSentLink(action) || prior && asksToUseSentLink(previous) && displayedNoticeAddress.test(action)) &&
+          onlyUnverifiedNoticeAddress(report, action, unverifiedLinks)) yield SIG_LINK;
+      if (prior && hasBodyContactDemand(action)) yield SIG_CALL_THIS_NUMBER;
       const sameEvent = issuerOfReceivedEvent(action) || issuerOfReceivedEvent(previous) && !otherEventActor.test(action) &&
         (sameDocumentReference.test(action) || continuedDemand.test(action));
       if (!sameEvent) continue;
