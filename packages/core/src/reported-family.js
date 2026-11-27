@@ -232,6 +232,27 @@ function hasWrittenOnlyResponse(context, hasClaimantEvidence) {
   });
 }
 
+const withdrawnVoiceRefusal = /^(?:(?:그|앞선|이전)\s*)?(?:(?:통화|전화|음성\s*확인)(?:의)?\s*)?거절(?:을|은)\s*(?:철회|취소)하고\s*(?:직접\s*)?(?:음성\s*|전화\s*)?(?:통화|전화)에\s*응(?:했고|하여|해서|해|하며)\s*[,，]?\s*/u;
+const verifiedDuringCall = /^(?:(?:제가|내가|저는|나는|수신자(?:가|는))\s+)?(?:(?:(?:잘\s*아는|아는|익숙한|들은)\s+(?:[가-힣]+(?:의)?\s+){0,2})?목소리로\s*(?:(?:본인|신원)\s*)?|(?:본인|신원)\s*)확인(?:을)?\s*(?:마쳤|끝냈|완료했|했)(?:습니다|어요|다|음)[.!。…]?$/u;
+
+function resolvedVoiceRefusal(clause) {
+  const sameConversation = /^(?:같은|동일한)\s*(?:대화|연락)에서\s+/u.exec(clause);
+  const continuation = sameConversation ? clause.slice(sameConversation[0].length) : clause;
+  const sender = replyFromClaimant.exec(continuation);
+  if (!sameConversation && !sender) return false;
+  const response = continuation.slice(sender?.[0].length ?? 0);
+  const withdrawal = withdrawnVoiceRefusal.exec(response);
+  return Boolean(withdrawal && verifiedDuringCall.test(response.slice(withdrawal[0].length)));
+}
+
+function voiceRefusalIn(context, isCurrent, hasClaimantEvidence, claim) {
+  return context.some(clause => isCurrent(clause) && hasVoiceRefusal(clause)) ||
+    hasWrittenOnlyResponse(context, hasClaimantEvidence) ||
+    (!context.some(clause => temporaryVoiceLimit.test(clause) || laterVoiceOffer.test(clause) ||
+      offersIdentityCheckLater.test(clause) || completedIdentityCall.test(clause)) &&
+      context.some(clause => isCurrent(clause) && declinedOwnIdentityCheck(clause, claim)));
+}
+
 const voiceNoteHeading = /^(?:상담|신고|(?:문자\s*)?수신|받은\s*(?:연락|문자|메시지)|연락|통화)\s*(?:메모|기록|요약|정리)[.!。]?$/u;
 const voiceNoteSender = new RegExp(
   "^(?:발신(?:자|인)|보낸\\s*(?:사람|이))(?:의)?\\s*(?:관계\\s*)?" +
@@ -290,10 +311,12 @@ export function addReportedFamilySignals(text, signals) {
       active.some(clause => hasCurrentRequest(clause, signal, pattern))).map(([signal]) => signal));
     const hasClaimantEvidence = !mentionsKinshipExpression.test(claim);
     if (active.some(clause => PAYMENT_DEADLINE.test(clause) || hasClaimantEvidence && hasDelegatedExpense(clause))) requested.add(SIG_MONEY);
-    const voice = active.some(hasVoiceRefusal) || hasWrittenOnlyResponse(context, hasClaimantEvidence) ||
-      (!context.some(clause => temporaryVoiceLimit.test(clause) || laterVoiceOffer.test(clause) ||
-        offersIdentityCheckLater.test(clause) || completedIdentityCall.test(clause)) &&
-        active.some(clause => declinedOwnIdentityCheck(clause, claim)));
+    const reportedVoiceRefusal = voiceRefusalIn(context, isCurrent, hasClaimantEvidence, claim);
+    // 완료 전에 한 거절만 해소하고 가족 주장이나 다른 행동 신호는 그대로 둔다.
+    const resolvedAt = context.findLastIndex((clause, index) =>
+      index > 0 && isCurrent(clause) && resolvedVoiceRefusal(clause));
+    const voice = reportedVoiceRefusal && (resolvedAt < 0 ||
+      voiceRefusalIn(context.slice(resolvedAt + 1), isCurrent, hasClaimantEvidence, claim));
     const groupedSecret = active.some(clause => secretPaymentReceipt.test(clause));
     if (groupedSecret) requested.add(SIG_MONEY);
     const secret = groupedSecret || requested.has(SIG_MONEY) && active.some(clause => SECRET.test(clause));
@@ -304,7 +327,7 @@ export function addReportedFamilySignals(text, signals) {
         hasCurrentRequest(precedingRequest, SIG_MONEY, moneyRequest);
     });
 
-    if (!voice && !requested.has(SIG_GIFTCARD) && !secret && !pressured && !(newContact && requested.size)) continue;
+    if (!reportedVoiceRefusal && !requested.has(SIG_GIFTCARD) && !secret && !pressured && !(newContact && requested.size)) continue;
     signals.add(SIG_FAMILY_IMPERSONATION);
     if (newContact) signals.add(SIG_NEW_NUMBER);
     if (voice) signals.add(SIG_AVOID_VOICE);
