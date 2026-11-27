@@ -148,6 +148,10 @@ function hasCurrentRequest(clause, signal, pattern) {
 
 // Read a request to take over payment of a stated expense as a directed object.
 const payableExpense = "(?:지출(?:금|액)?|경비|(?:병원|진료|치료|교육|수강|학원|교재|수리|교통|숙박|이용|통신|생활|참가)\\s*(?:비|료))";
+const mentionsKinshipExpression = new RegExp(
+  CLAIMED_RELATION + "이?라는\\s*(?:말|호칭|단어|표현|어휘)(?:을|를|만)?\\s*" +
+  "(?:(?:먼저|그냥|단지|잠시|한번)\\s*){0,2}(?:꺼내|꺼낸|꺼냈|언급|사용|읽|썼|따라)", "u",
+);
 const delegatedExpense = new RegExp(
   "(?<![\\p{L}\\p{N}_])" + payableExpense + "(?:을|를)\\s*대신\\s*" +
   "(?:내|치러|부쳐|보내|(?:송금|입금|이체|납부|부담|대납|결제|지불|지급)(?:해|하))\\s*" +
@@ -201,13 +205,13 @@ function respondedToCurrentCall(clause, reply) {
     !hasOtherSource(reply) && !offersIdentityCheckLater.test(reply) && !completedIdentityCall.test(reply);
 }
 
-function hasWrittenOnlyResponse(context) {
+function hasWrittenOnlyResponse(context, hasClaimantEvidence) {
   return context.some((clause, index) => {
     const reply = context[index + 1];
     if (!reply || DENIAL.test(clause) || DENIAL.test(reply) || clause.endsWith("?") || reply.endsWith("?")) return false;
     if (independentVoiceChallenge.test(clause) || temporaryVoiceLimit.test(reply) ||
         laterVoiceOffer.test(reply) || closedVoiceRecord.test(reply)) return false;
-    return voiceChallenge.test(clause) && writtenOnlyReply.test(reply) || respondedToCurrentCall(clause, reply);
+    return voiceChallenge.test(clause) && writtenOnlyReply.test(reply) || hasClaimantEvidence && respondedToCurrentCall(clause, reply);
   });
 }
 
@@ -236,8 +240,9 @@ export function addReportedFamilySignals(text, signals) {
       !active.some(clause => NEGATED_CONTACT.test(clause));
     const requested = new Set(REQUESTS.filter(([signal, pattern]) =>
       active.some(clause => hasCurrentRequest(clause, signal, pattern))).map(([signal]) => signal));
-    if (active.some(clause => PAYMENT_DEADLINE.test(clause) || hasDelegatedExpense(clause))) requested.add(SIG_MONEY);
-    const voice = active.some(hasVoiceRefusal) || hasWrittenOnlyResponse(context);
+    const hasClaimantEvidence = !mentionsKinshipExpression.test(claim);
+    if (active.some(clause => PAYMENT_DEADLINE.test(clause) || hasClaimantEvidence && hasDelegatedExpense(clause))) requested.add(SIG_MONEY);
+    const voice = active.some(hasVoiceRefusal) || hasWrittenOnlyResponse(context, hasClaimantEvidence);
     const groupedSecret = active.some(clause => secretPaymentReceipt.test(clause));
     if (groupedSecret) requested.add(SIG_MONEY);
     const secret = groupedSecret || requested.has(SIG_MONEY) && active.some(clause => SECRET.test(clause));
