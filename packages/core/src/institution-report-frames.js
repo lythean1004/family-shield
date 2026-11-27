@@ -345,12 +345,28 @@ const recipientRepayment = /(?:갚을|갚아야\s*할|갚기로\s*한)\s*(?:몫|
 const reportsPickupPlan = /(?:수령|수거|회수)하겠(?:다고|다는)|(?:받아|가져)\s*가겠(?:다고|다는)|(?:받아|가져)\s*간(?:다고|다는)/u;
 const asksAboutCollection = /(?:수거|수령|받아\s*가|가지러\s*오|방문)(?:하는지|할지|할\s*수\s*있는지|하는\s*건지)|(?:방문|수거|수령)\s*여부/u;
 
-function requiresLoanPickup(action, issuerClause) {
+const closedCashPickupPlan = /^(?:그|이|해당|같은)\s*(?:현금\s*)?(?:수거|회수|방문)(?:\s*(?:계획|일정|요청|절차))?(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:취소|철회|중단)/u;
+const preparesRepaymentInCash = /(?:현금|현찰)(?:으로|로)\s*(?:준비|마련)(?:해\s*(?:두면|놓으면)|하면|해\s*놓을\s*경우)\s*[,，]?\s*/u;
+const issuerVisitsAfterPreparation = /^(?:(?:자기|자신|본인)(?:이|가)\s+)?(?:직접\s+)?(?:(?:집|댁|자택|거주지)(?:에|로|으로)\s+)?(?:방문(?:해(?:서)?|하여(?:서)?)|찾아(?:와서|가서|온\s*뒤|간\s*뒤))\s+/u;
+
+function pickupAfterCashPreparation(action, debt) {
+  const preparation = preparesRepaymentInCash.exec(action);
+  const debtEnd = debt.index + debt[0].length;
+  if (!preparation || preparation.index < debtEnd ||
+      !/^(?:[을를은는이가])?\s*$/u.test(action.slice(debtEnd, preparation.index))) return false;
+  const pickup = action.slice(preparation.index + preparation[0].length);
+  const visit = issuerVisitsAfterPreparation.exec(pickup);
+  return Boolean(visit && cashReceipt.test(pickup.slice(visit[0].length)));
+}
+
+function requiresLoanPickup(action, issuerClause, hasCurrentIssuer) {
   if (!cashMedium.test(action) || noCashCollection.test(action) || separateCashPart.test(action) ||
       asksAboutCollection.test(action) || !reportsPickupPlan.test(action)) return false;
   const debt = attributedLoan.exec(action) ?? (loanRoleContext.test(issuerClause) && recipientRepayment.exec(action));
   const visit = employeeVisit.exec(action) ?? staffVisit.exec(action);
-  return Boolean(debt && visit && pickupVerbAfterVisit(action, debt, visit));
+  // 명시 발신자가 있는 한 절에서만, 준비 조건 뒤 무표지 주어를 그 발신자로 연결한다.
+  return Boolean(debt && (visit ? pickupVerbAfterVisit(action, debt, visit) :
+    hasCurrentIssuer && pickupAfterCashPreparation(action, debt)));
 }
 
 function* reportedCashTransfers(text) {
@@ -368,7 +384,7 @@ function* reportedCashTransfers(text) {
       const action = speakerHere ? body.slice(speaker.index + speaker[0].length) : body;
       if (investigator.test(role) && requiresCashAtMeeting(action)) yield SIG_CASH_HANDOVER;
       if ((financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "") &&
-          requiresLoanPickup(action, speakerHere ? body : previous)) yield SIG_LOAN_CASH_PICKUP;
+          requiresLoanPickup(action, speakerHere ? body : previous, Boolean(speakerHere) && !closedCashPickupPlan.test(next))) yield SIG_LOAN_CASH_PICKUP;
     }
   }
 }
