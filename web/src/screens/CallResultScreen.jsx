@@ -41,14 +41,14 @@ export default function CallResultScreen() {
     setBusy(true)
     setError('')
     try {
+      const base = loadCurrentResult()
       const req = await getCurrentRequest(request.id)
-      if (!mounted.current) return
+      if (!mounted.current || !base?.receipt || loadCurrentResult()?.receipt !== base.receipt) return
       setRequest(req)
       if (!canReportOriginalCall(req)) return
       if (answer === ANSWERS.WILL_CALL) { setUnreachable(true); return }
-      if (answer === ANSWERS.NOT_SENT) {
-        const base = loadCurrentResult()
-        const result = await updateResultContext(base, { familyDenied: true })
+      if (answer === ANSWERS.NOT_SENT && !base.fired_rules?.includes('R5')) {
+        const result = await updateResultContext(base, { familyDenied: true, requestId: req.id })
         if (!mounted.current || !commitResultUpdate(base.receipt, result)) return
       }
       navigate('/check/result')

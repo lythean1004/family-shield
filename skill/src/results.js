@@ -32,7 +32,7 @@ export function createReceipts(key) {
       const payload=Buffer.from(JSON.stringify({result:storedResult(result),userId,expiresAt:Date.now()+600000,nonce:randomBytes(16).toString('hex')})).toString('base64url')
       return `${payload}.${sign(payload)}`
     },
-    read(receipt,userId) {
+    read(receipt,userId,{expiredAsNull=false}={}) {
       if(typeof receipt!=='string'||receipt.length>10000) fail(400,'result_expired')
       const parts=receipt.split('.')
       if(parts.length!==2) fail(400,'result_expired')
@@ -40,7 +40,11 @@ export function createReceipts(key) {
       if(expected.length!==actual.length||!timingSafeEqual(expected,actual)) fail(400,'result_expired')
       let data
       try{data=JSON.parse(Buffer.from(parts[0],'base64url').toString())}catch{fail(400,'result_expired')}
-      if(data.expiresAt<=Date.now()||(data.userId&&data.userId!==userId)) fail(400,'result_expired')
+      if(data.userId&&data.userId!==userId) fail(400,'result_expired')
+      if(data.expiresAt<=Date.now()) {
+        if(expiredAsNull) return null
+        fail(400,'result_expired')
+      }
       return data.result
     },
   }

@@ -16,6 +16,11 @@ const SELECT=`select cr.*,ch.circle_id,ch.created_by,ch.receipt_hash,ch.level,ch
 function confirmedNotSent(row) {
   return row.kind==='family_check'&&row.state==='responded'&&row.response?.answer==='not_sent'
 }
+async function currentConsent(tx,circleId) {
+  const {rows:consents}=await tx.query(`select distinct on(item) item,granted from public.consents
+    where circle_id=$1 order by item,created_at desc,id desc`,[circleId])
+  return item=>consents.find(consent=>consent.item===item)?.granted
+}
 function requestView(row,userId) {
   if(!row) return null
   return {
@@ -27,8 +32,27 @@ function requestView(row,userId) {
   }
 }
 export function createConfirmService(db,receipts) {
+  async function recoverOriginalCall(userId,body) {
+    const result=await db.user(userId,async tx=>{
+      const {rows:[circle]}=await tx.query('select id from public.circles where protected_user_id=$1',[userId])
+      if(!circle) fail(400,'result_expired')
+      await tx.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[circle.id])
+      // Recover only from the stored check that was originally used for this request.
+      const {rows:[row]}=await tx.query(`${SELECT} and cr.id=$1 and ch.created_by=$2 and ch.circle_id=$3 and ch.receipt_hash=$4`,
+        [body.requestId,userId,circle.id,hashToken(body.receipt)])
+      if(!row||row.kind!=='family_check'||row.device_suspect||!['pending','expired','responded'].includes(row.state)) {
+        fail(400,'result_expired')
+      }
+      const granted=await currentConsent(tx,circle.id)
+      if(!granted('family_alert')||!granted('impersonation_check')) fail(403,'consent_required')
+      return applyParentContext(rowResult(row),{family_denied:true})
+    })
+    return {ok:true,result:{...result,receipt:receipts.issue(result,userId)},originalCallRecovered:true}
+  }
   async function context(userId,body) {
-    const result=receipts.read(body.receipt,userId)
+    const recoverable=body.familyDenied===true&&typeof body.requestId==='string'&&UUID.test(body.requestId)
+    const result=receipts.read(body.receipt,userId,{expiredAsNull:recoverable})
+    if(!result) return recoverOriginalCall(userId,body)
     const next={...applyParentContext(result,{
       called_before:body.calledBefore===true,family_denied:body.familyDenied===true,
     })}
@@ -45,9 +69,7 @@ export function createConfirmService(db,receipts) {
       const {rows:[circle]}=await tx.query('select id from public.circles where protected_user_id=$1',[userId])
       if(!circle) fail(403,'parent_required')
       await tx.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[circle.id])
-      const {rows:consents}=await tx.query(`select distinct on(item) item,granted from public.consents
-        where circle_id=$1 order by item,created_at desc,id desc`,[circle.id])
-      const granted=item=>consents.find(c=>c.item===item)?.granted
+      const granted=await currentConsent(tx,circle.id)
       if(!granted('family_alert')||!granted('impersonation_check')) fail(403,'consent_required')
       if(!granted('check_log')&&!(body.processingConsent===true&&body.processingVersion===PROCESSING_VERSION)) fail(409,'processing_consent_required')
       // A retried POST returns the original request; no duplicate push or sibling request.

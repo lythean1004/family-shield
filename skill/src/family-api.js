@@ -20,8 +20,8 @@ export function createFamilyApi(auth,confirm,config,{notify=async()=>{},recordCh
       try{body=JSON.parse(await readBody(req))}catch{fail(400,'json')}
       if(!body||typeof body!=='object') fail(400,'json')
       if(path==='/api/result/context'){
-        const updated=await confirm.context(session.userId,body)
-        await recordCheck(session.userId,updated.result.receipt)
+        const {originalCallRecovered,...updated}=await confirm.context(session.userId,body)
+        if(!originalCallRecovered) await recordCheck(session.userId,updated.result.receipt)
         send(200,updated)
       }
       else if(path==='/api/confirm') {
