@@ -4,6 +4,27 @@ import { extractCodeSignals } from "../src/extract.js";
 import { SIG_MONEY, SIG_GIFTCARD, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "../src/signals.js";
 
 const has = (text, id) => extractCodeSignals(text).signals.includes(id);
+describe("사용할 수 없는 원래 계좌와 대체 수취인", () => {
+  for (const text of [
+    "회계 연습표 / 공용 통장이 점검 중이라 제 개인 계좌로 부탁드립니다.",
+    "실습 / 내 계좌가 묶여서 조카 통장으로 보내 주면 돼.",
+    "예시 서식 / 제 통장이 한도 제한이라 상대방한테 바로 보내 주세요.",
+    "서식 / 모임 통장이 정지되어 아래 계좌로 보내 주세요. 예금주 표기 (회장의 가족)",
+    "관계 연습 / 이 계좌로 보내 줘. 상대방 아버지 통장이야.",
+  ]) it(text, () => assert.ok(has(text, SIG_THIRD_PARTY_ACCOUNT)));
+  for (const text of [
+    "공용 통장이 점검 중이에요. 다음 주에 원래 계좌를 다시 이용할 예정입니다.",
+    "공용 통장이 점검 중이라도 제 개인 계좌로 보내 주지 마세요.",
+    "통장이 정지되지 않았습니다. 내 개인 계좌로 부탁드립니다.",
+    "통장 압류가 풀려서 내 개인 계좌로 부탁드립니다.",
+    "우리 조카 계좌로 지난주에 보냈어. 잘 받았대.",
+    "계좌 안내 / 교재비를 출판사 명의 계좌로 부탁드립니다.",
+    "제 통장이 한도 제한입니다. 상대방한테 사진을 바로 보내 주세요.",
+    "회비 통장 점검 안내예요. 오늘은 휴관입니다. 제 개인 계좌로 부탁드립니다.",
+    "예방 안내 / ‘모임 통장이 정지되어 아래 계좌로 보내 주세요’라는 요구에 주의하세요.",
+  ]) it(text, () => assert.ok(!has(text, SIG_THIRD_PARTY_ACCOUNT)));
+});
+
 describe("원 단위를 생략한 송금 부탁", () => {
   for (const text of [
     "회비 이체 연습 / 2만 좀 보내 줄래?",

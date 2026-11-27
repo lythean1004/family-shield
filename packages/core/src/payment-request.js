@@ -10,6 +10,16 @@ const borrow = new RegExp("(?:돈|금액|[가-힣]{1,6}비|\\d+\\s*(?:만|천)?\
 const owner = "(?:(?:우리|내|제)[ \\t]*)?(?:딸|아들|동생|형|언니|누나|오빠|친구|가족|동료|지인)(?:의)?[ \\t]*";
 const namedAccount = new RegExp("(?:계좌(?:[ \\t]*번호)?|통장)(?:는|은)?[ \\t:：]*(?:" + ACCOUNT_NUMBER + "[ \\t,]*)?" +
   owner + "(?:(?:이름|명의)(?:으)?로[ \\t]*(?:돼|되어)[ \\t]*있(?:어|어요|습니다)|명의(?:야|예요|입니다))" + end);
+const unavailable = /(?:계좌|통장)(?:이|가|은|는)?\s*(?:압류|동결|한도\s*제한|묶여|막혀|정지|(?:정비|점검)\s*중)(?![가-힣]{0,3}\s*(?:아니|않|풀려|해제))/;
+const relative = "(?:조카|처제|형제|누나|동생|친척|가족|아들|딸|배우자|남편|아내)";
+const counterpartyParent = "상대(?:방)?(?:의)?\\s*(?:아빠|엄마|아버지|어머니|부모님|보호자)";
+const personalPayee = "(?:(?:(?:제|내|저의)\\s*)?개인(?:\\s*명의)?|" + relative + ")(?:의)?\\s*(?:통장|계좌)";
+const remitTo = "(?:보내\\s*(?:" + polite + "|주면\\s*(?:돼|된다|됩니다))|부탁(?:드립니다|드려요|해요))" + end;
+const substitute = new RegExp("(?:" + personalPayee + "(?:로|으로|에)|상대방(?:에게|한테))\\s*(?:바로\\s*)?" + remitTo);
+const separateHolder = new RegExp(counterpartyParent + "(?:의)?\\s*(?:통장|계좌)(?:이?야|이에요|예요|입니다)" + end);
+const relatedPayeeField = new RegExp("(?:예금주|" + ACCOUNT_NUMBER + ")[^.!?\\n()]{0,18}\\(\\s*(?:총무|회장|담당자)(?:의)?\\s*" + relative + "\\s*\\)");
+const requestedAccount = new RegExp("(?:이|아래|다음)\\s*(?:계좌|통장)(?:로|으로|에)\\s*" +
+  "(?:(?:금일|오늘|내일)까지\\s*)?(?:좀\\s*)?" + remitTo);
 const toAccount = new RegExp("(?:계좌|통장)(?:로|으로|에)\\s*(?:(?:바로|좀|지금|대신)\\s*){0,2}보내" +
   "(?:\\s*" + polite + "|(?=\\s*(?:[0-9]+\\s*만?\\s*원|$)))" + end);
 const oneTransfer = /(?:송금|이체)(?:을|를)?\s*(?:한\s*(?:번|건)|하나)만\s*(?:부탁(?:해|할게요?|드릴게요?|드려요|드립니다)?|해\s*(?:줘|주세요))(?=[\s,.!?~ㅋㅎ]|$)/;
@@ -43,15 +53,26 @@ export function requestedPayments(text) {
   let gift = false;
   let thirdPartyAccount = false;
   let precedingLoanRequest = false;
+  let precedingAccountRequest = false;
+  let precedingSubstitution = false;
   for (const clause of text.split(/[.!?\n]/)) {
     if (!clause.trim()) continue;
     if (reported.test(clause)) {
       precedingLoanRequest = false;
+      precedingAccountRequest = false;
+      precedingSubstitution = false;
       continue;
     }
     const loanRequest = borrow.test(clause);
     // 대여할 물건과 받는 계좌가 따로 언급될 수 있어, 금전 차용을 부탁한 같은 절이나 바로 다음 절만 본다.
     if ((loanRequest || precedingLoanRequest) && namedAccount.test(clause)) thirdPartyAccount = true;
+    const blocked = unavailable.test(clause);
+    const accountRequest = requestedAccount.test(clause);
+    if ((blocked && substitute.test(clause)) ||
+        ((accountRequest || precedingAccountRequest) && separateHolder.test(clause)) ||
+        (((blocked && accountRequest) || precedingSubstitution) && relatedPayeeField.test(clause))) thirdPartyAccount = true;
+    precedingAccountRequest = accountRequest;
+    precedingSubstitution = blocked && accountRequest;
     precedingLoanRequest = loanRequest;
     if (toAccount.test(clause) || oneTransfer.test(clause) || (remit.test(clause) && !mail.test(clause)) ||
         (shortAmount.test(clause) && !nonMoneyItem.test(clause))) money = true;
