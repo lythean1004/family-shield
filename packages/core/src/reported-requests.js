@@ -131,13 +131,13 @@ function addConditions(passage, signals) {
   }
 }
 
-export function reportedRequestSignals(text) {
+export function reportedRequestSignals(text, { inputComplete = true } = {}) {
   const signals = new Set();
   // 같은 자료를 설명하는 다음 문장도 예방·철회 문맥일 수 있다. 별개의 수신문을 밝힌 곳에서만 분리한다.
   for (const passage of text.split(newMessage)) {
     if (illustrative.test(passage) || withdrawn.test(passage)) continue;
     addConditions(passage, signals);
   }
-  addReportedTransactionConditions(text, signals);
+  addReportedTransactionConditions(text, signals, { inputComplete });
   return signals;
 }

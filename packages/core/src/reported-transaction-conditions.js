@@ -194,11 +194,28 @@ const evidenceOfWorkerPayment = /(?:(?:제가|내가|저는)\s*)?(?:(?:실제로
 const paysWorker = /(?:발주(?:자|처|사)|업체|의뢰인|가게|회사)(?:가|에서|는|은)[^.!?\n]{0,35}(?:작업자|수행자|제게|저한테|저에게|내게)[^.!?\n]{0,22}(?:돈|선금|착수금|보수|대금|재료비|지원금|급여|건네|주기로|지급|송금)|(?:제게|저에게|작업자에게|수행자에게)\s*(?:선금|착수금|재료비|지원금|보수)(?:을|를)?\s*(?:보내|주|건네|지급)/u;
 const ownPreparation = /(?:스스로|자체|자비로|제가\s*직접|각자)\s*(?:구매|구입|준비)|(?:장비|재료|부품|소모품)(?:을|를)?\s*(?:직접|제가|스스로|자비로)?\s*(?:구매|구입)|(?:수강료|교재비|정규\s*수업)/u;
 
-function workerPaysBeforeAssignment(clause, context) {
-  if (!currentlyReported(context) || NO_PAYMENT.test(context) || paysWorker.test(context) ||
-      ownPreparation.test(context) || !assigningParty.test(context) || !gateBeforeWork.test(clause)) return false;
+const workerReceivedOffer = new RegExp(
+  "^(?:(?:제가|저는|내가|작업자가|수행자가)\\s*)?(?:작업|업무|용역|과업|일감)(?:을|를)?\\s*" +
+  "(?:의뢰|제안|배정)(?:를|을)?\\s*받(?:아서|아|고)\\s+" +
+  "(?:(?:그\\s*)?조건(?:을|에\\s*대해)?\\s*(?:묻던\\s*중|물었더니|확인하던\\s*중|문의하자)\\s*[,，]?\\s*)?$", "u");
+const requiredWorkerFee = new RegExp(
+  "^(?:에(?:는)?\\s+)?(?:수수료|보증금|등록비|예치금|참가비)(?:을|를|부터)\\s*" +
+  "(?:먼저|미리|우선)\\s*(?:내|보내|납부하|입금하)라는\\s+(?:선납\\s*|선입금\\s*)?" +
+  "(?:요구|요청|지시)(?:(?:가|이)\\s*(?:있었|나왔|들어왔)|(?:을|를)\\s*(?:전달)?받았)" +
+  "(?:다|습니다|어요|음|다고\\s*(?:한다|했다|기록했다|설명했다)|" +
+  "다는\\s*(?:(?:상담|접수)\\s*)?(?:기록|설명|내용)(?:이다|입니다))[.!。]?$", "u");
+
+const workerDidNotPay = /^(?:(?:제가|저는|내가|수행자는|작업자는)\s*)?(?:(?:실제로|아직)\s*)?(?:(?:그\s*)?(?:돈|비용|수수료|보증금|등록비|예치금|참가비)(?:은|는|을|를)?\s*)?(?:내지|납부하지|송금하지|입금하지)\s*않았(?:다|습니다|어요|음)[.!。]?$/u;
+
+function workerPaysBeforeAssignment(clause, context, completeWorkReport) {
   const before = gateBeforeWork.exec(clause);
+  if (!before) return false;
   const following = clause.slice(before.index + before[0].length);
+  // 납부 주체가 생략된 요구는 의뢰를 받은 사람의 완결된 보고 안에서만 해석한다.
+  if (completeWorkReport && workerReceivedOffer.test(clause.slice(0, before.index)) &&
+      requiredWorkerFee.test(following.trimStart())) return true;
+  if (!currentlyReported(context) || NO_PAYMENT.test(context) || paysWorker.test(context) ||
+      ownPreparation.test(context) || !assigningParty.test(context)) return false;
   if (!workerFee.test(following)) return false;
   // 일을 맡긴 쪽이 발신자이고 수신자가 지불 주체라고 본문에서 알 수 있는 경우만 결합한다.
   return explicitWorker.test(following) || workerSubject.test(clause.slice(0, before.index)) ||
@@ -406,13 +423,15 @@ function recordedAdvanceBeforeCommitment(text) {
   return false;
 }
 
-export function addReportedTransactionConditions(text, signals) {
+export function addReportedTransactionConditions(text, signals, { inputComplete = true } = {}) {
   if (recordedAdvanceBeforeCommitment(text)) signals.add(SIG_PREPAYMENT);
   if (requiresOrganizerPaymentForFreeBooking(text)) {
     signals.add(SIG_PREPAYMENT);
     signals.add(SIG_THIRD_PARTY_ACCOUNT);
   }
   const clauses = text.split(SENTENCES).map(value => value.trim()).filter(Boolean);
+  const completeWorkReport = inputComplete && (clauses.length === 1 ||
+    clauses.length === 2 && workerDidNotPay.test(clauses[1]));
   for (const [index, clause] of clauses.entries()) {
     const prior = clauses[index - 1] ?? "";
     const next = clauses[index + 1] ?? "";
@@ -421,7 +440,7 @@ export function addReportedTransactionConditions(text, signals) {
     if (EXAMPLE.test(context) || EXAMPLE.test(next) && !SWITCH.test(next)) continue;
     if (paymentBeforeOutcome(clause) || paymentBeforeOutcome(context) || bindsPaymentBeforeCounterpartyCheck(prior, clause, context, next) ||
         reportedUpfrontGate(context) || demandsPaymentBeforeVerification(clause) || paymentBeforeBasicInformation(clause, context) ||
-        workerPaysBeforeAssignment(clause, context) || requiresVerificationFeeBeforeContinuing(clause, context, next) ||
+        workerPaysBeforeAssignment(clause, context, index === 0 && completeWorkReport) || requiresVerificationFeeBeforeContinuing(clause, context, next) ||
         sellerDemandsPaymentBeforeInspection(clause, context, next)) {
       signals.add(SIG_PREPAYMENT);
     }
