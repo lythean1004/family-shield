@@ -7,7 +7,7 @@ import { readInstitutionIssuer } from "./institution-request-context.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { isOfficialLink, readUnregisteredAddressDirection } from "./official-links.js";
 import { hasOpenInstallationReport, ORDINARY_LOOKUP, startsOtherOrganizer } from "./reported-notice-fields.js";
-import { cashEventEvidence, couldDescribeCashTransaction } from "./cash-event-evidence.js";
+import { cashEventEvidence, couldDescribeCashTransaction, loanPayment } from "./cash-event-evidence.js";
 import { currentReceivedRequests, isReceivedContinuation, receivedFieldLines } from "./received-message.js";
 import {
   SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_CASH_HANDOVER,
@@ -263,7 +263,7 @@ const linkedPrivateReply = /(?:주민\s*등록\s*번호|여권\s*(?:번호|사�
 const deniedReportAction = /(?:요청|요구|지시|부탁|안내|말|뜻|내용)(?:[을를이가은는])?\s*(?:하지\s*않|없(?:었|다|다는|음)|아니(?:었|라|다)|취소|철회|거절)|(?:달라|하라|해야|보라)(?:고|는)?\s*(?:한|했던)?\s*(?:말|적|사실)(?:[이은가는])?\s*(?:없|아니)|이미\s*(?:종결됐|철회했|거절했|취소했)/u;
 const personCashDelivery = /(?:^|[\s,，])(?:수신자(?:가|는)?|받은\s*(?:사람|이)(?:가|이|은|는)?|제가|내가)\s*(?:(?:직접|먼저)\s*)?(?:사람|직원|담당자|수사관|대리인)(?:을|를)?\s*(?:직접\s*)?만나(?:서)?\s*(?:직접\s*)?(?:현금|현찰)(?:을|를|은)?\s*(?:건네|넘겨|인계해|전달해|교부해)(?:야|라(?:고|는)|\s*달라)/u;
 const requiredInPersonCash = /(?:대면\s*(?:으로)?\s*(?:현금|현찰)\s*(?:인계|전달|교부)|(?:현금|현찰)\s*대면\s*(?:인계|전달|교부))(?:를|을)?\s*(?:요구|지시)(?:하|한|했|함)/u;
-const inPersonLoanRepayment = /(?:대출(?:금)?|융자금)(?:의|을)?\s*상환(?:금|액)?(?:을|를|은)?\s*(?:현금|현찰)(?:으로|로|을|를)?\s*(?:직접\s*)?(?:(?:찾아\s*와서|와서|방문(?:해|하여|해서))\s*(?:수거|회수|받아\s*가|받아가|받)(?:하)?겠다고|(?:준비해(?:서)?\s*)?방문\s*(?:수거인|수령인|직원|담당자)(?:에게|한테)\s*(?:인계|전달|건네|넘겨)(?:하라는|하라고|해야|도록|라(?:고|는))?(?=\s*[.!。]?$))/u;
+const inPersonLoanRepayment = /(?:대출(?:금)?|융자금)(?:의|을)?\s*상환(?:금|액)?(?:을|를|은)?\s*(?<payment>현금|현찰)(?:으로|로|을|를)?\s*(?:직접\s*)?(?:(?:찾아\s*와서|와서|방문(?:해|하여|해서))\s*(?<pickup>수거|회수|받아\s*가|받아가|받)(?:하)?겠다고|(?:준비해(?:서)?\s*)?방문\s*(?:수거인|수령인|직원|담당자)(?:에게|한테)\s*(?:인계|전달|건네|넘겨)(?:하라는|하라고|해야|도록|라(?:고|는))?(?=\s*[.!。]?$))/du;
 const summarySplit = /\s*(?:\/|[|｜])\s*(?=(?:발신(?:인|자|처)|보낸\s*(?:사람|이)|(?:요구|요청)\s*(?:요약|내용|항목))[^.!?\n]{0,20}[:：])/u;
 const summaryHeading = /^(?:기록\s*(?:종류|유형)|(?:수신|받은\s*연락)\s*(?:기록|요약))(?:\s*[:：]\s*[^.!?\n]{0,20})?$/u;
 const summaryRole = /^(?:발신(?:인|자|처)|보낸\s*(?:사람|이))(?:의)?(?:\s*(?:자기\s*소개|소속|역할|표기|주장))?\s*[:：]\s*(?<value>[^\r\n]+)$/u;
@@ -398,7 +398,7 @@ function linkedDestination(action, unverifiedLinks) {
 const attributedLoan = /(?:남은|미상환|잔여)\s*(?:대출(?:금)?|융자금)|(?:대출(?:금)?|융자금)\s*(?:잔액|잔금|상환(?:금|액)?|갚)|(?:^|[\s,，])상환(?:금|액)(?=$|[을를은는이가\s,，])/u;
 const cashMedium = /(?:현금|현찰)(?:으로|로|을|를|은)?(?=$|[\s,，.!?])/u;
 const employeeVisit = /(?:^|[\s,，])(?:금융\s*(?:회사|기관)\s*|은행\s*)?(?:담당\s*(?:자|직원)|직원|수거인|수령인)(?:이|가|은|는)\s*(?:(?:직접|나중에|당일에?|별도로)\s*)?(?:(?:집|댁|자택|수신지|거주지)(?:으로|로|에)\s*)?(?:방문(?:해(?:서)?|하여(?:서)?|하고)|찾아\s*(?:와서|가서|온\s*뒤|간\s*뒤))/u;
-const cashReceipt = /^\s*(?:(?:직접|따로|당일에?)\s*)?(?:(?:현금|현찰)(?:으로|로|을|를)?\s*)?(?:받아\s*가(?:는|겠다고|기로)|받아\s*간(?:다는|다고)|(?:수거|회수|수령)하(?:는|겠다고|겠다는|기로)|가져\s*가(?:는|겠다고)|가져\s*간(?:다는|다고))/u;
+const cashReceipt = /^\s*(?:(?:직접|따로|당일에?)\s*)?(?:(?:현금|현찰)(?:으로|로|을|를)?\s*)?(?<pickup>받아\s*가(?:는|겠다고|기로)|받아\s*간(?:다는|다고)|(?:수거|회수|수령)하(?:는|겠다고|겠다는|기로)|가져\s*가(?:는|겠다고)|가져\s*간(?:다는|다고))/du;
 const currentCollection = /(?:겠다고|ㄴ다고|다고|다는)\s*(?:연락|알려|적|설명|안내|내용|했다|했음)|(?:방식|방법|절차)(?:이)?라고\s*(?:연락|알려|알렸|적|안내|통보|설명)|(?:받아\s*간다는|수거한다는)\s*(?:내용|안내|연락)/u;
 const separateCashPart = /(?:하지만|다만|한편|와는?\s*별개|이번엔\s*다른)|(?:같은\s*(?:금액|자료|요금)|[가-힣]{1,10})(?:을|를)\s*(?:환급|반환|돌려주|지원)/u;
 
@@ -476,25 +476,34 @@ const resumedPickup = /^(?:재개(?:(?:됐|되었|했|하였)(?:다|습니다|�
 const pickupStatusPreface = /^(?:(?:이후|재차|최종적으로)\s*){0,2}/u;
 const startsPickupStatus = text => pickupStatusSubject.test(text.replace(pickupStatusPreface, ""));
 
-function reportedPickupPlanStatus(clause, statusNotes = []) {
-  const fallback = hasClosedCashPickupPlan(clause) ? "unresolved" : "active";
+function reportedPickupPlanStatus(clause, statusNotes = [], requireConfirmedStatus = false) {
+  const fallback = requireConfirmedStatus || hasClosedCashPickupPlan(clause) ? "unresolved" : "active";
   let status;
   let initialEvent;
   for (const [index, note] of [clause, ...statusNotes].join(",").split(/[,，]/u).entries()) {
     const statement = note.trim().replace(pickupStatusPreface, "");
     const subject = pickupStatusSubject.exec(statement);
-    if (!subject) break;
+    if (!subject) {
+      if (requireConfirmedStatus) return "unresolved";
+      break;
+    }
     const event = subject.groups.event === "방문" ? "visit" : "collection";
     initialEvent ??= event;
-    if (event !== initialEvent) break;
+    if (event !== initialEvent) {
+      if (requireConfirmedStatus) return "unresolved";
+      break;
+    }
     const predicate = statement.slice(subject[0].length).replace(/^(?:(?:다시|현재|이미)\s*){0,2}/u, "");
     const verb = pickupCancellationVerb.exec(predicate);
     if (verb) {
       const outcome = predicate.slice(verb[0].length);
       if (finalCancellation.test(outcome) || subject.groups.sender && /^한다[.!。]?$/u.test(outcome)) status = "closed";
       else if (index === 0 && pendingCancellation.test(outcome)) status = "active";
-    } else if (status && resumedPickup.test(predicate)) {
+      else if (requireConfirmedStatus) return "unresolved";
+    } else if ((status || requireConfirmedStatus) && resumedPickup.test(predicate)) {
       status = "active";
+    } else if (requireConfirmedStatus) {
+      return "unresolved";
     } else if (!/^(?:재개|유효|진행)/u.test(predicate)) {
       break;
     }
@@ -507,14 +516,19 @@ function reportedPickupPlanStatus(clause, statusNotes = []) {
 const preparesRepaymentInCash = /(?:현금|현찰)(?:으로|로)\s*(?:준비|마련)(?:해\s*(?:두면|놓으면)|하면|해\s*놓을\s*경우)\s*[,，]?\s*/u;
 const issuerVisitsAfterPreparation = /^(?:(?:자기|자신|본인)(?:이|가)\s+)?(?:직접\s+)?(?:(?:집|댁|자택|거주지)(?:에|로|으로)\s+)?(?:방문(?:해(?:서)?|하여(?:서)?)|찾아(?:와서|가서|온\s*뒤|간\s*뒤))\s+/u;
 
-function pickupAfterCashPreparation(action, debt) {
+function pickupAfterCashPreparation(action, debt, linkedPickup) {
   const preparation = preparesRepaymentInCash.exec(action);
   const debtEnd = debt.index + debt[0].length;
   if (!preparation || preparation.index < debtEnd ||
       !/^(?:[을를은는이가])?\s*$/u.test(action.slice(debtEnd, preparation.index))) return false;
-  const pickup = action.slice(preparation.index + preparation[0].length);
-  const visit = issuerVisitsAfterPreparation.exec(pickup);
-  return Boolean(visit && cashReceipt.test(pickup.slice(visit[0].length)));
+  const visitStart = preparation.index + preparation[0].length;
+  const visit = issuerVisitsAfterPreparation.exec(action.slice(visitStart));
+  if (!visit) return false;
+  const receiptStart = visitStart + visit[0].length;
+  const receipt = cashReceipt.exec(action.slice(receiptStart));
+  return Boolean(receipt && (!linkedPickup ||
+    preparation.index === linkedPickup.paymentIndex &&
+    receiptStart + receipt.indices.groups.pickup[0] === linkedPickup.pickupIndex));
 }
 
 function requiresLoanPickup(action, issuerClause, hasCurrentIssuer) {
@@ -527,13 +541,14 @@ function requiresLoanPickup(action, issuerClause, hasCurrentIssuer) {
     hasCurrentIssuer && pickupAfterCashPreparation(action, debt)));
 }
 
-function* currentCashReports(text, extraRequest = () => false, extraIssuer = () => null) {
+function* currentCashReports(text, extraRequest = () => false, extraIssuer = () => null, needsReceiptRemainder) {
   const issuer = clause => openDirectedReport(clause) && roleBelongsToReportedSource(clause) &&
     (reportCashRole.exec(clause) || issuerForCurrentReport(clause) || extraIssuer(clause));
   // 이 단계에서는 현금 요구 후보만 찾는다. 지급자와 인수자는 발신자 소개를 뺀 본문에서 확인한다.
   const request = clause => extraRequest(clause) || cashMedium.test(clause) && (directedHandover.test(clause) || reportsPickupPlan.test(clause));
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
-    for (const { body, previous, next, statusNotes } of currentReceivedRequests(record, issuer, request, startsPickupStatus)) {
+    for (const { body, previous, next, statusNotes, sameReceiptRemainder } of
+      currentReceivedRequests(record, issuer, request, startsPickupStatus, needsReceiptRemainder)) {
       if (!openDirectedReport(body) || asksAboutCollection.test(body) || closedRemainder.test(next)) continue;
       const speakerHere = issuer(body);
       const speaker = speakerHere || ((receivedArtifactHere.test(previous) || receivedRoleNotice.test(previous) || extraIssuer(previous)) && issuer(previous));
@@ -541,7 +556,8 @@ function* currentCashReports(text, extraRequest = () => false, extraIssuer = () 
       const { role, unit } = speaker.groups;
       const action = speakerHere ? body.slice(speaker.index + speaker[0].length) : body;
       yield { role, unit, action, source: speakerHere ? body : previous, speakerHere: Boolean(speakerHere),
-        previous, next, pickupStatus: reportedPickupPlanStatus(next, statusNotes) };
+        previous, next, sameReceiptRemainder, anchoredSpeaker: speakerHere?.index === 0,
+        pickupStatus: reportedPickupPlanStatus(next, statusNotes) };
     }
   }
 }
@@ -645,8 +661,57 @@ function* cashRecordFacts(blocks) {
 
 const unperformedPickupNote = /[,，]\s*(?:(?:다만|그리고)\s*)?(?:(?:예정된|실제(?:로)?)\s*){0,2}(?:방문|수거|회수|수령)(?:은|는|이|가|을|를)?\s*아직\s*(?:실제로\s*)?(?:하지|이행되지|이뤄지지)\s*않았(?:다|습니다|음|다고\s*(?:기록했|기록됐|확인했|확인됐)다|다는\s*(?:상태\s*)?(?:기록|메모)(?:이|가)?\s*(?:남았다|있었다|기록됐다))\s*[.!。]?\s*$/u;
 
+const unperformedPickupStatus = /^(?:(?:실제|예정된)\s+)?(?:방문|수거|회수|수령)(?:은|는|이|가)?\s*(?:아직\s*)?(?:이뤄지지\s*않았(?:다|습니다|음)|이루어지지\s*않았(?:다|습니다|음)|이행되지\s*않았(?:다|습니다|음)|없었(?:다|습니다|음))[.!。]?$/u;
+
+function finitePickupReportRemainsCurrent(notes) {
+  const updates = notes.filter(note => !unperformedPickupStatus.test(note));
+  if (!updates.every(startsPickupStatus)) return false;
+  return !updates.length || reportedPickupPlanStatus(updates[0], updates.slice(1), true) === "active";
+}
+
+
+const presentPickupQuote = /(?<verb>수거|수령|회수)한(?<ending>다고|다는)/gu;
+const recipientDebtOwner = /^\s*(?:(?:수신자|수신인)(?:\s*본인)?의\s+)?$/u;
+const confirmedPastReport = /^(?:(?:했|말했|밝혔|알렸|안내했|설명했)(?:다|습니다|음|다는\s*(?:신고|제보|(?:(?:접수|상담)\s*)?(?:메모|기록))(?:다|이다|입니다|임)|다고\s*(?:기록됐|기록되었|접수됐|접수되었)(?:다|습니다))|(?:알린|밝힌|설명한)\s*것으로\s*(?:확인됐|확인되었|접수됐|접수되었)(?:다|습니다))[.!。]?$/u;
+
+function canonicalPickupReport(action) {
+  const [quote, extraQuote] = action.matchAll(presentPickupQuote);
+  if (!quote || extraQuote) return null;
+  const debt = [attributedLoan.exec(action), loanPayment.exec(action)].find(match =>
+    match && recipientDebtOwner.test(action.slice(0, match.index)));
+  const payment = cashMedium.exec(action);
+  if (!debt || !payment || payment.index >= quote.index ||
+      !/^[을를은는이가]?\s+$/u.test(action.slice(debt.index + debt[0].length, payment.index))) return null;
+  // 현재형 자체는 계획이 아니다. 발신자가 해당 내용을 알렸다는 확정 기록이 있어야 한다.
+  const quoteEnd = quote.index + quote[0].length;
+  const report = action.slice(quoteEnd).trim().replace(/^(?:취지로|내용(?:을|이라고))\s+/u, "");
+  if (!confirmedPastReport.test(report)) return null;
+  const { verb, ending } = quote.groups;
+  return {
+    action: action.slice(0, quote.index) + verb + "하겠" + ending + action.slice(quoteEnd),
+    debt,
+    paymentIndex: payment.index,
+    pickupIndex: quote.index,
+  };
+}
+
+function matchesLinkedInPersonRepayment({ action, paymentIndex, pickupIndex }) {
+  const match = inPersonLoanRepayment.exec(action);
+  return match?.indices.groups.payment[0] === paymentIndex &&
+    match.indices.groups.pickup?.[0] === pickupIndex;
+}
+
+function hasPresentPickupQuote(action) {
+  return action.search(presentPickupQuote) >= 0;
+}
+
+function couldDescribeCashReport(action) {
+  return couldDescribeCashTransaction(action) || cashMedium.test(action) && hasPresentPickupQuote(action);
+}
+
 export function* cashEventSignals(text, blocks = structuredRecordBlocks(text)) {
-  for (const { role, unit, action, source, speakerHere, previous, next, pickupStatus } of currentCashReports(text, couldDescribeCashTransaction, alternateCashSource)) {
+  for (const { role, unit, action, source, speakerHere, previous, next, pickupStatus, anchoredSpeaker, sameReceiptRemainder } of
+    currentCashReports(text, couldDescribeCashReport, alternateCashSource, hasPresentPickupQuote)) {
     if (!openDirectedReport(action)) continue;
     const branchPickup = speakerHere ? pendingBranchPickup(action, source, previous, next) : "";
     const investigative = investigator.test(role);
@@ -660,6 +725,18 @@ export function* cashEventSignals(text, blocks = structuredRecordBlocks(text)) {
     });
     if (evidence === "investigative_handover" && !hasClosedCashPickupPlan(next)) yield SIG_CASH_HANDOVER;
     if (evidence === "staff_loan_pickup" && pickupStatus === "active") yield SIG_LOAN_CASH_PICKUP;
+    else if (financialStaff && anchoredSpeaker && !branchPickup && pickupStatus === "active" &&
+        sameReceiptRemainder !== undefined && finitePickupReportRemainsCurrent(sameReceiptRemainder)) {
+      const canonical = canonicalPickupReport(reportedPlan.replace(unperformedPickupNote, ""));
+      if (canonical && (pickupAfterCashPreparation(canonical.action, canonical.debt, canonical) ||
+          matchesLinkedInPersonRepayment(canonical) ||
+          cashEventEvidence(canonical.action, {
+            financialStaff, loanFromSource: loanRoleContext.test(source), sourceInClause: true,
+            linkedPickup: canonical,
+          }) === "staff_loan_pickup")) {
+        yield SIG_LOAN_CASH_PICKUP;
+      }
+    }
   }
   const records = [...structuredFrames(blocks)].map(({ issuer, sender, heading, fields, cashOnly, cashClosed }) => ({
     source: issuer, sender, heading, cashOnly, cashClosed, fields: fields.map(({label, value}) => ({key: label, value})),

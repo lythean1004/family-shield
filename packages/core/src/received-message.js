@@ -92,7 +92,7 @@ function fromSameNarrator(neighbor, speaker) {
   return neighbor.body;
 }
 
-export function* currentReceivedRequests(text, identifiesIssuer = () => false, identifiesRequest = () => false, isStatusNote) {
+export function* currentReceivedRequests(text, identifiesIssuer = () => false, identifiesRequest = () => false, isStatusNote, needsReceiptRemainder) {
   const clauses = text.split(endOfClause).map(clause => clause.trim()).filter(Boolean);
   const reportedClauses = clauses.map(clause => {
     const attribution = narrator.exec(clause);
@@ -118,6 +118,17 @@ export function* currentReceivedRequests(text, identifiesIssuer = () => false, i
         statusNotes.push(note.body);
       }
       frame.statusNotes = statusNotes;
+    }
+    if (needsReceiptRemainder?.(body)) {
+      const sameReceiptRemainder = [];
+      const noteSpeaker = speaker ?? reportedClauses[i + 1]?.speaker;
+      for (let j = i + 1; j < reportedClauses.length; j++) {
+        const note = reportedClauses[j];
+        if ((note.speaker && note.speaker !== noteSpeaker) || isSeparateRequest(note.body) ||
+            opensIndependentReceipt(note.body) || explicitIndependentSender.test(note.body)) break;
+        sameReceiptRemainder.push(note.body);
+      }
+      frame.sameReceiptRemainder = sameReceiptRemainder;
     }
     yield frame;
   }
