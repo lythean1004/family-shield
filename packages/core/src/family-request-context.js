@@ -107,6 +107,72 @@ const speaker = /(?:발신자|발신인|연락처|번호|연락.{0,8}사람|대�
 const reflexive = new RegExp(source + "(?:는|은|이|가)\\s*(?:자신|자기|본인)(?:을|이)?\\s*(?:(?:제|내|우리)\\s*)?" +
   relation + "이?라고\\s*(?:밝|했|소개|말)", "u");
 
+const framedRoleLabel = new RegExp(role + "[’”'」』]?(?:\\s*(?:이야|야|이에요|예요|입니다|이?라고))?\\s*$", "u");
+const framedSourceHead = new RegExp(
+  "^(?:" + source + "|상대(?:방)?|문자(?:를)?\\s*(?:쓴|보낸)\\s*(?:사람|이))" +
+  "(?:의|이|가|은|는)?\\s*[^,，.!?\\n]{0,16}(?:자기\\s*소개|소개|관계|정체|신분|역할|자칭|호칭|표시(?:\\s*이름)?)" +
+  "[^,，.!?\\n]{0,8}$", "u",
+);
+
+const displayedRoleHead = /^(?:표시\s*(?:된\s*)?이름|표기된\s*이름|표시\s*호칭|(?:신분|정체|역할|관계|자칭)\s*(?:표기|표시|이름|소개))(?:(?:은|는|이|가))?\s*[:：=]?\s*[‘“'「『]?\s*$/u;
+const unrelatedIdentityHead = /수신자|받는\s*사람|별명|추정|비유|흉내\s*예시|모르|아니|역할극|배역|연극/u;
+const receivedSynopsis = /(?:받은|수신한)\s*(?:쪽지|연락|메시지|문자)|(?:연락|메시지|문자|쪽지|수신)[^.!?\n]{0,12}(?:기록|요약|정리|분류|검토)/u;
+const familyMessageClaim = new RegExp("^" + role + "(?:의|이|가)?\\s*[^,，.!?\\n]{0,8}?" + message + "이?라고", "u");
+const labeledSenderBoundary = new RegExp("^" + source + "(?:의)?\\s*(?:자기\\s*소개|소개|이름|관계|역할)?(?:은|는|이|가)?\\s*[:：=]", "u");
+const contactChangeField = /(?:연락처|(?:전화|발신)\s*번호|^번호)(?:가|는|를)?\s*[:：]?\s*(?:(?:이전|기존|원래)(?:과|와)?\s*)?(?:전환|교체|변경|바뀜|바뀐|달라|다름|미등록|미저장)|(?:바꾼|교체한|전환한)\s*(?:발신\s*|전화\s*)?(?:번호|연락처)/u;
+const unchangedContactField = /(?:번호|연락처)[^,.!?\n]{0,10}(?:전환|교체|변경|바뀐)(?:이|는|은|가)?\s*(?:없|아니|않)/u;
+
+function hasFramedFamilySource(clause, previous) {
+  if (recipientField.test(clause) || closed.test(clause)) return false;
+  if (familyMessageClaim.test(clause) && newContact.test(clause) && !/(?:아닌|아니라고|가족이\s*아니)/u.test(clause)) return true;
+  const label = framedRoleLabel.exec(clause);
+  if (!label) return false;
+  const head = clause.slice(0, label.index);
+  return !unrelatedIdentityHead.test(head) && framedSourceHead.test(head) ||
+    displayedRoleHead.test(head) && receivedSynopsis.test(previous);
+}
+
+const reportedVerbField = /^(?<verb>전달|전송|제출|제시|첨부|입력|기입|공유|알림|회신|송금|이체|입금|구매|구입|설치|보내(?:기)?|넘겨(?:주기)?)\s*(?:을|를)?\s*(?:요청|요구|부탁)\s*[:：=]\s*/u;
+const reportedVerbObject = /^(?<verb>보내|전해|전달해|부쳐|옮겨|넘겨|알려|불러|읽어|보여|내|사|구매해|제출해|설치해)\s*(?:달(?:라(?:고|는|며)?|랬|래)|라(?:고|는|며))\s*(?:(?:한|하는)\s*)?(?:것|건|항목|대상|물품|자료|내용)(?:은|는|이|가)?\s*[:：]?\s*/u;
+const listedRecipient = /^(?:(?:이|그|해당|같은|새)\s*(?:번호|연락처|대화|문자|메시지)(?:에|로|으로)|(?:발신자|보낸\s*사람|자기|자신)(?:에게|한테))\s*/u;
+const listedMoney = new RegExp("^(?:" + money + "|경비|잔금|소액|용돈|여윳돈)" + "(?=$|[\\s은는이가을를이])", "u");
+const listedGift = new RegExp("^(?<prefix>(?:[\\p{L}\\p{N}]{1,10}\\s+){0,2}(?:[가-힣]{1,8})?)" + gift + "(?=$|[\\s은는이가을를이])", "u");
+const listedPrivate = new RegExp("^(?:(?:수신자|받(?:은|는)\\s*사람|내|제)(?:의)?\\s*)?" + privateInfo + "(?=$|[\\s은는이가을를이])", "u");
+const privateDocumentStatus = /^\s*(?:의|은|는|이|가)?\s*(?:발급|재발급|갱신|등록|분실|처리|제출|신청)(?:\s*(?:예정|여부|유무|일정|일자|날짜|이력)|했는지)/u;
+const listedDeviceApp = new RegExp("^" + deviceApp + "(?=$|[\\s은는이가을를이])", "u");
+const nonPaymentGiftLabel = /^(?:비(?:금전|상품권)|가짜|모형|종이|소품|장식용|연습용|예시)\s*/u;
+const framedMoneyOnObject = new RegExp(
+  "^(?:" + money + "|경비|잔금|소액|용돈|여윳돈)\\s*(?:을|를|은|는)?\\s*(?:보내|전해|부쳐|부치|옮겨|옮기|전달|전송|입금|이체|송금)(?:하|해|할)?\\s*" +
+  "(?:달(?:라|래|랬)|라(?:고|는)|요청|요구|부탁)", "u",
+);
+
+const negativeFieldMark = /^[×✕✖✗✘⊗☒❌]/u;
+const fieldDivider = /^(?:[\p{P}\p{S}]{1,3}\s+|[:：=]\s*)/u;
+const fieldTransfer = /^(?:전달|전송|제출|제시|첨부|입력|기입|공유|알림|회신|보내|넘겨|전해|알려|불러|읽어|보여)/u;
+const fieldPayment = /^(?:보내|전해|전달|부쳐|옮겨|넘겨|내|입금|이체|송금)/u;
+const fieldPurchase = /^(?:사|구매|구입)/u;
+
+function reportedFieldSignal(clause) {
+  const field = reportedVerbField.exec(clause) ?? reportedVerbObject.exec(clause);
+  if (!field) return null;
+  const payload = clause.slice(field[0].length).trimStart();
+  if (negativeFieldMark.test(payload)) return null;
+  const value = payload.replace(fieldDivider, "").replace(listedRecipient, "").trimStart();
+  const verb = field.groups.verb;
+  if (verb.startsWith("설치")) return listedDeviceApp.test(value) ? SIG_APP_INSTALL : null;
+
+  const voucher = listedGift.exec(value);
+  if ((fieldTransfer.test(verb) || fieldPurchase.test(verb)) && voucher &&
+      !nonPaymentGiftLabel.test(value) && !displayProp.test(voucher.groups.prefix) &&
+      !absentObject.test(value.slice(voucher[0].length))) return SIG_GIFTCARD;
+  if (fieldPayment.test(verb) && listedMoney.test(value)) return SIG_MONEY;
+  const personal = listedPrivate.exec(value);
+  if (fieldTransfer.test(verb) && personal && !privateDocumentStatus.test(value.slice(personal[0].length))) {
+    return SIG_PERSONAL_INFO;
+  }
+  return null;
+}
+
 function isSource(clause) {
   return claim.test(clause) || display.test(clause) || senderField.test(clause) || caption.test(clause) ||
     reflexive.test(clause) || (speaker.test(clause) && familyClaim.test(clause));
@@ -122,12 +188,19 @@ function hasActiveGiftObject(value, pattern) {
     !absentObject.test(value.slice(item.index + item[0].length)));
 }
 
-function requestsIn(context, fieldContext, numberMismatch) {
+function requestsIn(context, fieldContext, numberMismatch, framed = false) {
   const found = new Set();
   for (const clause of context) {
     if (closed.test(clause) || recipientAsks.test(clause)) continue;
     const hasPositiveAction = !actionNegation.test(clause);
     const object = fieldContext ? requestField.exec(clause) : null;
+    if (framed && hasPositiveAction) {
+      const slot = reportedFieldSignal(clause);
+      if (slot) found.add(slot);
+      if (framedMoneyOnObject.test(clause) || hasAmountObjectAsk(clause)) {
+        found.add(SIG_MONEY);
+      }
+    }
     if (paymentAsk.test(clause) && hasPositiveAction || numberMismatch && hasAmountObjectAsk(clause)) found.add(SIG_MONEY);
     if ((hasPositiveAction && hasActiveGiftObject(clause, giftAsk)) ||
         (!voucherReportDenial.test(clause) && hasActiveGiftObject(clause, voucherRelay)) ||
@@ -149,20 +222,22 @@ function requestsIn(context, fieldContext, numberMismatch) {
 export function addFamilyRequestContextSignals(text, signals, { numberMismatch = false } = {}) {
   const clauses = text.split(/\.(?=\s|$)|[!?。…\r\n]+/u).map(clause => clause.trim()).filter(Boolean);
   for (const [index, start] of clauses.entries()) {
-    if (!isSource(start) || isOtherSource(start) || illustrative.test(start)) continue;
     const previous = clauses[index - 1] ?? "";
+    const framed = hasFramedFamilySource(start, previous);
+    if ((!isSource(start) && !framed) || isOtherSource(start) || illustrative.test(start)) continue;
     const context = [start];
     if (newContact.test(previous) && !isSource(previous) && !isOtherSource(previous) && !request.test(previous)) context.unshift(previous);
     for (const clause of clauses.slice(index + 1, index + 4)) {
-      if (isOtherSource(clause) || isSource(clause)) break;
+      if (isOtherSource(clause) || isSource(clause) || framed && labeledSenderBoundary.test(clause)) break;
       context.push(clause);
     }
     if (context.some(clause => illustrative.test(clause) || verified.test(clause) || closed.test(clause))) continue;
 
     const heading = recipientField.test(previous) ? clauses[index - 2] ?? "" : previous;
     const fieldContext = senderField.test(start) && documentaryField.test(heading);
-    const found = requestsIn(context, fieldContext, numberMismatch);
-    const changed = context.some(clause => newContact.test(clause)) && !context.some(clause => sameContact.test(clause));
+    const found = requestsIn(context, fieldContext, numberMismatch, framed);
+    const changed = context.some(clause => newContact.test(clause) || framed && contactChangeField.test(clause)) &&
+      !context.some(clause => sameContact.test(clause) || framed && unchangedContactField.test(clause));
     const pressure = found.has(SIG_MONEY) && context.some(clause => urgency.test(clause) && urgentRequirement.test(clause));
     const secret = found.has(SIG_MONEY) && context.some(clause => secrecy.test(clause) && secrecyRequirement.test(clause));
     if (found.has(SIG_MONEY)) {
