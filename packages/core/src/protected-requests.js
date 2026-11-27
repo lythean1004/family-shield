@@ -139,19 +139,22 @@ function reportsRelayWithExplicitArguments(clause) {
   const ending = predicate.groups.ending.trim();
   if (!(lead.groups.request ? nominalRelayEnding : relayRequestEnding).test(ending)) return false;
 
-  // 조사가 붙은 수신자 주어, 인증값 목적어, 사람 목적지가 동일한 인용문의 전달 동사에 걸려야 한다.
-  const argumentsInQuote = new Set();
-  let rest = request.slice(0, predicate.index).trim();
+  const argumentsInQuote = relayArguments(request.slice(0, predicate.index), relayArgument);
+  return argumentsInQuote?.size === 3;
+}
+
+function relayArguments(text, argument) {
+  const roles = new Set();
+  let rest = text.trim();
   while (rest) {
-    const match = relayArgument.exec(rest);
-    if (!match) return false;
-    const { agent, value } = match.groups;
-    const role = agent ? "agent" : value ? "value" : "destination";
-    if (argumentsInQuote.has(role)) return false;
-    argumentsInQuote.add(role);
+    const match = argument.exec(rest);
+    if (!match) return null;
+    const role = Object.keys(match.groups).find(name => match.groups[name] !== undefined);
+    if (roles.has(role)) return null;
+    roles.add(role);
     rest = rest.slice(match[0].length).trimStart();
   }
-  return argumentsInQuote.size === 3;
+  return roles;
 }
 
 const speakerAsRecipient = "(?:자기|자신|발신자|발신인|상대(?:방)?)(?:에게|한테|쪽으로)";
@@ -170,13 +173,72 @@ function reportsIssuerContingentHandoff(clause) {
   return Boolean(argumentsInReport && proceedsWhenIssuerReceives.test(request.slice(argumentsInReport[0].length)));
 }
 
+const supportOfferIssuer = /^(?:[\p{L}\p{N}·-]{1,12}\s+){0,3}(?:수리|기술|원격|기기|전산|고장|점검)\s*(?:상담|지원|점검|안내)(?:을|를|이라고|이라며)?\s*(?:내세운|자처한|사칭한|가장한|빙자한|표방한|제안한|권한|하겠다는|한다는|한다며|한다고\s*한|해\s*주겠다는|해\s*준다는|하던|한)\s*(?:사람|쪽|이)(?:이|가|은|는)\s+/u;
+const displayedSupportCode = "(?:원격\\s*(?:지원|제어|접속|상담)\\s*(?:화면|창|도구|앱)(?:에|에서)\\s*" +
+  "(?:표시된|나온|뜬|보이는|발급된|나타난|생성된)\\s*" +
+  "(?:(?:일회용|1\\s*회용|일회성|1\\s*회성)\\s*)?(?:연결|접속|지원|인증)\\s*(?:코드|번호|값)|" +
+  "(?:일회용|1\\s*회용|일회성|1\\s*회성)\\s*원격\\s*(?:지원|제어|접속)\\s*(?:코드|번호|값))";
+const hasDisplayedSupportCode = new RegExp(displayedSupportCode, "iu");
+const deliveryToIssuer = "(?:자신|자기|본인|발신(?:자|인)|보낸\\s*사람|상대(?:방)?)(?:에게|한테|쪽으로)";
+const supportChatChannel = "(?:(?:이|같은|해당|상담|지원)\\s*)?(?:문자|메시지|채팅(?:방|창)?|대화방|메신저)(?:로|으로|에)";
+const remoteRelayArgument = new RegExp(
+  "^\\s*(?:(?<agent>제가|내가|수신자가|받은\\s*사람이)|" +
+  "(?<value>(?:" + deliveredToRecipient.source + "\\s*)?" + displayedSupportCode + "(?:을|를|만))|" +
+  "(?<destination>" + deliveryToIssuer + ")|(?<channel>" + supportChatChannel + "))(?=\\s|$)", "iu",
+);
+const supportRelayPredicate = /\s*(?:(?:전달하|전송하|인계하|건네|넘기|알리)(?:라(?:고|는|며)|도록)|(?:전달해|전송해|보내|전해|알려|넘겨|건네|읽어|불러)\s*달(?:라고|라는|라며))\s*(?<ending>[^.!?\n]*)[.!?]?$/u;
+const supportReportedEnding = /^(?:했|하였|말했|설명했|덧붙였)(?:다|습니다|어요|음)$/u;
+const supportIllustration = /^(?:연습|예시|예제|사례|가상|훈련|모의)(?:로)?\s*(?:용|기록|자료|상황|사례|문구|대본|설명|[：:])/u;
+const supportIssuerWithdrawal = /^(?:발신자|발신인|상담원|상대(?:방)?|보낸\s*사람)(?:이|가|은|는)\s*(?:(?:그|같은|해당)\s*)?(?:요구|요청|지시)(?:을|를)?\s*(?:이미\s*)?(?:취소|철회)(?:했|하였)/u;
+const ownSupportBooking = /^(?:제가|저는|내가|나는|수신자(?:가|는))\s*[^,.!?\n]{0,32}(?:원격\s*지원|지원\s*상담|원격\s*상담|기술\s*지원)[^,.!?\n]{0,18}(?:(?:먼저|직접|미리)\s*)?(?:예약|신청|요청|접수)(?:을|를)?\s*(?:했(?:다|습니다|어요)|해\s*두었(?:다|습니다)|해\s*뒀(?:다|습니다)|하였(?:다|습니다))(?=[\s.!?。]|$)/u;
+const earlierSupportBooking = /^(?:제가|저는|내가|나는|수신자(?:가|는))\s*(?:먼저|직접|미리)\s*(?:예약|신청|접수|요청)한\s*(?:원격\s*)?(?:지원|상담)(?:이었(?:다|습니다)|였(?:다|습니다)|입니다|임)(?=[\s.!?。]|$)/u;
+
+function reportsSupportCodeToIssuer(clause) {
+  if (inactiveReport.test(clause) || otherRelayTopic.test(clause) || supportIllustration.test(clause) || clause.endsWith("?")) return false;
+  const lead = relayReportLead.exec(clause) ?? supportOfferIssuer.exec(clause);
+  if (!lead) return false;
+  const request = clause.slice(lead[0].length);
+  const predicate = supportRelayPredicate.exec(request);
+  if (!predicate) return false;
+  const ending = predicate.groups.ending.trim();
+  if (lead.groups?.request ? !nominalRelayEnding.test(ending) :
+      !relayRequestEnding.test(ending) && !supportReportedEnding.test(ending)) return false;
+  const roles = relayArguments(request.slice(0, predicate.index), remoteRelayArgument);
+  return Boolean(roles?.has("value") && roles.has("destination"));
+}
+
+const otherBookingActor = /(?:발신자|상담원|담당자|직원|상대(?:방)?|다른\s*사람)(?:이|가|은|는)\s/u;
+
+function receiverInitiatedSupport(text) {
+  return !otherBookingActor.test(text) && (ownSupportBooking.test(text) || earlierSupportBooking.test(text));
+}
+
 function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
   if (hasUnverifiedLink && reportsSecretInLinkedForm(text)) return true;
-  if (deliveredToRecipient.test(text)) {
-    const identifiesIssuer = clause => currentRelayIssuer.test(clause) || relayReportLead.test(clause);
-    const identifiesHandoff = clause => reportsRelayWithExplicitArguments(clause) || reportsIssuerContingentHandoff(clause);
-    for (const { body, next } of currentReceivedRequests(text, identifiesIssuer, identifiesHandoff)) {
-      if (!withdrewCodeRelay.test(next) && identifiesHandoff(body)) return true;
+  const hasOwnedCode = deliveredToRecipient.test(text);
+  const hasSupportCode = hasDisplayedSupportCode.test(text);
+  if (hasOwnedCode || hasSupportCode) {
+    const identifiesIssuer = clause => currentRelayIssuer.test(clause) || relayReportLead.test(clause) ||
+      (hasSupportCode && supportOfferIssuer.test(clause));
+    const observations = new Map();
+    // 수신 문맥 판별 콜백에서 읽은 절은 결과를 채택할 때 다시 분석하지 않는다.
+    function readHandoff(clause) {
+      if (!observations.has(clause)) observations.set(clause, {
+        owned: hasOwnedCode && (reportsRelayWithExplicitArguments(clause) || reportsIssuerContingentHandoff(clause)),
+        remote: hasSupportCode && reportsSupportCodeToIssuer(clause),
+      });
+      return observations.get(clause);
+    }
+    const identifiesHandoff = clause => {
+      const handoff = readHandoff(clause);
+      return handoff.owned || handoff.remote;
+    };
+    for (const { body, previous, next } of currentReceivedRequests(text, identifiesIssuer, identifiesHandoff)) {
+      if (withdrewCodeRelay.test(next)) continue;
+      const handoff = readHandoff(body);
+      if (handoff.owned) return true;
+      if (handoff.remote && !supportIssuerWithdrawal.test(next) && !supportIllustration.test(previous) &&
+          ![previous, body, next].some(receiverInitiatedSupport)) return true;
     }
   }
   if (relayOrderFromIssuer.test(text)) {
