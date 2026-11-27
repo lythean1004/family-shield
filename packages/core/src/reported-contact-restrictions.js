@@ -111,6 +111,37 @@ const serviceDeletion = verbPattern("삭제|제거|지우고|없애고|지운|�
 const removalBeforeCallback = /^(?:(?:삭제|제거)하(?:고|면)|(?:삭제|제거)한\s*(?:뒤|후)|(?:지우|없애)고|(?:지운|없앤)\s*(?:뒤|후))/u;
 const senderDesignatesCallback = /(?:본인|자신|발신(?:자|인)|상대(?:방)?|보낸\s*사람)(?:이|가)?\s*(?:지정한|정한|알려\s*준)\s*(?:전화\s*)?(?:번호|연락처)(?:로|으로|에)(?:만)?\s*(?:회신|전화|연락|통화)(?:하(?:라|래|도록)|해\s*달라)/u;
 
+const marketplace = /(?:중고\s*(?:거래|장터)|인터넷\s*장터|온라인\s*(?:장터|거래)|판매자(?:에게|한테)|거래\s*상대(?:에게|한테))/u;
+const asksMarketplace = /(?:문의|질문)(?:를|을)?\s*(?:했|하였)|(?:물었|물어봤)/u;
+const marketplaceResponder = /^(?:상대(?:방)?|판매자|(?:답변|상담|응답)(?:하던|한|하는)\s*(?:사람|쪽)|상담(?:원|자))(?:가|이|은|는)\s+/u;
+const communicatedRemoval = /^(?:(?:삭제|제거)하(?:라고|라는)|(?:지우|없애)(?:라고|라는)|(?:삭제해|제거해|지워|없애)\s*달라고)\s*(?:(?:(?:했|말했|요청했|요구했)(?:다|습니다|어요|음|(?:고|지만)(?=\s+(?:저는|제가|나는|내가|수신자는)))|(?:해|말해)서)|(?:요청|지시|내용)(?:이었|였)(?:다|습니다|어요))(?:고\s*(?:적었|기록했)(?:다|습니다|어요))?(?=$|[.\s。!])/u;
+const ownOfficialServiceWork = /(?:공식|은행|통신사)(?:의)?\s*(?:고객\s*센터|상담|업데이트|교체|재설치)|(?:장애|오류)\s*(?:복구|정비|해결)|(?:재설치|업데이트)(?:를|을|하기)?\s*(?:위해|때문에)|(?:자기|자신|본인)(?:의)?\s*(?:기기|컴퓨터|휴대폰|단말기)/u;
+
+function marketplaceResponderDemandsRemoval(text) {
+  if (!marketplace.test(text)) return false;
+  for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    const clauses = record.split(CLAUSE).map(clause => clause.trim()).filter(Boolean);
+    for (const [index, clause] of clauses.entries()) {
+      const previous = clauses[index - 1] ?? "";
+      const next = clauses[index + 1] ?? "";
+      if (!marketplace.test(previous) || !asksMarketplace.test(previous) || BREAK.test(previous + " " + clause) ||
+          PAST_OR_REJECTED.test(clause) || DEVICE_ADMIN.test(clause) || SELF_REQUEST.test(clause) ||
+          COMPARISON_ONLY.test(clause) || ordinaryRemoval.test(clause) || senderClosedRemoval.test(next) ||
+          ownOfficialServiceWork.test(previous + " " + clause)) continue;
+      // 거래 문의의 상대, 수신자가 사용하던 앱, 그 앱을 지우라는 요구를 결속한다.
+      const requested = related(clause, serviceApp, deletion, ({before, between, after, object}) => {
+        const leading = clause.slice(0, object.index);
+        const predicate = clause.slice(object.index + object[0].length + between.length);
+        return marketplaceResponder.test(leading) && inUseApp.test(leading) && !otherAppRecipient.test(leading) &&
+          !OTHER_APPLICATION.test(before) && !NOT_REQUEST.test(after) &&
+          appObjectModifier.test(between) && communicatedRemoval.test(predicate);
+      }, ["", "부터", "을", "를", "의"]);
+      if (requested) return true;
+    }
+  }
+  return false;
+}
+
 function mandatesContextualRemoval(clause, previous, next, hasReport) {
   if (DEVICE_ADMIN.test(clause) || SELF_REQUEST.test(clause) || COMPARISON_ONLY.test(clause) ||
       ordinaryRemoval.test(clause) || senderClosedRemoval.test(next)) return false;
@@ -173,6 +204,7 @@ export function addReportedContactRestrictions(text, signals) {
   const clauses = text.split(CLAUSE).map(value => value.trim()).filter(Boolean);
   if (clauses.some(clause => TEACHING.test(clause))) return;
   if (mustContinueWithoutSupport(clauses)) signals.add(SIG_ISOLATION);
+  if (marketplaceResponderDemandsRemoval(text)) signals.add(SIG_DELETE_APP);
 
   for (const [index, clause] of clauses.entries()) {
     if (PAST_OR_REJECTED.test(clause) || BREAK.test(clause)) continue;

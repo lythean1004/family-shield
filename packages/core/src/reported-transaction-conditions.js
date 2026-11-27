@@ -327,7 +327,43 @@ function reportsPaymentDirectedToOutsider(clause, context, following) {
     MONEY_OBJECT.test(object) || /(?:물건|물품)값/u.test(object);
 }
 
+const advertisedFree = /무료\s*(?:체험|모임|참가|참여|이용|가입|행사|신청)/u;
+const placeBeforePayment = /(?:자리|좌석|예약|참가|참여|신청)(?:를|을|가|이)?\s*(?:확정|확보|접수|예약|잡아\s*두)(?:하)?려면/u;
+const advanceAmount = new RegExp("^(?:(?<before>먼저|미리|우선)\\s*)?" + MONEY_OBJECT.source +
+  "(?:을|를)?\\s*(?:(?<after>먼저|미리|우선)\\s*)?(?:내|보내|(?:입금|납부|송금|이체|지불|결제)해)야\\s*" +
+  "한다(?:는|고)\\s*(?:(?:답변|답|회신|연락|안내|설명)(?:을|를|이|가)\\s*(?:받았|왔|있었)|(?:했|답했|설명했))", "u");
+const organizerPersonalDestination = /^(?:단체|기관|협회|회사|주최\s*측|운영\s*측)(?:의)?\s*(?:(?:명의|계좌|통장)(?:가|이)?\s*)?(?:아니라|대신|말고)\s*(?:(?:행사|모임|체험)\s*)?(?:진행자|담당자|운영자|주최자)(?:의)?\s*개인\s*(?:명의(?:의)?\s*)?(?:계좌|통장)(?:로|으로|에)\s*/u;
+const asksPaymentToDestination = /^(?:입금|송금|납부|이체)(?:을|를)?\s*(?:요구|요청|하라(?:고|는)|해야)/u;
+const withdrewReservationPayment = /^(?:발신자|상대(?:방)?|담당자|진행자)(?:가|이)\s*(?:(?:그|해당|같은)\s*)?(?:(?:참가비|납부|입금|송금)\s*)?(?:요구|요청|지시)(?:을|를)?\s*(?:취소|철회)/u;
+const regularRemittance = /(?:회비\s*정산|각자\s*부담|실비\s*정산|반환하는\s*보증금|환불되는\s*예치금|유료로\s*전환하기로)/u;
+
+function requiresOrganizerPaymentForFreeBooking(text) {
+  for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    const clauses = record.split(SENTENCES).map(clause => clause.trim()).filter(Boolean);
+    for (const [index, clause] of clauses.entries()) {
+      const account = organizerPersonalDestination.exec(clause);
+      if (!account || !asksPaymentToDestination.test(clause.slice(account[0].length))) continue;
+      const demand = clauses[index - 1] ?? "";
+      const intro = clauses[index - 2] ?? "";
+      const next = clauses[index + 1] ?? "";
+      const context = [intro, demand, clause].join(" ");
+      if (EXAMPLE.test(context) || SWITCH.test(clause) || SWITCH.test(demand) || REVERSE_OR_AUTHORIZED.test(context) ||
+          NO_PAYMENT.test(context) || UP_TO_USER.test(context) || CLOSED_REQUEST.test(context) ||
+          regularRemittance.test(context) || withdrewReservationPayment.test(next) || samePaymentDemandEnded.test(next)) continue;
+      if (!advertisedFree.test(intro + " " + demand)) continue;
+      const goal = placeBeforePayment.exec(demand);
+      const payment = goal && advanceAmount.exec(demand.slice(goal.index + goal[0].length).trimStart());
+      if (payment && (payment.groups.before || payment.groups.after)) return true;
+    }
+  }
+  return false;
+}
+
 export function addReportedTransactionConditions(text, signals) {
+  if (requiresOrganizerPaymentForFreeBooking(text)) {
+    signals.add(SIG_PREPAYMENT);
+    signals.add(SIG_THIRD_PARTY_ACCOUNT);
+  }
   const clauses = text.split(SENTENCES).map(value => value.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
     const prior = clauses[index - 1] ?? "";
