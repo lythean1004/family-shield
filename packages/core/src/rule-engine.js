@@ -6,6 +6,7 @@
  * context 구성:
  *   signals_final : string[]  - 코드+AI 합집합 신호
  *   signals_code  : string[]? - 코드 신호만(R13 압박 조건). 없으면 합집합
+ *   unlinkedAgencyActions : string[]? - R6에 귀속할 수 없다고 확인된 코드 행동 신호
  *   call_in_progress : boolean - 지금 통화 중 (P1)
  *   called_before    : boolean - 전화를 받은 뒤 문자가 왔는지 (P2)
  *   family_denied    : boolean - 가족이 "보낸 적 없어요" 또는 P7 확인 (R5)
@@ -16,13 +17,21 @@
 import {
   SIG_LINK, SIG_APP_INSTALL, SIG_FAMILY_IMPERSONATION, SIG_NEW_NUMBER,
   SIG_MONEY, SIG_GIFTCARD, SIG_AVOID_VOICE, SIG_AGENCY_IMPERSONATION,
-  SIG_PERSONAL_INFO, SIG_CALL_THIS_NUMBER, SIG_URGENCY, SIG_SECRECY,
+  SIG_PERSONAL_INFO, SIG_URGENCY, SIG_SECRECY,
   SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT, SIG_DELETE_APP,
   SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN, SIG_OFFICIAL_LINK,
   SIG_DECEPTIVE_URL, SIG_CASH_HANDOVER, SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE, SIG_LOAN_CASH_PICKUP, SIG_FOREIGN_PAYMENT_CALLBACK,
 } from "./signals.js";
+import { AGENCY_ACTION_SIGNALS } from "./agency-request-scope.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
+
+function confirmationRules(signals, { called_before, family_denied }) {
+  const rules = [];
+  if (called_before && (signals.has(SIG_LINK) || signals.has(SIG_APP_INSTALL))) rules.push("R2");
+  if (family_denied) rules.push("R5");
+  return rules;
+}
 
 function higher(a, b) {
   return LEVELS[a] >= LEVELS[b] ? a : b;
@@ -31,6 +40,8 @@ function higher(a, b) {
 /**
  * @param {{
  *   signals_final: string[],
+ *   signals_code?: string[],
+ *   unlinkedAgencyActions?: string[],
  *   call_in_progress?: boolean,
  *   called_before?: boolean,
  *   family_denied?: boolean,
@@ -41,6 +52,7 @@ export function decide(context) {
   const {
     signals_final = [],
     signals_code = null,
+    unlinkedAgencyActions = [],
     call_in_progress = false,
     called_before = false,
     family_denied = false,
@@ -48,6 +60,7 @@ export function decide(context) {
 
   const sig = new Set(signals_final);
   const codeSignals = signals_code ? new Set(signals_code) : sig;
+  const confirmed = confirmationRules(sig, { called_before, family_denied });
   let level = "확인필요";
   const fired = [];
 
@@ -60,7 +73,7 @@ export function decide(context) {
   if (call_in_progress) fire("R1", "위험");
 
   // R2: 전화를 받은 뒤 + (링크 or 앱 설치 요구)
-  if (called_before && (sig.has(SIG_LINK) || sig.has(SIG_APP_INSTALL))) fire("R2", "위험");
+  if (confirmed.includes("R2")) fire("R2", "위험");
 
   // R3: 가족 사칭 + 새 번호 + (돈 or 상품권 요구)
   if (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_NEW_NUMBER) &&
@@ -89,7 +102,7 @@ export function decide(context) {
   if (sig.has(SIG_FAMILY_IMPERSONATION) && codeSignals.has(SIG_AVOID_VOICE)) fire("R4", "위험");
 
   // R5: 가족이 "보낸 적 없어요" 확인
-  if (family_denied) fire("R5", "위험");
+  if (confirmed.includes("R5")) fire("R5", "위험");
 
   // 링크가 모두 근거 카드의 공식 주소인지(코드가 판단). 공식 링크 표시는 코드 신호만 인정한다(AI가 끼워 넣을 수 없음)
   const officialOnly = codeSignals.has(SIG_OFFICIAL_LINK);
@@ -97,9 +110,11 @@ export function decide(context) {
   // R6: 기관 사칭 + (링크, 앱 설치, 개인정보, 문자 속 번호로 전화 유도 중 하나)
   // 링크가 모두 공식 주소면 링크만으로는 R6를 켜지 않는다(실제 기관 안내 “[국세청] … hometax.go.kr”, D48).
   // 앱 설치·개인정보·전화 유도가 함께 있으면 그대로 위험이다
-  if (sig.has(SIG_AGENCY_IMPERSONATION) &&
-      ((sig.has(SIG_LINK) && !officialOnly) || sig.has(SIG_APP_INSTALL) ||
-       sig.has(SIG_PERSONAL_INFO) || sig.has(SIG_CALL_THIS_NUMBER))) fire("R6", "위험");
+  // 새 AI 신호는 발신자를 특정할 수 없으므로 기존처럼 평가한다.
+  const agencyHasAction = AGENCY_ACTION_SIGNALS.some(signal =>
+    sig.has(signal) && (signal !== SIG_LINK || !officialOnly) &&
+    (!codeSignals.has(SIG_AGENCY_IMPERSONATION) || !codeSignals.has(signal) || !unlinkedAgencyActions.includes(signal)));
+  if (sig.has(SIG_AGENCY_IMPERSONATION) && agencyHasAction) fire("R6", "위험");
 
   // R9: 고립 요구, 선입금 요구, 개인 계좌 입금, 앱 삭제 지시
   if (sig.has(SIG_ISOLATION) || sig.has(SIG_PREPAYMENT) ||
@@ -129,4 +144,13 @@ export function decide(context) {
   if (fired.length === 0) fired.push("R8");
 
   return { level, fired_rules: fired };
+}
+
+/** 원문으로 이미 내린 판정에 새 확인 응답이 충족한 규칙을 더한다. */
+export function applyParentContext(result, context) {
+  const additions = confirmationRules(new Set(result.signals_final), context);
+  if (additions.length === 0) return result;
+  const fired = new Set([...(result.fired_rules ?? []), ...additions]);
+  fired.delete("R8");
+  return { ...result, level: "위험", fired_rules: [...fired] };
 }

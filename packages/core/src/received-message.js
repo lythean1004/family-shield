@@ -18,7 +18,37 @@ const topicShiftOrPast = /^(?:한편|(?:예전|이전|지난번)\s*(?:에|의|�
 const notDirected = /(?:요구|요청|안내|부탁)(?:[은는이가])?\s*(?:사실이\s*)?(?:아니|없(?:었|다))|(?:선택\s*사항|할\s*필요(?:가|는)?\s*없|(?:필수|조건|요건|의무)(?:가|이|은|는)?\s*아니|(?:제출|입력|설치|삭제|회신|연락|납부|송금|이체)\s*하지\s*(?:않|말|마)|(?:보내|적|알리|주|지우|내)지\s*(?:않|말|마)|(?:여부|유무|날짜|일정|버전)만)/u;
 const sameRequestClosed = /^(?:(?:그|이|같은|해당)\s*(?:요청|요구|절차|거래)(?:[을를이가은는])?\s*)?(?:이미\s*)?(?:거절했|철회했|취소했|취소됐|종료됐|처리됐|끝냈|끝났)/u;
 const reportedDenial = /(?:하라|으라)(?:고|는)\s*(?:(?:한|말한)\s*적(?:이|은)?\s*없|(?:뜻|의미|말)(?:[은는이가])?\s*아니)/u;
+// Strong boundaries only. Generic topic changes do not establish a different sender.
+const explicitIndependentSender = /^(?:(?:(?:그와|이와)(?:는)?\s*별개로|별건으로|또)\s+)?(?:다른|별도의?)\s+(?:발신자|발신처)(?:가|이|는|은|에게(?:서)?|한테(?:서)?)(?=\s)/u;
+const earlierSender = /^(?:첫(?:\s*번째)?|처음|앞선|기존|원래|먼저\s*(?:온|연락한))\s+(?:발신자|발신처|상대|보낸\s*사람)(?:가|이|는|은)(?=\s)/u;
+const otherRecipientOnly = /^(?:(?:같은|그|이|해당)\s+)?(?:발신자|발신처|상대|보낸\s*사람)(?:는|가|이|은)\s+(?:저나\s+수신자가\s+아닌\s+)?(?:다른\s+(?:참가자|사람|수신자|직원)|제\s*3\s*자)(?:에게|한테)만(?=\s)/u;
+const senderWithdrew = /^(?:(?:같은|그|이|해당)\s+)?(?:발신자|발신처|상대|보낸\s*사람)(?:가|이|는|은)\s+(?:그|이|같은|해당)\s*(?:요청|요구)(?:을|를)\s*(?:이미\s*)?(?:철회|취소)\s*(?:했(?:다|습니다|어요|음)|함|하였습니다|하였다)[.!?。…]*$/u;
 const endOfClause = /(?<=[.!?。…])\s+|[\r\n]+/u;
+
+const scopedClause = new RegExp("(" + endOfClause.source + ")", "u");
+
+// Null means there is insufficient bounded scope evidence to partition this report.
+export function receivedRequestEpisodes(text) {
+  const clauses = text.split(scopedClause, 24);
+  if (clauses.length < 3 || clauses.length > 23) return null;
+  let changed = false;
+  const episodes = [];
+  for (let index = 0; index < clauses.length; index += 2) {
+    const text = clauses[index];
+    const clause = text.trim();
+    if (!clause) continue;
+    const attribution = narrator.exec(clause);
+    const body = clause.slice(attribution?.[0].length ?? 0);
+    const separate = explicitIndependentSender.test(body) && !attribution;
+    const otherRecipient = otherRecipientOnly.test(body) && relevant.test(body) && !attribution;
+    const withdrawn = senderWithdrew.test(body) && !attribution;
+    if (episodes.length > 1 && earlierSender.test(body)) return null;
+    if (!episodes.length || separate) episodes.push([]);
+    changed ||= (separate && episodes.length > 1) || otherRecipient || withdrawn;
+    episodes.at(-1).push({ text, separator: clauses[index + 1] ?? "", otherRecipient, withdrawn, request: relevant.test(body) });
+  }
+  return changed ? episodes : null;
+}
 
 const isReceivedMessage = text => received.test(text) && !inactive.test(text);
 const isInactiveRequest = text => inactive.test(text) || notDirected.test(text) || reportedDenial.test(text);

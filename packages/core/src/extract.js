@@ -15,6 +15,7 @@
  * options.registeredLast4 : 사칭된 가족의 등록 번호 끝 4자리(P3에서 고른 뒤 알 수 있음)
  *   두 값이 모두 있고 다르면 SIG_NEW_NUMBER. 같아도 판정을 낮추지 않는다(발신번호 조작 가능).
  */
+import { unlinkedAgencyActions, AGENCY_ACTION_SIGNALS } from "./agency-request-scope.js";
 import { findLookalikes } from "./lookalike.js";
 import {
   SIG_LINK, SIG_SHORT_URL, SIG_LOOKALIKE_DOMAIN, SIG_APP_INSTALL, SIG_MONEY,
@@ -263,7 +264,7 @@ const PATTERNS = {
  * @param {{ senderLast4?: string, registeredLast4?: string, inputComplete?: boolean, shortUrlKeys?: Set<string> }} [options]
  * @returns {{ signals: string[], domains: string[], localHealthClaim?: boolean, healthRoutingSignals?: string[] }}
  */
-export function extractCodeSignals(text, options = {}) {
+function extractRawCodeSignals(text, options) {
   const signals = new Set();
   const domains = new Set();
   const input = typeof text === "string" ? text : "";
@@ -363,4 +364,18 @@ export function extractCodeSignals(text, options = {}) {
     // 수신자가 옮겨 적은 요구는 로컬 판정에만 보탠다. 기존 건강정보 전송 판단에는 직접 검출한 신호를 사용한다.
     ...(directSignals.length !== signals.size && { healthRoutingSignals: directSignals }),
   };
+}
+
+
+/**
+ * @returns {{ signals: string[], domains: string[], localHealthClaim?: boolean,
+ *   healthRoutingSignals?: string[], unlinkedAgencyActions?: string[] }}
+ */
+export function extractCodeSignals(text, options = {}) {
+  const result = extractRawCodeSignals(text, options);
+  if (options.inputComplete === false || !result.signals.includes(SIG_AGENCY_IMPERSONATION) ||
+      !AGENCY_ACTION_SIGNALS.some(signal => result.signals.includes(signal))) return result;
+
+  const unlinked = unlinkedAgencyActions(text, result.signals, slice => extractRawCodeSignals(slice, options).signals);
+  return unlinked.length ? { ...result, unlinkedAgencyActions: unlinked } : result;
 }

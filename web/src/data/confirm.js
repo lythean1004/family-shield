@@ -1,6 +1,6 @@
 import { api } from './api.js'
 import { createDemoConfirmStore } from './demo-confirm.js'
-import { decide } from '../../../packages/core/src/rule-engine.js'
+import { applyParentContext } from '../../../packages/core/src/rule-engine.js'
 
 // F5-1: 가족 사칭 확인 답변 3종
 export const ANSWERS = {
@@ -29,7 +29,6 @@ export const DEV_FAMILY = {
   guardian: { callName: '지은이', relation: '딸', phone: '010-0000-1234' },
 }
 
-const LEVEL_RANK = { 확인필요: 0, 주의: 1, 위험: 2 }
 export function toGuardianSummary(result, senderLast4 = null) {
   return { level:result.level, signals_final:[...(result.signals_final ?? [])],
     impersonated_relation:result.impersonated_relation ?? null,
@@ -54,21 +53,15 @@ export const confirmStore = createConfirmStore()
 
 export function applyFamilyAnswer(result, answer) {
   if (answer !== ANSWERS.NOT_SENT) return result
-  const { level, fired_rules } = decide({ signals_final: result.signals_final ?? [], family_denied: true })
-  const higher = LEVEL_RANK[level] >= LEVEL_RANK[result.level] ? level : result.level
-  const rules = [...new Set([...(result.fired_rules ?? []), ...fired_rules])].filter((r) => r !== 'R8')
-  return { ...result, level: higher, fired_rules: rules }
+  return applyParentContext(result, { family_denied: true })
 }
 
 /**
  * 전화 여부(P2)를 판정에 반영한다. R1(통화 중)은 끊기 화면으로 따로 가므로 여기서는 R2만.
- * 원문 없이 signals_final만으로 규칙 엔진을 다시 돌리고, 더 높은 쪽을 쓴다.
+ * 기존 판정에 전화 응답이 충족한 R2만 더한다.
  */
 export function applyCallContext(result, { calledBefore }) {
-  if (!calledBefore) return result
-  const { level, fired_rules } = decide({ signals_final: result.signals_final ?? [], called_before: true })
-  if (LEVEL_RANK[level] <= LEVEL_RANK[result.level]) return result
-  return { ...result, level, fired_rules: [...new Set([...(result.fired_rules ?? []), ...fired_rules])] }
+  return applyParentContext(result, { called_before: Boolean(calledBefore) })
 }
 
 /** "오후 3:12" */
