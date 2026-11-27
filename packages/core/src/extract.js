@@ -26,6 +26,7 @@ import { findLinks, toDomain, isShortener } from "./links.js";
 import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
 import { allLinksOfficial, isOfficialLink } from "./official-links.js";
 import { hasCardServiceRequest } from "./card-sender.js";
+import { classifyCallback } from "./callback-number.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
 /** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
@@ -193,13 +194,17 @@ export function extractCodeSignals(text, options = {}) {
 
   // 요구 키워드
   for (const [signal, patterns] of Object.entries(PATTERNS)) {
+    if (signal === SIG_CALL_THIS_NUMBER) continue;
     if (patterns.some((re) => re.test(input))) signals.add(signal);
   }
 
-  // 단축 서비스는 최종 목적지를 알 수 없다. 단순 조회와 구분되는 처리 요구에만 발신자 신호를 더한다.
-  if (signals.has(SIG_LINK) && !signals.has(SIG_OFFICIAL_LINK) &&
-      hasCardServiceRequest(input, signals.has(SIG_APP_INSTALL) || signals.has(SIG_PERSONAL_INFO)) &&
-      inspection.candidates.some(c => c.complete && !isShortener(c.host) && !isOfficialLink(c.raw))) {
+  const callback = classifyCallback(input, PATTERNS[SIG_CALL_THIS_NUMBER]);
+  if (callback.signal) signals.add(SIG_CALL_THIS_NUMBER);
+  const externalLink = signals.has(SIG_LINK) && !signals.has(SIG_OFFICIAL_LINK) &&
+    inspection.candidates.some(c => c.complete && !isShortener(c.host) && !isOfficialLink(c.raw));
+  if ((externalLink || callback.directed) && hasCardServiceRequest(input, {
+    externalLink, directedCallback: callback.directed, sensitiveRequest: signals.has(SIG_APP_INSTALL) || signals.has(SIG_PERSONAL_INFO),
+  })) {
     signals.add(SIG_AGENCY_IMPERSONATION);
   }
   addFamilySignals(input, signals);

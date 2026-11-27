@@ -4,6 +4,11 @@
     {
       "id": "EV-DOM-EPOST",
       "name": "우체국(우정사업본부)",
+      "callback_contact": {
+        "numbers": ["1588-1300"],
+        "source_url": "https://ibot.epost.go.kr/chatbot/",
+        "checked_at": "2026-11-27"
+      },
       "official_domains": [
         "epost.go.kr",
         "koreapost.go.kr"
@@ -245,6 +250,11 @@
     {
       "id": "EV-DOM-FSS",
       "name": "금융감독원",
+      "callback_contact": {
+        "numbers": ["1332"],
+        "source_url": "https://www.fsc.go.kr/no010101/87779",
+        "checked_at": "2026-11-27"
+      },
       "official_domains": [
         "fss.or.kr"
       ],
@@ -274,6 +284,11 @@
     {
       "id": "EV-DOM-POLICE",
       "name": "경찰청",
+      "callback_contact": {
+        "numbers": ["112"],
+        "source_url": "https://www.fsc.go.kr/no010101/87779",
+        "checked_at": "2026-11-27"
+      },
       "official_domains": [
         "police.go.kr"
       ],
@@ -570,6 +585,11 @@
     {
       "id": "EV-DOM-COUPANG",
       "name": "쿠팡",
+      "callback_contact": {
+        "numbers": ["1577-7011"],
+        "source_url": "https://privacy.coupang.com/ko/center/coupang/",
+        "checked_at": "2026-11-27"
+      },
       "official_domains": [
         "coupang.com"
       ],
