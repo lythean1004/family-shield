@@ -93,10 +93,25 @@ function mandatesDeletion(text) {
   }, ["", "부터", "을", "를", "은", "는", "만"]);
 }
 
+const senderLimitsOutsideAdvice = /(?:연락(?:한|하던|했던|을\s*한|해\s*온)\s*(?:사람|상대)|발신(?:자|인)|상대(?:방)?)(?:가|이|은|는)?\s*(?:제가|내가|수신자가)?[^.!?\n]{0,25}(?:다른\s*사람|가족|지인|친구)(?:과|와|에게|한테|하고)?\s*[^.!?\n]{0,12}(?:상의|의논|조언)(?:를|을)?\s*(?:하지\s*못\s*(?:하게|하도록)|할\s*수\s*없(?:게|도록)|못\s*하게|해선\s*안\s*된다고)/u;
+const senderDemandsContinuingAlone = /(?:혼자(?:서)?(?:만)?|단독(?:으로)?)\s*[^.!?\n]{0,16}(?:다음|계속|이어)[^.!?\n]{0,18}(?:이야기|대화|통화|연락|상담|응답)[^.!?\n]{0,17}(?:요구|요청|지시)/u;
+
+const sameIsolationDemandEnded = /^(?:그|해당|같은|이)\s*(?:요구|요청|조건|지시)(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:(?:취소|철회)(?:됐|되었)|(?:발신자|발신인|상대(?:방)?)(?:가|이)\s*(?:취소|철회)(?:했|하였))/u;
+function mustContinueWithoutSupport(clauses) {
+  return clauses.some((clause, index) => {
+    const next = clauses[index + 1] ?? "";
+    return senderLimitsOutsideAdvice.test(clause) && !PAST_OR_REJECTED.test(clause) &&
+      !SELF_REQUEST.test(clause) && !NARROW_CONTEXT.test(clause) && !BREAK.test(next) && !PAST_OR_REJECTED.test(next) &&
+      !NARROW_CONTEXT.test(next) && !allowedSupport.test(clause + " " + next) &&
+      !sameIsolationDemandEnded.test(clauses[index + 2] ?? "") && senderDemandsContinuingAlone.test(next);
+  });
+}
+
 /** 현재 받은 연락에서 대상과 명령, 말한 사람을 연결해 기존 R9 신호를 보강한다. */
 export function addReportedContactRestrictions(text, signals) {
   const clauses = text.split(CLAUSE).map(value => value.trim()).filter(Boolean);
   if (clauses.some(clause => TEACHING.test(clause))) return;
+  if (mustContinueWithoutSupport(clauses)) signals.add(SIG_ISOLATION);
 
   for (const [index, clause] of clauses.entries()) {
     if (PAST_OR_REJECTED.test(clause) || BREAK.test(clause)) continue;
@@ -110,7 +125,8 @@ export function addReportedContactRestrictions(text, signals) {
     const indirect = ARTIFACT.test(body) && (DIRECTIVE.test(body) || CUT_CONTACT.test(body) || ONLY_ALONE_AFTER_CUTOFF.test(body));
     const requiredRemovalReported = /(?:발신자|상대(?:방)?|보낸\s*사람|상담원?|안내(?:문)?|조건|절차|지시|요구|내용|라(?:고|는|며)|다(?:고|는|며)|(?:해야|해라|하라|하래)\s*[.!?]?)/u.test(body);
 
-    if ((narrates || indirect) && mandatesIsolation(body)) signals.add(SIG_ISOLATION);
+    const isolationClosure = sameIsolationDemandEnded.test(next) || sameTopic(next) && sameIsolationDemandEnded.test(clauses[index + 2] ?? "");
+    if ((narrates || indirect) && !isolationClosure && mandatesIsolation(body)) signals.add(SIG_ISOLATION);
     const administrative = sameTopic(previous) && DEVICE_ADMIN.test(previous);
     if ((narrates || indirect || requiredRemovalReported) && !administrative && mandatesDeletion(body)) signals.add(SIG_DELETE_APP);
   }
