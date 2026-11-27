@@ -154,11 +154,29 @@ function reportsRelayWithExplicitArguments(clause) {
   return argumentsInQuote.size === 3;
 }
 
+const speakerAsRecipient = "(?:자기|자신|발신자|발신인|상대(?:방)?)(?:에게|한테|쪽으로)";
+const receiverOwnedCode = deliveredToRecipient.source + "\\s*(?:" + oneTimeConfirmationValue + "|" + credential + ")(?:을|를)";
+const receivedCodeAndDestination = new RegExp("^(?:" + receiverOwnedCode + "\\s+" + speakerAsRecipient +
+  "|" + speakerAsRecipient + "\\s+" + receiverOwnedCode + ")\\s+", "iu");
+const proceedsWhenIssuerReceives = /^(?:전달|인계|전송)받(?:아야(?:만)?|은\s*뒤에만)\s*(?:(?:접수|처리|신청|확인|상담)(?:\s*절차)?|절차)(?:가|이|는|은)?\s*(?:된다|가능하다|진행된다)(?:고|는|며)\s*(?:했|하였|말했|설명했|적었|알렸|안내했)/u;
+
+function reportsIssuerContingentHandoff(clause) {
+  if (inactiveReport.test(clause) || localEntry.test(clause) || otherRelayTopic.test(clause)) return false;
+  const issuer = currentRelayIssuer.exec(clause);
+  if (!issuer) return false;
+  const request = clause.slice(issuer.index + issuer[0].length).trimStart();
+  const argumentsInReport = receivedCodeAndDestination.exec(request);
+  // 발신자가 받아야 일이 진행된다고 설명한 경우, 수신자에게 온 값이 발신자 쪽으로 이동한다.
+  return Boolean(argumentsInReport && proceedsWhenIssuerReceives.test(request.slice(argumentsInReport[0].length)));
+}
+
 function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
   if (hasUnverifiedLink && reportsSecretInLinkedForm(text)) return true;
   if (deliveredToRecipient.test(text)) {
-    for (const { body, next } of currentReceivedRequests(text, clause => relayReportLead.test(clause), reportsRelayWithExplicitArguments)) {
-      if (!withdrewCodeRelay.test(next) && reportsRelayWithExplicitArguments(body)) return true;
+    const identifiesIssuer = clause => currentRelayIssuer.test(clause) || relayReportLead.test(clause);
+    const identifiesHandoff = clause => reportsRelayWithExplicitArguments(clause) || reportsIssuerContingentHandoff(clause);
+    for (const { body, next } of currentReceivedRequests(text, identifiesIssuer, identifiesHandoff)) {
+      if (!withdrewCodeRelay.test(next) && identifiesHandoff(body)) return true;
     }
   }
   if (relayOrderFromIssuer.test(text)) {
