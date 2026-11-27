@@ -6,6 +6,10 @@ const visit = /(?:방문(?:하는|할|해(?:서)?|하여|한|하기로)|찾아\s
 const handoff = /(?:인계|전달|교부)하(?:라고|라는|도록)|(?:인계|전달|교부)해야|(?:넘기|건네)(?:라고|라는|라네|도록)|(?:넘겨|건네)야|(?:넘기|건네|인계하|전달하)는\s*(?:일|것)(?:이|은|는)?\s*(?:제|수신자의)?\s*(?:몫|의무)|대면\s*(?:현금|현찰)\s*(?:인계|전달|교부)(?:를|을)?\s*(?:요구|지시)|(?:건네|넘기|전달하|인계하)는\s*방식(?:으로)?\s*(?:적|기록|표시)/gu;
 const pickup = /(?:수거|수령|회수)하(?:겠다고|겠다는|겠다며|기로\s*했|ㄴ다고)|(?:받아|가져|거둬|거두어)\s*(?:가겠(?:다고|다는|다며)|간(?:다고|다는))|(?:받겠|거두겠)(?:다고|다는|다며)|(?:수거|수령|회수)하(?:는\s*(?:방식|계획)|겠습니다)|(?:방문\s*)?(?:수거|수령|회수)합니다|(?:받아|가져)\s*(?:감(?=[\s,.]|$)|가는\s*방식)/gu;
 const directCashLink = /^\s*(?:(?:준비|마련)(?:하면|해\s*(?:두면|놓으면))\s*[,，]?\s*)?(?:(?:직접|소속|(?:(?:자기|자신)의?\s*)?같은\s*(?:회사|금융회사)의?)\s+)?$/u;
+export const recipientDebtOwner = /^\s*(?:(?:수신자|수신인)(?:\s*본인)?의\s+)?$/u;
+const localVisitorRole = /^\s*(?:(?:소속|담당|같은\s*(?:회사|금융기관|은행)의?)\s+)?$/u;
+const onSitePickup = /^\s*(?:현장(?:에서)\s+)?(?:직접\s+)?$/u;
+const sameVisitorPlan = /^\s*(?:(?:예정|계획)(?:이며|이고|으로)\s+)?/u;
 const structuredPickup = /(?:수거|수령|회수)(?:함|하는\s*방식|할\s*예정)?(?=[\s,.]|$)|(?:받아|가져)\s*(?:감(?=[\s,.]|$)|가는\s*방식)/gu;
 const structuredHandoffAction = /(?:인계|전달|교부)(?=[\s,.]|$)/gu;
 const speakerCashPickup = /(?:현금|현찰)(?:을|를|으로|로)\s*찾아\s*가겠(?:다고|다는)/u;
@@ -66,6 +70,19 @@ function hasAdjacentCashPickup(action, payment, plan, qualifiedStaff, visits) {
   });
 }
 
+function hasVisitorBeforeCash(action, payment, plan, workers, visits, debtIndex) {
+  if (workers.length !== 1 || !onSitePickup.test(action.slice(endOf(payment), plan.index))) return false;
+  const [worker] = workers;
+  if (!/^(?:이|가)$/.test(worker.groups.case ?? "") || !localVisitorRole.test(action.slice(0, worker.index))) return false;
+  return visits.some(movement => {
+    if (!/^(?:방문|찾아)/u.test(movement[0]) || movement.index < endOf(worker) ||
+        endOf(movement) > debtIndex || !hasVisitForStaff(action, worker, [movement])) return false;
+    const beforeDebt = action.slice(endOf(movement), debtIndex);
+    const connector = sameVisitorPlan.exec(beforeDebt)[0];
+    return recipientDebtOwner.test(beforeDebt.slice(connector.length));
+  });
+}
+
 function pickupEvidence(action, payment, workers, visits, { loanFromSource, sourceInClause, structuredLoan, structuredHandoff, linkedPickup }) {
   const plans = structuredLoan ? [...action.matchAll(pickup), ...action.matchAll(structuredPickup)] : [...action.matchAll(pickup)];
   if (structuredLoan && structuredHandoff && [...action.matchAll(structuredHandoffAction)].some(handoff => workers.some(worker =>
@@ -76,10 +93,13 @@ function pickupEvidence(action, payment, workers, visits, { loanFromSource, sour
     if (!structuredLoan && endOf(payment) > plan.index || competingObject.test(action.slice(0, plan.index))) return false;
     const actionBeforePlan = action.slice(0, plan.index);
     if (!structuredLoan && !loanPayment.test(actionBeforePlan) && !(loanFromSource && /(?:갚을|갚아야\s*할)\s*(?:금액|몫|돈)/u.test(actionBeforePlan))) return false;
-    const qualifiedStaff = workers.filter(worker => hasVisitForStaff(action, worker, visits));
     if (linkedPickup &&
-        (payment.index !== linkedPickup.paymentIndex || plan.index !== linkedPickup.pickupIndex ||
-          !hasAdjacentCashPickup(action, payment, plan, qualifiedStaff, visits))) return false;
+        (payment.index !== linkedPickup.paymentIndex || plan.index !== linkedPickup.pickupIndex)) return false;
+    if (linkedPickup?.visitorFirst) {
+      return hasVisitorBeforeCash(action, payment, plan, workers, visits, linkedPickup.debtIndex);
+    }
+    const qualifiedStaff = workers.filter(worker => hasVisitForStaff(action, worker, visits));
+    if (linkedPickup && !hasAdjacentCashPickup(action, payment, plan, qualifiedStaff, visits)) return false;
     if (sourceInClause && !qualifiedStaff.length && !giverIsStaff.test(actionBeforePlan)) {
       const visitsBeforePickup = visits.some(movement => endOf(movement) <= plan.index && /직접|찾아|와서/u.test(movement[0]));
       // 수거 의사에 이어 주어 없이 예고한 방문은 앞 절 발신자의 계속된 행동이다.

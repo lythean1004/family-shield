@@ -7,7 +7,7 @@ import { readInstitutionIssuer } from "./institution-request-context.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { isOfficialLink, readUnregisteredAddressDirection } from "./official-links.js";
 import { hasOpenInstallationReport, ORDINARY_LOOKUP, startsOtherOrganizer } from "./reported-notice-fields.js";
-import { cashEventEvidence, couldDescribeCashTransaction, loanPayment } from "./cash-event-evidence.js";
+import { cashEventEvidence, couldDescribeCashTransaction, loanPayment, recipientDebtOwner } from "./cash-event-evidence.js";
 import { currentReceivedRequests, isReceivedContinuation, receivedFieldLines } from "./received-message.js";
 import {
   SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_CASH_HANDOVER,
@@ -671,14 +671,21 @@ function finitePickupReportRemainsCurrent(notes) {
 
 
 const presentPickupQuote = /(?<verb>수거|수령|회수)한(?<ending>다고|다는)/gu;
-const recipientDebtOwner = /^\s*(?:(?:수신자|수신인)(?:\s*본인)?의\s+)?$/u;
+const receivedFromLoanClaim = new RegExp("^\\s*보낸\\s*" + deliveryArtifact +
+  "(?:을|를)\\s*받았(?:다|습니다|어요|음)[.!。]?$", "u");
+
+function immediatelyPreviousClaimSentNotice(previous) {
+  const claim = reportCashRole.exec(previous);
+  return claim?.index === 0 && /[이가]$/u.test(claim[0]) && loanRoleContext.test(claim[0]) &&
+    receivedFromLoanClaim.test(previous.slice(claim[0].length));
+}
 const confirmedPastReport = /^(?:(?:했|말했|밝혔|알렸|안내했|설명했)(?:다|습니다|음|다는\s*(?:신고|제보|(?:(?:접수|상담)\s*)?(?:메모|기록))(?:다|이다|입니다|임)|다고\s*(?:기록됐|기록되었|접수됐|접수되었)(?:다|습니다))|(?:알린|밝힌|설명한)\s*것으로\s*(?:확인됐|확인되었|접수됐|접수되었)(?:다|습니다))[.!。]?$/u;
 
-function canonicalPickupReport(action) {
+function canonicalPickupReport(action, visitorFirst = false) {
   const [quote, extraQuote] = action.matchAll(presentPickupQuote);
   if (!quote || extraQuote) return null;
   const debt = [attributedLoan.exec(action), loanPayment.exec(action)].find(match =>
-    match && recipientDebtOwner.test(action.slice(0, match.index)));
+    match && (visitorFirst || recipientDebtOwner.test(action.slice(0, match.index))));
   const payment = cashMedium.exec(action);
   if (!debt || !payment || payment.index >= quote.index ||
       !/^[을를은는이가]?\s+$/u.test(action.slice(debt.index + debt[0].length, payment.index))) return null;
@@ -690,6 +697,8 @@ function canonicalPickupReport(action) {
   return {
     action: action.slice(0, quote.index) + verb + "하겠" + ending + action.slice(quoteEnd),
     debt,
+    debtIndex: debt.index,
+    visitorFirst,
     paymentIndex: payment.index,
     pickupIndex: quote.index,
   };
@@ -725,13 +734,15 @@ export function* cashEventSignals(text, blocks = structuredRecordBlocks(text)) {
     });
     if (evidence === "investigative_handover" && !hasClosedCashPickupPlan(next)) yield SIG_CASH_HANDOVER;
     if (evidence === "staff_loan_pickup" && pickupStatus === "active") yield SIG_LOAN_CASH_PICKUP;
-    else if (financialStaff && anchoredSpeaker && !branchPickup && pickupStatus === "active" &&
+    else if (financialStaff && !branchPickup && pickupStatus === "active" &&
         sameReceiptRemainder !== undefined && finitePickupReportRemainsCurrent(sameReceiptRemainder)) {
-      const canonical = canonicalPickupReport(reportedPlan.replace(unperformedPickupNote, ""));
-      if (canonical && (pickupAfterCashPreparation(canonical.action, canonical.debt, canonical) ||
-          matchesLinkedInPersonRepayment(canonical) ||
+      const visitorFirst = !speakerHere && immediatelyPreviousClaimSentNotice(previous);
+      const canonical = (anchoredSpeaker || visitorFirst) &&
+        canonicalPickupReport(reportedPlan.replace(unperformedPickupNote, ""), visitorFirst);
+      if (canonical && ((anchoredSpeaker && (pickupAfterCashPreparation(canonical.action, canonical.debt, canonical) ||
+          matchesLinkedInPersonRepayment(canonical))) ||
           cashEventEvidence(canonical.action, {
-            financialStaff, loanFromSource: loanRoleContext.test(source), sourceInClause: true,
+            financialStaff, loanFromSource: loanRoleContext.test(source), sourceInClause: speakerHere,
             linkedPickup: canonical,
           }) === "staff_loan_pickup")) {
         yield SIG_LOAN_CASH_PICKUP;
