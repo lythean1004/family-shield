@@ -13,7 +13,8 @@ export function isReceivedContinuation(text) {
 }
 
 const relevant = /(?:겠다고|겠다는|간다고|간다는|한다고|한다는|온다고|온다는)(?:\s|$)|(?:요구|요청|(?:해야|하라|달라|넘겨야|내야|받겠|수거하겠|찾아가겠|받아\s*가겠)고|(?:하라|달라|받겠|한다)는|(?:해야|한다)고\s*(?:되어|돼|적혀|써)|(?:받는|설치|회신|전화|제출)\s*(?:조건|방식|방법|절차))/u;
-const unrelated = /^(?:(?:그와|이와)\s*별개로|한편|별건으로|(?:다른|별도의?)\s*(?:발신처|담당자|쪽지|문자|사람|기관|업체)|(?:예전|이전|지난번)\s*(?:에|의|에는)?(?=\s|$))/u;
+const explicitSeparateNotice = /^(?:(?:그와|이와)(?:는)?\s*별개로|별건으로|(?:다른|별도의?)\s*(?:발신처|담당자|쪽지|문자|사람|기관|업체))/u;
+const topicShiftOrPast = /^(?:한편|(?:예전|이전|지난번)\s*(?:에|의|에는)?(?=\s|$))/u;
 const notDirected = /(?:요구|요청|안내|부탁)(?:[은는이가])?\s*(?:사실이\s*)?(?:아니|없(?:었|다))|(?:선택\s*사항|할\s*필요(?:가|는)?\s*없|(?:필수|조건|요건|의무)(?:가|이|은|는)?\s*아니|(?:제출|입력|설치|삭제|회신|연락|납부|송금|이체)\s*하지\s*(?:않|말|마)|(?:보내|적|알리|주|지우|내)지\s*(?:않|말|마)|(?:여부|유무|날짜|일정|버전)만)/u;
 const sameRequestClosed = /^(?:(?:그|이|같은|해당)\s*(?:요청|요구|절차|거래)(?:[을를이가은는])?\s*)?(?:이미\s*)?(?:거절했|철회했|취소했|취소됐|종료됐|처리됐|끝냈|끝났)/u;
 const reportedDenial = /(?:하라|으라)(?:고|는)\s*(?:(?:한|말한)\s*적(?:이|은)?\s*없|(?:뜻|의미|말)(?:[은는이가])?\s*아니)/u;
@@ -21,7 +22,13 @@ const endOfClause = /(?<=[.!?。…])\s+|[\r\n]+/u;
 
 const isReceivedMessage = text => received.test(text) && !inactive.test(text);
 const isInactiveRequest = text => inactive.test(text) || notDirected.test(text) || reportedDenial.test(text);
-const isSeparateRequest = text => unrelated.test(text);
+const isSeparateRequest = text => explicitSeparateNotice.test(text) || topicShiftOrPast.test(text);
+
+const newReceipt = /^(?:(?:오늘|방금|이번에|지금)\s*)?(?:새로|별도로)\s*(?:받(?:은|았)|온|도착(?:한|했)|수신(?:한|했))/u;
+
+function opensIndependentReceipt(text) {
+  return isReceivedMessage(text) && (explicitSeparateNotice.test(text) || newReceipt.test(text));
+}
 
 const tableRow = /^\|\s*(?<field>[^|]+?)\s*\|\s*(?<value>[^|]+?)\s*\|$/u;
 const tableDivider = /^\|\s*:?-{3,}:?\s*\|\s*:?-{3,}:?\s*\|$/u;
@@ -62,9 +69,12 @@ export function* currentReceivedRequests(text, identifiesIssuer = () => false, i
     return { body: clause.slice(attribution?.[0].length ?? 0), speaker: attribution?.groups.label };
   });
   for (const [i, { body, speaker }] of reportedClauses.entries()) {
-    const previous = fromSameNarrator(reportedClauses[i - 1], speaker);
-    const next = fromSameNarrator(reportedClauses[i + 1], speaker);
-    if (isInactiveRequest(body) || isInactiveRequest(previous) || isSeparateRequest(body) || sameRequestClosed.test(next)) continue;
+    const independent = opensIndependentReceipt(body);
+    const previous = independent ? "" : fromSameNarrator(reportedClauses[i - 1], speaker);
+    const following = fromSameNarrator(reportedClauses[i + 1], speaker);
+    const next = isSeparateRequest(following) || opensIndependentReceipt(following) ? "" : following;
+    if (isInactiveRequest(body) || isInactiveRequest(previous) ||
+        (isSeparateRequest(body) && !independent) || sameRequestClosed.test(next)) continue;
     const documented = (relevant.test(body) || identifiesRequest(body)) &&
       (attributed.test(body) || attributed.test(previous) || identifiesIssuer(body) || identifiesIssuer(previous));
     if (!documented && !isReceivedContinuation(body) && !isReceivedMessage(body) && !isReceivedMessage(previous)) continue;
