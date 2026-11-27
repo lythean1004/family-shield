@@ -22,17 +22,23 @@ const BENEFIT = /(?:쿠폰|이용권|지원금|포인트|바우처)/;
 const ENDING = /(?:미신청자|신청\s*마감|소멸\s*예정)/;
 const ACTION = /(?:신청하기|(?:쿠폰|이용권|혜택|포인트)\s*(?:받기|등록하기)|까지\s*받기)(?=[\s:：.!→]|$)/;
 const SENSITIVE_CONDITION = /(?:앱|어플)\s*설치\s*(?:후|해야|하셔야)\s*(?:신청|수령|지급)|(?:조회|납부|신청)\s*시\s*본인\s*인증\s*[(（]\s*(?:(?:성명|이름|생년월일|연락처)\s*[/,·]\s*){0,4}카드\s*번호\s*[,·/)）]|카드\s*번호로\s*본인\s*인증\s*(?:필수|필요)/;
+const authenticationForm = /(?:본인\s*인증\s*[(（][^()（）\n]{0,35}(?:인증\s*번호|일회용\s*코드)\s*[)）]|보안\s*카드\s*번호\s*(?:전체|전부)(?:를)?\s*입력)\s*(?:후|해야)\s*(?:지급|수령|신청|해제|인증|이용)/;
+const collectionNotice = /(?:압류\s*(?:예정|예고)|체납\s*처분)/;
+const collectionRoute = /납부\s*(?:(?:및|또는|·)\s*)?이의\s*신청/;
 
 // 금융위·경찰청 등 합동 예방 안내의 택배·기관 발신 사칭 유형. https://www.fsc.go.kr/no010101/87779
 export function hasCardServiceRequest(text, { externalLink, unverifiedLink, sensitiveRequest, directedCallback, personalReply }) {
   const opening = text.trimStart().replace(/^(?:\[(?:Web발신|국제발신|국외발신)\]\s*)+/i, "");
   const sender = /^\[([^\]\n]{1,30})\]\s*/.exec(opening) ?? /^\(([^()\n]{1,30})\)\s*/.exec(opening) ??
+    /^([가-힣a-z0-9]{2,20})[ \t]+[가-힣]{1,10}(?:과|부|팀)[ \t]+(?:알림|안내)(?=[\s.!]|$)/i.exec(opening) ??
     /^([가-힣a-z0-9]{2,24}?)(?:\s*[:：]|입니다(?=[\s.!]|$)|\s+(?=배송|결제|민원|공지|서비스\s*안내|신청|추가\s*지원))/i.exec(opening);
   const card = sender && senderCards.get(compactName(sender[1]));
   if (!sender || (!card && !serviceNames.has(sender[1]))) return false;
   const body = opening.slice(sender[0].length).trimStart();
   if (/^[.!:\s]*(?:(?:보이스|메신저)?피싱|스미싱|사칭)\s*(?:문자\s*)?(?:주의|예방|교육|경고)/.test(body)) return false;
   if (unverifiedLink && !/수신\s*거부|[(（]광고[)）]|[‘“「]|(?:라는|다는)\s*(?:문구|문자)|(?:설치|인증)하지\s*마/.test(body)) {
+    if (!/(?:예방\s*(?:안내|교육)|교육\s*자료|(?:라는|다는)\s*(?:사례|요구))/.test(body) &&
+        (authenticationForm.test(body) || (collectionNotice.test(body) && collectionRoute.test(body)))) return true;
     if (SENSITIVE_CONDITION.test(body) || (BENEFIT.test(body) && ENDING.test(body) && ACTION.test(body))) return true;
   }
   if (!card) return false;

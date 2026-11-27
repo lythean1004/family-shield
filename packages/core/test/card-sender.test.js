@@ -4,6 +4,26 @@ import { extractCodeSignals } from "../src/extract.js";
 import { decide } from "../src/rule-engine.js";
 import { SIG_AGENCY_IMPERSONATION } from "../src/signals.js";
 
+describe("기관 명의의 미확인 납부·인증 경로", () => {
+  const outside = "https://form.invalid/";
+  const tagged = text => extractCodeSignals(text).signals.includes(SIG_AGENCY_IMPERSONATION);
+  for (const text of [
+    "국세청 징수과 안내\n압류 예정 안내 양식 / 납부 및 이의신청",
+    "[정부24] 신청 서식 / 본인인증(성명·휴대폰 인증번호) 후 지급",
+    "[KB국민은행] 견본 / 보안카드 번호 전체 입력 후 신청",
+  ]) it(text, () => assert.ok(tagged(text + " " + outside)));
+  for (const text of [
+    "국세청 징수과 안내\n공개 전시 일정과 장소",
+    "[정부24] 지원금 신청 교육자료 / 일회용 번호를 입력하지 마세요.",
+    "[KB국민은행] 보안카드 번호 전체 입력을 요구한 사례에 주의하세요.",
+    "[KB국민은행] 보안카드 보관 방법 안내",
+    "독서회에서 국세청의 압류 예정 안내와 이의신청 절차를 설명합니다.",
+  ]) it(text, () => assert.ok(!tagged(text + " " + outside)));
+  it("공식 주소만 안내한 기관 서식에는 외부 경로 신호가 없다", () => {
+    assert.ok(!tagged("[정부24] 서식 / 본인인증(휴대폰 인증번호) 후 지급 https://www.gov.kr/"));
+  });
+});
+
 describe("확인된 기관·서비스 이름과 기한부 신청 조건", () => {
   const link = "https://forms.invalid/demo";
   const tagged = text => extractCodeSignals(text).signals.includes(SIG_AGENCY_IMPERSONATION);
