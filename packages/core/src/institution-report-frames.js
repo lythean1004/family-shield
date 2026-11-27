@@ -397,9 +397,16 @@ function* reportedCashTransfers(text) {
   }
 }
 
+const claimedInvestigator = new RegExp(
+  "^(?<role>" + INVESTIGATIVE + "|수사\\s*기관)(?:에서\\s*(?:나왔|파견됐|파견되었)|[을를]\\s*대표해(?:서)?\\s*왔)" +
+  "다고\\s*(?:한|밝힌|설명한|말한)\\s*(?:사람|직원|담당자|상대(?:방)?|발신자)(?:이|가|은|는)(?=\\s|[,，])", "u");
+const representativePayee = /(?:(?:자기|자신|본인|우리)(?:가|이)?\s*(?:쪽|소속|보낸|파견한)|(?:같은|해당)\s*기관(?:의)?)\s*(?:직원|담당자|수사관|요원|대리인)(?:에게|한테)\s*(?:(?:현금|현찰)(?:을|를|은|만)?\s*)?(?:직접\s*)?(?:건네|넘기|넘겨|인계하|전달하|교부하)/u;
+
 function alternateCashSource(clause) {
   const document = readInvestigativeCashDocument(clause);
   if (document) return document;
+  const representative = claimedInvestigator.exec(clause);
+  if (representative && representativePayee.test(clause.slice(representative[0].length))) return representative;
   const sender = readInstitutionIssuer(clause);
   if (sender && investigator.test(sender.name) && /(?:이래|라네요|이라며)[.?!]?\s*$/u.test(clause)) {
     return { index: 0, 0: clause, groups: { role: sender.name, unit: "" } };
