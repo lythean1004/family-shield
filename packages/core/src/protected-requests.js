@@ -13,6 +13,14 @@ const referencedRelay = new RegExp("(?:그거|그걸|그\\s*(?:번호|숫자|코
   "(?:(?:오면|도착하면|갔을\\s*거야)\\s*)?" + delivery, "u");
 const financialSecret = /(?:복구\s*(?:문구|구문)|시드\s*(?:문구|구문)|(?:계좌|통장)\s*비밀번호|보안\s*카드\s*(?:번호\s*)?(?:전체|전부))(?:를|을)?\s*(?:[(（][가-힣0-9\s]{1,14}[)）]\s*)?입력\s*(?:후|하면|하시면|해야|해\s*주세요|하세요)(?=[\s.!?,]|$)/;
 const commentary = /[‘’“”"'「」]|(?:예방|보안)\s*교육|(?:라고|라는|다는)\s*(?:문구|요구|사례|말)|(?:요구|사기)\s*사례/;
+const clauseBreak = /(?<=[.!?。])\s+|[\r\n]+/;
+const aidOrWork = /(?:지원금|긴급\s*생계비|부업|재택\s*(?:근무|알바|일자리|채용)|체험단\s*모집)/;
+const identityCopy = "(?:신분증|주민등록증|운전면허증)\\s*(?:(?:앞면|뒷면|앞뒤)\\s*)?(?:사진|사본)";
+const bankCopy = "(?:(?:(?:급여|입금|지급)(?:을)?\\s*)?받(?:으실|을)\\s*(?:계좌(?:\\s*번호)?|통장\\s*사본)|통장\\s*사본)";
+const together = "\\s*(?:과|와|이랑|랑|및|[,·])\\s*";
+const docs = new RegExp("(?:" + identityCopy + together + bankCopy + "|" + bankCopy + together + identityCopy +
+  ")(?:을|를)?\\s*(?:(?:아래(?:에|로)|이쪽으로|여기로|함께)\\s*)?(?:(?:올려|보내|첨부해|제출해)\\s*(?:줘|주세요|주십시오)|" +
+  "(?:제출|첨부|등록)\\s*(?:하세요|하십시오|바랍니다|필수))(?=[\\s.!?]|$)");
 
 function externalOnly(parsed) {
   return parsed.complete && parsed.candidates.length > 0 && parsed.candidates.every(c => c.complete && !isOfficialLink(c.raw));
@@ -27,7 +35,7 @@ function externalForm(clause, next) {
 }
 
 export function hasCredentialDisclosure(text, unverifiedLink) {
-  const clauses = text.split(/(?<=[.!?。])\s+|[\r\n]+/).filter(Boolean);
+  const clauses = text.split(clauseBreak).filter(Boolean);
   let awaitingCode = false;
   for (const [i, clause] of clauses.entries()) {
     if (commentary.test(clause) || /(?:인증|일회용)\s*(?:번호|코드)[^.!?\n]{0,28}(?:전달|보내|알려|공유)(?:주|하)?지\s*(?:마|말|않)/.test(clause)) {
@@ -43,4 +51,13 @@ export function hasCredentialDisclosure(text, unverifiedLink) {
     awaitingCode = codeNotice || (continuesNotice && arrival.test(clause));
   }
   return false;
+}
+
+export function hasDocumentBundle(text, unverifiedLink) {
+  if (!unverifiedLink || !aidOrWork.test(text)) return false;
+  const clauses = text.split(clauseBreak).filter(Boolean);
+  return clauses.some((clause, i) => {
+    const request = clauses.slice(Math.max(0, i - 1), i + 1).join(" ");
+    return aidOrWork.test(request) && !commentary.test(request) && docs.test(clause) && externalForm(clause, clauses[i + 1]);
+  });
 }

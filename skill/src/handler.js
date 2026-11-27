@@ -62,6 +62,7 @@ const CODE_RULE_SIGNALS = {
   R10: ["SIG_MALICIOUS_URL", "SIG_SB_UNSAFE_URL"], R11: ["SIG_LOOKALIKE_DOMAIN", "SIG_DECEPTIVE_URL"],
   R12: ["SIG_NEW_DOMAIN"], R15: ["SIG_CASH_HANDOVER"],
   R16: ["SIG_CREDENTIAL_DISCLOSURE"],
+  R17: ["SIG_DOCUMENT_BUNDLE"],
 };
 /** Google Safe Browsing 이용 규칙: Google 경고에는 출처 표시와 안내 링크를 붙인다(다른 출처 경고에는 붙이지 않는다) */
 const GOOGLE_ATTRIBUTION = "Advisory provided by Google";

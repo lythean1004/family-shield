@@ -20,7 +20,7 @@ import {
   SIG_LINK, SIG_SHORT_URL, SIG_LOOKALIKE_DOMAIN, SIG_APP_INSTALL, SIG_MONEY,
   SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
   SIG_FAMILY_IMPERSONATION, SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT, SIG_OFFICIAL_LINK,
-  SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL, SIG_CASH_HANDOVER, SIG_PREPAYMENT, SIG_CREDENTIAL_DISCLOSURE,
+  SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL, SIG_CASH_HANDOVER, SIG_PREPAYMENT, SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
 import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
@@ -28,7 +28,7 @@ import { allLinksOfficial, isOfficialLink } from "./official-links.js";
 import { hasCardServiceRequest } from "./card-sender.js";
 import { classifyCallback } from "./callback-number.js";
 import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
-import { hasCredentialDisclosure } from "./protected-requests.js";
+import { hasCredentialDisclosure, hasDocumentBundle } from "./protected-requests.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover } from "./cash-handover.js";
 import { ACCOUNT_NUMBER, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
@@ -266,6 +266,7 @@ export function extractCodeSignals(text, options = {}) {
   const outside = inspection.candidates.filter(c => c.complete && !isOfficialLink(c.raw));
   const unverifiedLink = signals.has(SIG_LINK) && outside.length > 0;
   if (hasCredentialDisclosure(input, unverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
+  if (hasDocumentBundle(input, unverifiedLink)) signals.add(SIG_DOCUMENT_BUNDLE);
   const externalLink = unverifiedLink && outside.some(c => !isShortener(c.host));
   if ((unverifiedLink || callback.directed || disclosure.reply) && hasCardServiceRequest(input, {
     externalLink, unverifiedLink, directedCallback: callback.directed, personalReply: disclosure.reply,
