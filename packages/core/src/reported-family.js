@@ -134,11 +134,15 @@ function hasOtherSource(clause) {
   return [...clause.matchAll(REPORTED_CLAIM)].some(match => describesRole(clause, match));
 }
 
+const reportedRequestPredicate = /^\s*(?:요구|요청|부탁)(?:하(?:였|고|며)|했|해)/u;
+
 function hasCurrentRequest(clause, signal, pattern) {
   for (const match of clause.matchAll(pattern)) {
     const start = match.index;
     const end = start + match[0].length;
-    if (PROHIBITED_ACTION.test(match[0]) || RECIPIENT_REQUEST.test(clause.slice(0, end))) continue;
+    const predicate = reportedRequestPredicate.exec(clause.slice(end));
+    const requestEnd = end + (predicate?.[0].length ?? 0);
+    if (PROHIBITED_ACTION.test(match[0]) || RECIPIENT_REQUEST.test(clause.slice(0, requestEnd))) continue;
     if (signal === SIG_GIFTCARD && (nonTransferGiftAction.test(match[0]) ||
         !GIFT_WITH_CODE.test(match[0]) && PROP_GIFT.test(clause.slice(0, start)))) continue;
     return true;

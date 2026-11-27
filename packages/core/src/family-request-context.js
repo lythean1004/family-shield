@@ -450,9 +450,26 @@ function sameAccountDisclosure(parts, signals) {
   signals.add(SIG_PERSONAL_INFO);
 }
 
+const contactAnnouncingRelative = new RegExp(
+  "^(?<changed>(?:" + newContact.source + "))(?:을|를|었다고|었다는\\s*말을)?\\s*" +
+  "(?:알린|알려\\s*준|남긴|적어서\\s*보낸)\\s*(?:이|사람|상대(?:방)?|발신자|쪽)(?:이|가|은|는)\\s*" +
+  roleQuoted + "\\s*(?:" + reflexiveObject + ")?" + claimPredicate, "u");
+const relationshipClaimant = new RegExp(
+  "^(?:(?:제|내|우리)\\s*)?" + role + "이?라(?:던|는)\\s*" +
+  "(?:상대(?:방)?|발신(?:자|인)|쪽|사람)(?:이|가|은|는)\\s*", "u");
+const takesRecipientDocument = new RegExp(
+  "(?:^|[\\s,，])(?:제|내|수신자(?:의)?|받은\\s*사람의)\\s*" + privateInfo +
+  "(?:\\s*(?:사본|사진|원본))?(?:을|를)\\s*" +
+  "(?:문자|메시지|회신|답장)(?:로|으로)\\s*(?:(?:자신|자기)(?:이|가)\\s*)?" +
+  "받아야(?:만)?\\s*(?:한다(?:는|고)|된다는)\\s*(?:요구|요청|연락|말|했)", "u");
+
 function attributedSpeaker(clause) {
   const actor = senderThenRole.exec(clause) ?? roleThenSender.exec(clause);
   if (actor && !conditionalOrQuotedRole.test(clause.slice(actor[0].length))) return { head: actor[0] };
+  const contactSpeaker = contactAnnouncingRelative.exec(clause) ?? relationshipClaimant.exec(clause);
+  if (contactSpeaker && !conditionalOrQuotedRole.test(clause.slice(contactSpeaker[0].length))) {
+    return { head: contactSpeaker[0], changedContact: Boolean(contactSpeaker.groups?.changed), contactNarrative: true };
+  }
   const account = changedAccountFamilySource.exec(clause);
   if (account) return { head: account[0], accountReceipt: true };
   const receipt = issuedFamilyName.exec(clause);
@@ -481,25 +498,29 @@ function addAttributedFamilySignals(parts, signals, actor) {
       .map(part => part.replace(continuingReceipt, ""))]
     : parts;
   const active = contents.filter(part => !askerIsReporter.test(part));
-  const requestParts = actor.namedReceipt ? active.filter(part => receivedPaymentObject.test(part)) : active;
+  // 새 연락처를 내세운 발신자의 이어지는 요구는 첫 후속 절의 현재 요청까지만 결합한다.
+  const sameNotice = actor.contactNarrative ? contents.slice(0, 2).filter(part => !askerIsReporter.test(part)) : active;
+  const requestParts = actor.namedReceipt ? sameNotice.filter(part => receivedPaymentObject.test(part)) : sameNotice;
   const requested = requestsIn(requestParts, false, false);
-  const changed = (actor.changedContact || active.some(mentionsChangedContact)) &&
+  const changed = (actor.changedContact || sameNotice.some(mentionsChangedContact)) &&
     !active.some(part => sameContact.test(part) || unchangedContactField.test(part));
-  const payment = requested.has(SIG_MONEY) || !actor.namedReceipt && active.some(part =>
+  const payment = requested.has(SIG_MONEY) || !actor.namedReceipt && sameNotice.some(part =>
     !actionNegation.test(part) && askedToPay.test(part));
-  const privateRequest = !actor.namedReceipt && (requested.has(SIG_PERSONAL_INFO) || active.some(part =>
-    !documentForOwnUse.test(part) && recipientPrivateNeed.test(part)));
+  const privateRequest = !actor.namedReceipt && (requested.has(SIG_PERSONAL_INFO) || sameNotice.some(part =>
+    !documentForOwnUse.test(part) && (recipientPrivateNeed.test(part) ||
+      actor.contactNarrative && !actionNegation.test(part) && takesRecipientDocument.test(part))));
   const giftRequest = !actor.namedReceipt && requested.has(SIG_GIFTCARD);
   const appRequest = !actor.namedReceipt && requested.has(SIG_APP_INSTALL);
   const pressure = payment && (actor.namedReceipt
     ? requestParts.some(part => pairedMoneyPressure.test(part)) || Boolean(next &&
       reportedImmediateDeadline.test(next) && repeatsPreviousDemand.test(next) &&
       reportsSpeaker.test(next) && !askerIsReporter.test(next))
-    : active.some(part => urgency.test(part) && urgentRequirement.test(part)));
+    : sameNotice.some(part => urgency.test(part) && urgentRequirement.test(part)));
   const secret = !actor.namedReceipt && payment &&
-    active.some(part => secrecy.test(part) && secrecyRequirement.test(part));
-  const voice = !actor.namedReceipt && active.some(reportedFamilyVoiceResponse);
-  if (!(giftRequest || voice || pressure || secret || changed && (payment || privateRequest || appRequest))) return;
+    sameNotice.some(part => secrecy.test(part) && secrecyRequirement.test(part));
+  const voice = !actor.namedReceipt && !actor.contactNarrative && active.some(reportedFamilyVoiceResponse);
+  if ((actor.contactNarrative && !changed) ||
+      !(giftRequest || voice || pressure || secret || changed && (payment || privateRequest || appRequest))) return;
 
   signals.add(SIG_FAMILY_IMPERSONATION);
   if (voice) signals.add(SIG_AVOID_VOICE);
