@@ -1,4 +1,4 @@
-import { SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "./signals.js";
+import { SIG_DELETE_APP, SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "./signals.js";
 
 // 수신자가 현재 요구를 옮겨 적은 경우도 원래의 신호로 읽는다.
 // 피해 사례를 가르치거나 거절·철회한 요구를 설명하는 문맥에는 이 경로를 쓰지 않는다.
@@ -11,6 +11,13 @@ const proceeds = /(?:환불|환급|상금|포상금|장려금|지원금|지원�
 const advance = /(?:보증금|수수료|선납금|예치금|비용)(?:(?:을|를)?\s*(?:먼저|미리|앞서|우선|별도로)|부터)\s*(?:내야|내는\s*(?:게|것이|사람만)|(?:납부|지불|입금)해야)|(?:먼저|앞서|미리)\s*(?:별도\s*)?(?:비용|수수료|보증금)(?:을|를)?\s*(?:내야|지불해야|납부해야)/;
 const unrelatedHolder = /(?:제\s*(?:3|삼)자|(?:과|와|하고)(?:는)?\s*(?:아무\s*)?(?:무관한|관계\s*없는)|아무\s*관계\s*없는)[^.!?\n]{0,20}(?:계좌|통장)(?:로|으로|에)/;
 const instructionToPay = /(?:보내|내|입금하|송금하|이체하|납부하)(?:라(?:고|는)|달라(?:고|는)|야(?:만|\s*한)|는\s*(?:게|것이)\s*조건)/;
+
+const socialSupport = /(?:가족|친구|이웃|지인|주위|주변|다른\s*사람|평소\s*(?:연락|상의|상담)하던\s*(?:사람|이들)|누구(?:와|하고|에게)도)/;
+const avoidSupport = /(?:연락|이야기|대화|의논|상의)(?:까지|을|를|도)?\s*끊(?:어야|는\s*(?:게|것|일))|(?:연락|의논|상의)(?:하거나\s*(?:의논|상의))?하지\s*않(?:는\s*데|기로)/;
+const requirement = /조건|필수|전제|요건|동의해야|(?:상담|점검|이용|접수|처리|참여)(?:을|를|가|이|는)?\s*(?:하|받|이[어용]|계속|진행)|(?:받|계속하|이용하|신청하)려면/;
+const noObligation = /(?:필요|의무)(?:가|는)?\s*없|(?:조건|필수|요건)(?:은|이|가)?\s*아니/;
+const protectionApp = /(?:보호|보안|안전|백신)\s*(?:앱|어플|프로그램)(?:을|를|부터)?\s*(?:먼저\s*)?(?:삭제(?:를\s*)?해야|지워야|(?:삭제하|지우)는\s*(?:게|것이))/;
+const harmfulApp = /(?:사칭|가짜|악성|감염된|위조된)\s*(?:보호|안전|보안|백신)|(?:보호|안전|보안|백신)\s*(?:앱|프로그램)(?:을|를)?\s*사칭/;
 
 export function reportedRequestSignals(text) {
   const signals = new Set();
@@ -25,6 +32,12 @@ export function reportedRequestSignals(text) {
     if (holder && instructionToPay.test(clause.slice(holder.index + holder[0].length, holder.index + holder[0].length + 32))) {
       signals.add(SIG_THIRD_PARTY_ACCOUNT);
     }
+    if (noObligation.test(clause) || !requirement.test(clause)) continue;
+    const contact = socialSupport.exec(clause);
+    if (contact && avoidSupport.test(clause.slice(contact.index + contact[0].length, contact.index + contact[0].length + 65))) {
+      signals.add(SIG_ISOLATION);
+    }
+    if (protectionApp.test(clause) && !harmfulApp.test(clause)) signals.add(SIG_DELETE_APP);
   }
   return signals;
 }
