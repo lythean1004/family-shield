@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { analyze } from "../packages/core/src/pipeline.js";
 
 const levels = new Set(["위험", "주의", "확인필요"]);
+const parentFlags = ["call_in_progress", "called_before", "family_denied"];
 const errorCounts = () => ({ danger: 0, nonDanger: 0, misses: 0, falseAlarms: 0 });
 
 function countPrediction(counts, expected, predicted) {
@@ -32,9 +33,13 @@ try {
     const expected = item.gold?.level_rule;
     if (!levels.has(expected) || typeof item.message_text !== "string") throw new Error();
     if (includeHuman && !levels.has(item.gold.level_human)) throw new Error();
+    const parentInputs = item.parent_inputs ?? {};
+    if (parentFlags.some(flag => Object.hasOwn(parentInputs, flag) && typeof parentInputs[flag] !== "boolean")) {
+      throw new Error();
+    }
     const { level } = await analyze({
       text: item.message_text,
-      parentInputs: item.parent_inputs ?? {},
+      parentInputs,
       registeredLast4: item.fixture?.registered_member?.last4,
       ai: null,
     });

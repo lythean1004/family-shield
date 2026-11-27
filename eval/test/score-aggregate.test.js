@@ -67,3 +67,24 @@ it("사람 기준도 요청하면 잘못된 사람 등급에서 부분 집계를
   assert.equal(result.status, 2);
   assert.equal(result.stdout, "");
 });
+
+for (const flag of ["call_in_progress", "called_before", "family_denied"]) {
+  it(`${flag}에 문자열이 들어오면 정상 행의 부분 집계도 표시하지 않는다`, () => {
+    const row = { message_text: "그림 전시 일정", gold: { level_rule: "확인필요", level_human: "확인필요" } };
+    const malformed = { ...row, parent_inputs: { [flag]: "false" } };
+    const result = run([row, malformed].map(value => JSON.stringify(value)).join("\n"), ["--with-human"]);
+    assert.equal(result.status, 2);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr.trim(), "평가 자료의 전체 집계를 완료하지 못했습니다.");
+  });
+}
+
+it("부모 선택을 생략했거나 실제로 아니오를 선택한 경우를 집계한다", () => {
+  const selections = [null, {}, { called_before: false, family_denied: false, sender_last4: null }];
+  const rows = selections.map(parent_inputs => JSON.stringify({
+    message_text: "도서관 휴관 안내", parent_inputs, gold: { level_rule: "확인필요" },
+  }));
+  const result = run(rows.join("\n"));
+  assert.equal(result.status, 0);
+  assert.deepEqual(JSON.parse(result.stdout), { cases: 3, danger: 0, nonDanger: 3, misses: 0, falseAlarms: 0 });
+});
