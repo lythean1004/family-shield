@@ -1,4 +1,4 @@
-import { isCardCallbackNumber } from "./card-sender.js";
+import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { hasOpenInstallationReport, ORDINARY_LOOKUP, startsOtherOrganizer } from "./reported-notice-fields.js";
@@ -143,6 +143,105 @@ function reportsLoanCollection(fields, sender, heading) {
     staffVisit.test(value) && collects.test(value) && (cash || fieldCash.test(value)));
 }
 
+const formRow = /^\|\s*(?<label>[^|]*?)\s*\|\s*(?<value>[^|]*?)\s*\|$/u;
+const formDivider = /^\|\s*:?-{3,}:?\s*\|\s*:?-{3,}:?\s*\|$/u;
+const labeledRow = /^(?<label>[^:：|]{1,32})\s*[:：|]\s*(?<value>.*)$/u;
+const installationFields = new Map([
+  ["actor", ["설치담당", "설치담당자", "설치수행자", "설치주체", "설치하는사람"]],
+  ["device", ["설치대상", "설치대상기기", "설치기기"]],
+  ["requirement", ["필수여부", "설치필수여부", "설치조건", "설치요건"]],
+  ["status", ["설치상태", "설치진행상태", "요청상태", "요구상태"]],
+  ["route", ["설치경로", "설치출처", "프로그램출처"]],
+  ["action", ["설치항목", "설치요청", "필수항목", "필수설치항목"]],
+].flatMap(([kind, labels]) => labels.map(label => [label, kind])));
+const recordMetadata = new Set(["문서번호", "수신시각", "수신시간", "수신일", "수신일자", "기록일", "작성일", "시행일"]);
+const newRecordLabel = /^(?:(?:새(?:로운)?|별도|다음|다른)(?:의)?(?:문서|기록|연락|안내|양식|요청)|(?:문서|기록|양식)(?:제목|시작))$/u;
+const installationActionField = /^(?:받은\s*(?:요청|요구)|(?:요청|요구)\s*(?:항목|사항|내용)|해야\s*할\s*일)$/u;
+const legacyInstallationLabel = /항목|해야\s*할\s*일/u;
+const recipientInstaller = /^(?:수신자|받은\s*(?:사람|이)|신고인|민원인|고객|본인|나|저|제가|내가)$/u;
+const recipientEquipment = /^(?:(?:수신자(?:의)?|받은\s*(?:사람|이)(?:의)?|본인(?:의)?|제|내)\s*(?:개인(?:용)?\s*)?|개인(?:용)?\s*)(?:기기|단말(?:기)?|휴대\s*(?:폰|전화)|스마트폰|컴퓨터|노트북)$/u;
+const requiredInstallationField = /^(?:필수(?:\s*항목)?|의무|예|필요|해야\s*함)$/u;
+const activeInstallationStatus = /^(?:대기(?:\s*중)?|진행\s*중|요청됨|미처리|미이행|미설치|유효|수신|접수\s*대기)$/u;
+const exactRequestedInstallation = new RegExp("^" + remoteInstall.source + "(?:\\s*(?:요청(?:됨)?|필수|필요|해야\\s*함))?[.!。]?$", "u");
+const installationDescription = /(?:설치(?:가|는)?\s*(?:여부|유무|방법|절차\s*안내|기록|이력|예시|참고)|설치하지|설치\s*(?:금지|불필요)|설치(?:가|는)?\s*(?:필요하지|필요\s*없|끝났|완료|취소|철회))/u;
+
+// 발신과 요청·담당 행을 같은 수신 기록에서만 읽는다. 별도의 표나 기록을 이어 붙이지 않는다.
+function* installationRows(lines, start) {
+  if (!lines[start] && formDivider.test(lines[start + 2] ?? "")) start++;
+  const table = formRow.test(lines[start] ?? "") && formDivider.test(lines[start + 1] ?? "");
+  for (let index = start + (table ? 2 : 0); lines[index]; index++) {
+    const line = lines[index];
+    if (!table) {
+      if (formRow.test(line)) break;
+      yield line;
+      continue;
+    }
+    const row = formRow.exec(line);
+    if (!row || formDivider.test(lines[index + 1] ?? "")) break;
+    yield row.groups.label + ": " + row.groups.value;
+  }
+}
+
+function structuredInstallation(rows) {
+  let sender = "";
+  let closed = false;
+  const actions = [];
+  const details = new Map();
+  for (const row of rows) {
+    if (anotherTopic.test(row) || startsOtherOrganizer(row)) break;
+    if (closedRemainder.test(row.replace(dispositionField, ""))) {
+      closed = true;
+      break;
+    }
+    const issuer = issuerField.exec(row);
+    if (issuer) {
+      if (sender) break;
+      sender = issuer.groups.value.trim();
+      continue;
+    }
+    const entry = labeledRow.exec(row)?.groups;
+    const label = entry?.label.replace(/\s/g, "");
+    const kind = installationFields.get(label);
+    // 경로 표기만으로 받은 설치 요청 자체를 무효로 보지 않는다.
+    if (kind === "route" || recordMetadata.has(label)) continue;
+    const field = relevantField.exec(row)?.groups;
+    if (!kind && !field) {
+      if (!entry || !label || newRecordLabel.test(label)) break;
+      // 같은 양식의 부가 필드 뒤에도 담당자나 철회 상태가 올 수 있다.
+      continue;
+    }
+    if (kind && kind !== "action") {
+      if (details.has(kind)) return false;
+      details.set(kind, entry.value.trim());
+    } else if (kind || installationActionField.test(field.label)) {
+      const legacy = !kind && legacyInstallationLabel.test(field.label);
+      actions.push({ value: kind ? entry.value.trim() : field.value, legacy });
+    }
+  }
+  if (!sender || closed) return false;
+  const genericIssuer = issuerLabel.test(sender);
+  const requested = ({ value }) => remoteInstall.test(value) && !staffInstallation.test(value) &&
+    !noInstallation.test(value) && !installationDescription.test(value) && !notCurrent.test(value);
+  const actor = details.get("actor");
+  const device = details.get("device");
+  const requirement = details.get("requirement");
+  const status = details.get("status");
+  if (requirement !== undefined && !requiredInstallationField.test(requirement) ||
+      status !== undefined && !activeInstallationStatus.test(status)) return false;
+  if (actor === undefined && device === undefined) {
+    return genericIssuer && actions.some(action => action.legacy && requested(action));
+  }
+  return (genericIssuer || isCardSenderName(sender)) && actions.length === 1 &&
+    exactRequestedInstallation.test(actions[0].value) && recipientInstaller.test(actor ?? "") && recipientEquipment.test(device ?? "");
+}
+
+function hasStructuredInstallation(text) {
+  const lines = text.split(/\r?\n/u).map(line => line.trim());
+  return lines.some((heading, index) => recordedNotice.test(heading) && !notCurrent.test(heading) &&
+    !labeledRow.exec(heading)?.groups.value && !formRow.test(heading) && !anotherTopic.test(heading) &&
+    structuredInstallation(installationRows(lines, index + 1)));
+}
+
 export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [] } = {}) {
   const addAgencyAction = signal => {
     signals.add(SIG_AGENCY_IMPERSONATION);
@@ -158,9 +257,8 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     }
     if (investigator.test(issuer) && reportsInvestigativeCash(action)) signals.add(SIG_CASH_HANDOVER);
   }
+  if (hasStructuredInstallation(text)) addAgencyAction(SIG_APP_INSTALL);
   for (const { issuer, sender, heading, fields } of structuredFrames(text)) {
-    if (fields.some(({label, value}) => /항목|해야\s*할\s*일/u.test(label) && remoteInstall.test(value) &&
-        !staffInstallation.test(value) && !noInstallation.test(value))) addAgencyAction(SIG_APP_INSTALL);
     if (financialIssuer.test(issuer) && reportsLoanCollection(fields, sender, heading)) signals.add(SIG_LOAN_CASH_PICKUP);
     if (investigator.test(issuer) && fields.some(({ label, value }) => /요청|요구/u.test(label) &&
         receivedCashDemand.test(value) && !cashReturn.test(value) && !notCurrent.test(value))) {
