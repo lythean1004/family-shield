@@ -1,11 +1,15 @@
 // 로컬 규칙만으로 채점한다. 성공하면 분모와 오류 건수만 표준 출력에 한 줄 남긴다.
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { analyze } from "../packages/core/src/pipeline.js";
 
 const levels = new Set(["위험", "주의", "확인필요"]);
 try {
-  if (process.argv.length !== 3) throw new Error();
-  const data = readFileSync(process.argv[2], "utf8").replace(/^\uFEFF/, "");
+  const [file, ...args] = process.argv.slice(2);
+  if (!file || (args.length && (args.length !== 2 || args[0] !== "--sha256" || !/^[0-9a-f]{64}$/.test(args[1])))) throw new Error();
+  const bytes = readFileSync(file);
+  if (args.length && createHash("sha256").update(bytes).digest("hex") !== args[1]) throw new Error();
+  const data = bytes.toString("utf8").replace(/^\uFEFF/, "");
   const counts = { cases: 0, danger: 0, nonDanger: 0, misses: 0, falseAlarms: 0 };
   for (const line of data.split(/\r?\n/)) {
     if (!line.trim()) continue;

@@ -1,17 +1,30 @@
 import { it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(new URL("../score-aggregate.mjs", import.meta.url));
-function run(contents) {
+function run(contents, args = []) {
   const path = join(mkdtempSync(join(tmpdir(), "fs-score-")), "sample.jsonl");
   writeFileSync(path, contents);
-  return spawnSync(process.execPath, [script, path], { encoding: "utf8" });
+  return spawnSync(process.execPath, [script, path, ...args], { encoding: "utf8" });
 }
+
+it("작성자가 고정한 파일 지문이 일치할 때만 집계한다", () => {
+  const sample = JSON.stringify({ gold: { level_rule: "확인필요" }, message_text: "수업 장소 안내" }) + "\n";
+  const digest = createHash("sha256").update(sample).digest("hex");
+  const result = run(sample, ["--sha256", digest]);
+  assert.equal(result.status, 0);
+  assert.deepEqual(JSON.parse(result.stdout), { cases: 1, danger: 0, nonDanger: 1, misses: 0, falseAlarms: 0 });
+  const changed = run(sample + "\n", ["--sha256", digest]);
+  assert.equal(changed.status, 2);
+  assert.equal(changed.stdout, "");
+  assert.equal(changed.stderr.trim(), "평가 자료의 전체 집계를 완료하지 못했습니다.");
+});
 
 it("가족 응답과 규칙 정답을 적용하고 총 다섯 개의 건수만 출력한다", () => {
   const rows = [
