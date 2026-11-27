@@ -6,12 +6,14 @@ import {
 const RELATION = "(?:(?:큰|작은|맏|막내|첫째|둘째|친|사촌)\\s*(?:아들|딸|동생|오빠|누나|언니|형님|형)|(?:외|친)\\s*(?:손자|손녀|손주)|아들|딸|손자|손녀|손주|자녀|아이|막내|어머니|어머님|엄마|어무이|아버지|아버님|아빠|아부지|부모님|할머니|할아버지|할매|할배|오빠|오라버니|누나|누님|언니|형님|형아|형|동생|남편|아내|배우자|(?:외|친)?삼촌|숙모|이모|고모|조카|사촌|형제|자매|가족)";
 // 친족 명사가 다른 단어 안의 글자와 일치하는 경우를 제외한다.
 const CLAIMED_RELATION = `(?<![\\p{L}\\p{N}_])(?:우리\\s*)?${RELATION}[’”"'」』]?`;
+const EXPLICIT_RELATION = "(?<![\\p{L}\\p{N}_])(?:친족|친척|식구|사위|며느리|부모|자식|일가)";
 const CLAUSE = /(?:[^.!?。…\r\n]|\.(?!\s|$))+(?:[.!?。…]|$)?/gu;
 const REPORTED_CLAIM = new RegExp(
   `${CLAIMED_RELATION}(?:(?:이?라(?:고|는|며|면서)|인\\s*)` +
   `(?:[‘’“”"'」』]\\s*)?\\s*(?:스스로\\s*)?` +
   `(?:소개|주장|자처|밝|말|했|해|적|썼|쓴|보내|하더|하는|하네|하며|하면서|합니다|하고|한\\s*(?:뒤|다음|발신|사람)|연락|문자|메시지|발신|쪽지|사람)|` +
-  `(?:이?래(?:요|서)|이?라(?:면서|며)(?=\\s)|(?:[을를]\\s*)?자처|[을를]\\s*(?:사칭|가장)|인\\s*척|\\s*행세))`,
+  `(?:이?래(?:요|서)|이?라(?:면서|며)(?=\\s)|(?:[을를]\\s*)?자처|[을를]\\s*(?:사칭|가장)|인\\s*척|\\s*행세))|` +
+  `(?:${CLAIMED_RELATION}|${EXPLICIT_RELATION})(?:[을를]|으?로)\\s*(?:자처|사칭|가장)`,
   "gu",
 );
 const ROLE_SETTING = /(?:낭독극|연극|역할극|대본|극본|시나리오)(?:에서(?:는)?|\s*속(?:에서|의)?)[^,，.!?\n]{0,20}$/u;
@@ -67,6 +69,15 @@ const receivedRequest = "(?:요구|요청|부탁)(?:(?:을|를)?\\s*받(?:았|�
 const REQUEST = "(?:요구|요청|부탁)(?:하(?:고|여|면서|는|며|더|니|네요|는데|기)|해(?:요|서|도)?|했|합|이|도|을|은|만|\\s*(?:내|문|메|쪽|부|했|있|뿐|사|이|담|적)|(?=[.!?\\s]|$))" + "|" + receivedRequest;
 const ASK_ENDING = "(?:[으이]?라(?:고|는|며)|달(?:라(?:고|는|며)?|랬)|줘야\\s*(?:한|한다며))";
 const PAYMENT = "(?:송금|입금|이체|결제|돈|금전|현금|비용|금액)";
+const asRequest = "(?:요구|요청|부탁)";
+const paymentPurpose = PAYMENT + "(?:을|를)?\\s*" + asRequest;
+const privacyPurpose = "비밀\\s*유지(?:를)?\\s*" + asRequest;
+const coordinatePurposes = "(?:과|와|랑|도)\\s*(?:그리고\\s*)?";
+const secretPaymentReceipt = new RegExp(
+  "(?:" + paymentPurpose + coordinatePurposes + privacyPurpose + "|" + privacyPurpose + coordinatePurposes +
+  paymentPurpose + ")(?:이|가|을|를|까지)?\\s*(?:(?:함께|같이|동시에)\\s*)?" +
+  "(?:왔|있었|들어왔|담겼|적혔|받았|(?:수신|접수)(?:했|함|됐|됨|되었)|들어옴|받음|옴)", "u",
+);
 const GIFT_ITEM = "(?:상품권|기프트\\s*카드|기프티콘|교환권|충전\\s*카드)";
 const GIFT_CODE = "(?:의)?\\s*(?:번호|코드|핀)";
 const GIFT = GIFT_ITEM + "(?:" + GIFT_CODE + ")?";
@@ -177,7 +188,9 @@ export function addReportedFamilySignals(text, signals) {
       active.some(clause => hasCurrentRequest(clause, signal, pattern))).map(([signal]) => signal));
     if (active.some(clause => PAYMENT_DEADLINE.test(clause))) requested.add(SIG_MONEY);
     const voice = active.some(hasVoiceRefusal) || hasWrittenOnlyResponse(context);
-    const secret = requested.has(SIG_MONEY) && active.some(clause => SECRET.test(clause));
+    const groupedSecret = active.some(clause => secretPaymentReceipt.test(clause));
+    if (groupedSecret) requested.add(SIG_MONEY);
+    const secret = groupedSecret || requested.has(SIG_MONEY) && active.some(clause => SECRET.test(clause));
     const pressured = requested.has(SIG_MONEY) && active.some(clause => PRESSURE.test(clause));
 
     if (!voice && !requested.has(SIG_GIFTCARD) && !secret && !pressured && !(newContact && requested.size)) continue;

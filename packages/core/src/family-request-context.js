@@ -128,8 +128,18 @@ const pretendedFamilySource = new RegExp(
   "^(?:(?:제|내|우리|저희)\\s*)?" + role + "(?:인\\s*(?:척|양|듯)|인\\s*것처럼|(?:의)?\\s*(?:흉내|행세|사칭))", "u",
 );
 
+const reportedRecipient = "(?:수신(?:자|인)|받(?:은|는)\\s*(?:사람|쪽|이))";
+const senderDisplayKinship = new RegExp(
+  "(?:^|\\s)(?:발신(?:자|인)?|보낸\\s*(?:이|사람|쪽))(?:의)?\\s*" +
+  "(?:(?:본인|자기|자신)\\s*)?(?:표시|표기|소개)(?:는|은|이|가)?\\s*[:：=]?\\s*[「『“\"']?" +
+  reportedRecipient + "의\\s*" + role + "(?=$|[\\s\\p{P}]|이?라고)", "u",
+);
+
+const exampleReceiptHeading = /^(?:낭독극|연극|역할극|대본|극본|수업|교육|예방)\s*(?:자료|안내|연습|대본|예시)/u;
+
 function hasFramedFamilySource(clause, previous) {
   if (recipientField.test(clause) || closed.test(clause)) return false;
+  if (senderDisplayKinship.test(clause) && !exampleReceiptHeading.test(clause) && !exampleReceiptHeading.test(previous)) return true;
   if ((familyMessageClaim.test(clause) || pretendedFamilySource.test(clause)) &&
       newContact.test(clause) && !/(?:아닌|아니라고|가족이\s*아니)/u.test(clause)) return true;
   const label = framedRoleLabel.exec(clause);
@@ -212,6 +222,20 @@ const otherInstallationTarget = new RegExp(
 );
 const installationNotDirected = /(?:지시|요청|요구|명령|유도|시키)(?:하지\s*않|한\s*적(?:은|이)?\s*없)|(?:않|아니)하도록|(?:했|했는지)(?:는|도)?\s*(?:불확실|확인되지\s*않)/u;
 
+const installedProgramReceipt = new RegExp(
+  "(?:설치|다운로드)(?:를|을)?\\s*(?:요구|요청|부탁|지시)(?:을|를)?\\s*받은\\s*(?:사람|쪽|이)(?:은|는|이|가)\\s*" +
+  reportedRecipient + "(?:임|이고|이며|고|다|(?:으)?로)?\\s*[,，·;:/|]?\\s*(?:(?:그|해당|같은)\\s+)?" +
+  deviceApp + "(?:의)?\\s*(?:주소|링크|이름|파일)(?=$|[\\s\\p{P}]|[을를이가은는])", "u",
+);
+
+const unrelatedProgramReference = /^(?:[을를이가은는]\s*)?(?:별개|별도|다른|예시|가상|연습용)(?=[\s\p{P}]|$)/u;
+
+function hasProgramReceipt(clause) {
+  const installation = installedProgramReceipt.exec(clause);
+  return Boolean(installation && senderDisplayKinship.test(clause) &&
+    !unrelatedProgramReference.test(clause.slice(installation.index + installation[0].length).trimStart()));
+}
+
 function hasBoundInstallation(clause) {
   const action = directedInstallation.exec(clause);
   if (!action || installationNotDirected.test(clause)) return false;
@@ -230,7 +254,9 @@ function requestsIn(context, fieldContext, numberMismatch, framed = false) {
     if (framed && hasPositiveAction) {
       const slot = reportedFieldSignal(clause);
       if (slot) found.add(slot);
-      if (hasBoundInstallation(clause)) found.add(SIG_APP_INSTALL);
+      if (hasBoundInstallation(clause) || hasProgramReceipt(clause)) {
+        found.add(SIG_APP_INSTALL);
+      }
       if (framedMoneyOnObject.test(clause) || hasAmountObjectAsk(clause)) {
         found.add(SIG_MONEY);
       }
