@@ -149,6 +149,12 @@ describe("핸들러 - 기본", () => {
     assert.match(r.body.template.outputs[0].simpleText.text, /위험 이유: .*현금/);
   });
 
+  it("인증값 전달 요구를 규칙이 찾으면 AI 설명과 함께 안내한다", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway([]) } };
+    const r = await handleRequest({ utterance: "문법 연습 / 원격지원 코드를 담당자에게 알려 주세요." }, c);
+    assert.match(r.body.template.outputs[0].simpleText.text, /위험 이유: .*인증값/);
+  });
+
   it("링크 규칙(R11)으로 위험이면 AI 설명이 있어도 이유 문구를 함께 보여 준다(2026-11-11 카카오 시험)", async () => {
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK"]) } };
     const r = await handleRequest({ utterance: "[시험] 보험료 환급 안내 nhis-event.or.kr" }, c);

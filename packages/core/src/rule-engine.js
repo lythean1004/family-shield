@@ -19,7 +19,7 @@ import {
   SIG_PERSONAL_INFO, SIG_CALL_THIS_NUMBER, SIG_URGENCY, SIG_SECRECY,
   SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT, SIG_DELETE_APP,
   SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN, SIG_OFFICIAL_LINK,
-  SIG_DECEPTIVE_URL, SIG_CASH_HANDOVER,
+  SIG_DECEPTIVE_URL, SIG_CASH_HANDOVER, SIG_CREDENTIAL_DISCLOSURE,
 } from "./signals.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
@@ -47,6 +47,7 @@ export function decide(context) {
   } = context;
 
   const sig = new Set(signals_final);
+  const codeSignals = signals_code ? new Set(signals_code) : sig;
   let level = "확인필요";
   const fired = [];
 
@@ -69,26 +70,26 @@ export function decide(context) {
   if (sig.has(SIG_FAMILY_IMPERSONATION) && sig.has(SIG_NEW_NUMBER) &&
       (sig.has(SIG_PERSONAL_INFO) || sig.has(SIG_APP_INSTALL))) fire("R14", "위험");
   if (sig.has(SIG_CASH_HANDOVER)) fire("R15", "위험");
+  if (codeSignals.has(SIG_CREDENTIAL_DISCLOSURE)) fire("R16", "위험");
 
   // R13: 가족 사칭 + (상품권 요구, 또는 돈 요구 + 압박[재촉·통화 회피·비밀·고립]).
   // 카카오는 보낸 번호를 받지 않아 R3의 '새 번호'가 없을 수 있다(D45). 압박 조건은 “용돈 보냈어” 같은
   // 정상 가족 송금 알림의 오경보를 막는다(기록된 AI 결과 3회: 잡는 사기 같음, 새 오경보 3·3·1 → 0)
   // 2026-11-12: 압박은 코드가 찾은 신호만 본다. AI가 “저녁에 전화할게”에 통화 회피를 붙이거나(SUP-D01 오경보)
   // “전화는 못 받아”를 놓쳐(SUP-A03) 판정이 흔들렸다. signals_code가 없으면(이전 기록 재계산) 합집합을 쓴다.
-  const pressure = signals_code ? new Set(signals_code) : sig;
   if (sig.has(SIG_FAMILY_IMPERSONATION) &&
       (sig.has(SIG_GIFTCARD) ||
-       (sig.has(SIG_MONEY) && (pressure.has(SIG_URGENCY) || pressure.has(SIG_AVOID_VOICE) ||
-                               pressure.has(SIG_SECRECY) || pressure.has(SIG_ISOLATION))))) fire("R13", "위험");
+       (sig.has(SIG_MONEY) && (codeSignals.has(SIG_URGENCY) || codeSignals.has(SIG_AVOID_VOICE) ||
+                               codeSignals.has(SIG_SECRECY) || codeSignals.has(SIG_ISOLATION))))) fire("R13", "위험");
 
   // R4: 가족 사칭 + 통화를 피함. 통화 회피는 코드가 찾은 신호만 본다(D46, 기록된 AI 결과 재계산 오경보 11→2, 놓침 변화 없음)
-  if (sig.has(SIG_FAMILY_IMPERSONATION) && pressure.has(SIG_AVOID_VOICE)) fire("R4", "위험");
+  if (sig.has(SIG_FAMILY_IMPERSONATION) && codeSignals.has(SIG_AVOID_VOICE)) fire("R4", "위험");
 
   // R5: 가족이 "보낸 적 없어요" 확인
   if (family_denied) fire("R5", "위험");
 
   // 링크가 모두 근거 카드의 공식 주소인지(코드가 판단). 공식 링크 표시는 코드 신호만 인정한다(AI가 끼워 넣을 수 없음)
-  const officialOnly = (signals_code ? new Set(signals_code) : sig).has(SIG_OFFICIAL_LINK);
+  const officialOnly = codeSignals.has(SIG_OFFICIAL_LINK);
 
   // R6: 기관 사칭 + (링크, 앱 설치, 개인정보, 문자 속 번호로 전화 유도 중 하나)
   // 링크가 모두 공식 주소면 링크만으로는 R6를 켜지 않는다(실제 기관 안내 “[국세청] … hometax.go.kr”, D48).
