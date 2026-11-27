@@ -69,6 +69,8 @@ function senderIn(clause) {
   return null;
 }
 
+export { senderIn as readInstitutionIssuer };
+
 function requestedValue(text, pattern) {
   for (const field of text.matchAll(new RegExp(pattern.source, "g"))) {
     const after = text.slice(field.index + field[0].length);

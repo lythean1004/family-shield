@@ -1,10 +1,12 @@
 import { classifyCallback } from "./callback-number.js";
 import { personalDisclosure } from "./personal-disclosure.js";
 import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
-import { INVESTIGATIVE } from "./cash-handover.js";
+import { INVESTIGATIVE, readInvestigativeCashDocument } from "./cash-handover.js";
+import { readInstitutionIssuer } from "./institution-request-context.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { isOfficialLink, readUnregisteredAddressDirection } from "./official-links.js";
 import { hasOpenInstallationReport, ORDINARY_LOOKUP, startsOtherOrganizer } from "./reported-notice-fields.js";
+import { cashEventEvidence, couldDescribeCashTransaction } from "./cash-event-evidence.js";
 import { currentReceivedRequests, isReceivedContinuation, receivedFieldLines } from "./received-message.js";
 import {
   SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_CASH_HANDOVER,
@@ -369,23 +371,101 @@ function requiresLoanPickup(action, issuerClause, hasCurrentIssuer) {
     hasCurrentIssuer && pickupAfterCashPreparation(action, debt)));
 }
 
-function* reportedCashTransfers(text) {
+function* currentCashReports(text, extraRequest = () => false, extraIssuer = () => null) {
   const issuer = clause => openDirectedReport(clause) && roleBelongsToReportedSource(clause) &&
-    (reportCashRole.exec(clause) || issuerForCurrentReport(clause));
+    (reportCashRole.exec(clause) || issuerForCurrentReport(clause) || extraIssuer(clause));
   // 이 단계에서는 현금 요구 후보만 찾는다. 지급자와 인수자는 발신자 소개를 뺀 본문에서 확인한다.
-  const request = clause => cashMedium.test(clause) && (directedHandover.test(clause) || reportsPickupPlan.test(clause));
+  const request = clause => extraRequest(clause) || cashMedium.test(clause) && (directedHandover.test(clause) || reportsPickupPlan.test(clause));
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
     for (const { body, previous, next } of currentReceivedRequests(record, issuer, request)) {
       if (!openDirectedReport(body) || asksAboutCollection.test(body) || closedRemainder.test(next)) continue;
       const speakerHere = issuer(body);
-      const speaker = speakerHere || ((receivedArtifactHere.test(previous) || receivedRoleNotice.test(previous)) && issuer(previous));
+      const speaker = speakerHere || ((receivedArtifactHere.test(previous) || receivedRoleNotice.test(previous) || extraIssuer(previous)) && issuer(previous));
       if (!speaker) continue;
       const { role, unit } = speaker.groups;
       const action = speakerHere ? body.slice(speaker.index + speaker[0].length) : body;
-      if (investigator.test(role) && requiresCashAtMeeting(action)) yield SIG_CASH_HANDOVER;
-      if ((financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "") &&
-          requiresLoanPickup(action, speakerHere ? body : previous, Boolean(speakerHere) && !closedCashPickupPlan.test(next))) yield SIG_LOAN_CASH_PICKUP;
+      yield { role, unit, action, source: speakerHere ? body : previous, speakerHere: Boolean(speakerHere), next };
     }
+  }
+}
+
+function* reportedCashTransfers(text) {
+  for (const { role, unit, action, source, speakerHere, next } of currentCashReports(text)) {
+    if (investigator.test(role) && requiresCashAtMeeting(action)) yield SIG_CASH_HANDOVER;
+    if ((financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "") &&
+        requiresLoanPickup(action, source, speakerHere && !closedCashPickupPlan.test(next))) yield SIG_LOAN_CASH_PICKUP;
+  }
+}
+
+function alternateCashSource(clause) {
+  const document = readInvestigativeCashDocument(clause);
+  if (document) return document;
+  const sender = readInstitutionIssuer(clause);
+  if (sender && investigator.test(sender.name) && /(?:이래|라네요|이라며)[.?!]?\s*$/u.test(clause)) {
+    return { index: 0, 0: clause, groups: { role: sender.name, unit: "" } };
+  }
+  return null;
+}
+
+const cashRecordHeading = /(?:받은|수신|발췌|문자\s*일부|문자\s*상담|통지서)/u;
+const cashRecordRow = /^(?<key>[가-힣 ]{1,34}?)(?:\s*[|:：]\s*|[ \t]{2,}|\u3000+)(?<value>\S.*)$/u;
+const cashRecordAction = /(?:수단|방식|방법|요구|요청|인계|수거|받는|받으러|받기로|수취|상환|준비|항목|용도)/u;
+
+function* cashRecordFacts(text) {
+  for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    if (!openDirectedReport(record) || !roleBelongsToReportedSource(record)) continue;
+    const fieldLines = receivedFieldLines(record);
+    const [heading, ...lines] = fieldLines.length === 1 ? fieldLines[0].split(summarySplit).map(line => line.trim()) : fieldLines;
+    if (!cashRecordHeading.test(heading ?? "") || lines.length < 2 || lines.length > 5) continue;
+    const sources = [heading, ...lines].map(line => {
+      const row = cashRecordRow.exec(line)?.groups;
+      const normalized = row ? row.key + ": " + row.value : line;
+      const named = summaryRole.exec(line)?.groups.value ?? issuerField.exec(normalized)?.groups.value;
+      const declared = named && institutionTitle.exec(named)?.groups.role;
+      return declared ? { name: declared } : readInstitutionIssuer(named ? "발신처: " + named : normalized);
+    }).filter(Boolean);
+    if (sources.length !== 1) continue;
+    const [source] = sources;
+    const fields = lines.map(line => cashRecordRow.exec(line)?.groups).filter(field=>field && cashRecordAction.test(field.key));
+    const actionRows = fields.map(field => field.value);
+    const proceduralLine = lines.find(line => !cashRecordRow.test(line) && /(?:직접\s*)?(?:건네|넘기|인계하|전달하)는\s*방식(?:으로)?\s*(?:적|기록|표시)/u.test(line));
+    if (proceduralLine) actionRows.push(proceduralLine);
+    yield { source: source.name, heading, fields, action: actionRows.join(" ") };
+  }
+}
+
+export function* cashEventSignals(text) {
+  for (const { role, unit, action, source, speakerHere, next } of currentCashReports(text, couldDescribeCashTransaction, alternateCashSource)) {
+    if (!openDirectedReport(action) || closedCashPickupPlan.test(next)) continue;
+    const evidence = cashEventEvidence(action, {
+      investigative: investigator.test(role),
+      financialStaff: (financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? ""),
+      loanFromSource: loanRoleContext.test(source),
+      sourceInClause: speakerHere,
+    });
+    if (evidence === "investigative_handover") yield SIG_CASH_HANDOVER;
+    if (evidence === "staff_loan_pickup") yield SIG_LOAN_CASH_PICKUP;
+  }
+  const records = [...structuredFrames(text)].map(({issuer, sender, heading, fields}) => ({
+    source: issuer, sender, heading, fields: fields.map(({label, value}) => ({key: label, value})),
+    action: fields.map(field => field.value).join(" "),
+  }));
+  for (const { source, sender = source, heading, fields, action } of [...records, ...cashRecordFacts(text)]) {
+    const structuredLoan = /(?:대출|융자|상환)/u.test(heading) ||
+      fields.some(field => /상환/.test(field.key) || attributedLoan.test(field.value));
+    const structuredReceiver = fields.some(field =>
+      /받으러|수취인|수령인/.test(field.key) && /직원|담당자|경찰|수사관|수거인/u.test(field.value));
+    const evidence = cashEventEvidence(action, {
+      investigative: investigator.test(source),
+      financialStaff: /(?:금융\s*(?:회사|기관|사)|은행)$/u.test(source) && (structuredLoan || /직원|담당/u.test(sender)),
+      loanFromSource: loanRoleContext.test(sender),
+      sourceInClause: false,
+      structuredLoan,
+      structuredReceiver,
+      structuredHandoff: fields.some(field => /요구|요청|지시/u.test(field.key)),
+    });
+    if (evidence === "investigative_handover") yield SIG_CASH_HANDOVER;
+    if (evidence === "staff_loan_pickup") yield SIG_LOAN_CASH_PICKUP;
   }
 }
 
@@ -681,6 +761,7 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     else signals.add(signal);
   }
   for (const signal of reportedCashTransfers(text)) signals.add(signal);
+  for (const signal of cashEventSignals(text)) signals.add(signal);
   if (hasStructuredInstallation(text)) addAgencyAction(SIG_APP_INSTALL);
   for (const { issuer, sender, heading, fields } of structuredFrames(text)) {
     if (financialIssuer.test(issuer) && reportsLoanCollection(fields, sender, heading)) signals.add(SIG_LOAN_CASH_PICKUP);

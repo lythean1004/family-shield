@@ -21,6 +21,14 @@ const giveToVisitor = /(?:현금|현찰)(?:을|은|만)?\s*(?:방문(?:한)?\s*(
 const collectFromRecipient = /(?:제게서|저한테서|나에게서|내게서|저에게서)\s*(?:현금|현찰)(?:을|만)?\s*(?:직접\s*)?(?:받아|가져)\s*(?:갈\s*(?:절차|예정)|간다는\s*(?:절차|내용|예정))/;
 const noCollection = /(?:사례|교육|분실|습득|반환|돌려[받주]|거절했|철회했)|(?:연극|드라마|영화)\s*(?:대본|배역|장면)|(?:뜻|일|절차)(?:이|은|가)?\s*아니|(?:받|건네|넘기|수거하)지\s*(?:말|마|않)/;
 
+export function readInvestigativeCashDocument(text) {
+  const source = reportedOfficer.exec(text);
+  if (!source || source.index !== 0 || !/(?:썼|작성했|보냈)다는$/.test(source[0])) return null;
+  const following = text.slice(source[0].length);
+  if (!/^\s*(?:통지서|통지문|안내문|문서|고지서|공문)(?:에|에는|의)/u.test(following)) return null;
+  return { index: source.index, 0: source[0], groups: { role: "수사기관", unit: "" } };
+}
+
 function reportsHandover(text) {
   if (!reportedOfficer.test(text) || noCollection.test(text)) return false;
   const sentences = text.split(/[.!?\n]+/u).map(sentence => sentence.trim()).filter(Boolean);
