@@ -215,7 +215,7 @@ function* reportedDirectedInstitutionActions(text, unverifiedLinks) {
 }
 
 const recordRole = "(?<role>(?:" + reportedRole + "|공공\\s*(?:요금|서비스)|공과금))" +
-  "(?<unit>(?:(?:\\s+|의\\s*)(?:관리|민원|정산|처리|납부|상담|대출|상환|담당(?:자)?|부서|직원|소속|센터|창구|팀)){0,5})";
+  "(?<unit>(?:(?:\\s+|의\\s*)(?:관리|민원|정산|처리|납부|상담|대출|상환|지원|복지|사업|담당(?:자)?|부서|직원|소속|센터|창구|팀)){0,5})";
 const selfAttributedRole = "(?:이?라고\\s*(?:한|소개한|밝힌|주장한)|(?:[을를]\\s*)?(?:자처|자칭)(?:한|하는))";
 const deliveryArtifact = "(?:문자|메시지|알림|통지|안내(?:문)?|연락|회신|쪽지)";
 const receivedPredicate = "(?:받았|왔|도착했|수신했|받아\\s*(?:확인|기록))";
@@ -229,6 +229,30 @@ const informationalAddress = /(?:참고|예시|기록|비교|교육|상담\s*이
 const bodyLinkLabel = /(?:^|[\s,，])(?:(?:같은|그|해당|이)\s*)?(?:본문|(?:문자|메시지|통지|안내문?)(?:의\s*본문)?)(?:에|\s*속)\s*(?:적힌|실린|나온|기재된|표시된|들어\s*있는)\s*(?:주소|페이지|링크)(?:은|는|이|가)?\s*(?:[:：]\s*)?(?<token>\S+)/u;
 const exclusiveDirection = /^\s*(?:으로|로|에)만\s*(?<action>연락|전화|통화|문의|회신|응답|접수)(?:를|을)?\s*(?:해야|하도록|하라(?:고|는)?|하라는|해야만|할\s*수\s*있)/u;
 const excludedReply = /(?:수신\s*거부|발신\s*전용|참고용|예시용|기존\s*(?:대표|공식)\s*(?:번호|연락처))|(?:번호|연락처)(?:로도|에서도)\s*(?:가능|연결)|(?:할|하실)\s*필요(?:는|가)?\s*없/u;
+
+const formName = /(?:신청|접수|제출)\s*(?:양식|서식|주소|링크)/u;
+const formRecipient = /^\s*(?:(?:제게|내게|저에게|나에게|수신자에게)\s*)?(?:신청|접수|제출)\s*(?:양식|서식|주소|링크)\s*[:：]?\s*$/u;
+const deliveredForm = /^\s*(?:을|를)?\s*(?:직접\s*)?(?:보냈|보내\s*왔|전송했|전달했)(?:습니다|다|음|어요)?[.!。]?$/u;
+function suppliedApplicationForm(action, unverifiedLinks) {
+  if (!unverifiedLinks.length || !formName.test(action) || informationalAddress.test(action)) return false;
+  const { complete, candidates } = inspectLinkCandidates(action);
+  if (!complete || candidates.length !== 1) return false;
+  const [{ raw, protocol }] = candidates;
+  if (!["http:", "https:"].includes(protocol) || !unverifiedLinks.includes(raw)) return false;
+  const position = action.indexOf(raw);
+  return formRecipient.test(action.slice(0, position)) && deliveredForm.test(action.slice(position + raw.length));
+}
+
+const recordedSelfClaim = new RegExp("^(?:문자\\s*)?발신(?:처|자|인)(?:은|는|이|가)\\s*(?:(?:지역|지방|보건)\\s*)?" +
+  recordRole + "(?:[을를]\\s*)?\\s*(?:자칭|자처)(?:함|했음|했다|했습니다)?[.。]?$", "u");
+const nameAndBirth = /(?:수신자의|받은\s*사람의|저의|제|내)\s*(?:(?:이름|성명)(?:과|와|·)\s*(?:생년월일|출생\s*(?:일자|일))|(?:생년월일|출생\s*(?:일자|일))(?:과|와|·)\s*(?:이름|성명))(?:을|를)\s*$/u;
+const requiredDisclosure = /(?:제공|제출|전달)해야(?:만)?\s*(?:한다(?:고|는)|된다는)\s*(?:내용|설명|안내|요구|말|기재|표시|적혀)/u;
+const independentIdentityCheck = /(?:본인|자기|개인)\s*기기|현장|대면|직접\s*(?:방문|방문한)|방문\s*창구|공식\s*(?:앱|창구|사이트|누리집)/u;
+function requiresRecipientIdentity(action) {
+  if (independentIdentityCheck.test(action) || ORDINARY_LOOKUP.test(action)) return false;
+  const transfer = requiredDisclosure.exec(action);
+  return transfer !== null && nameAndBirth.test(action.slice(0, transfer.index));
+}
 
 function linkedDestination(action, unverifiedLinks) {
   if (informationalAddress.test(action) || ORDINARY_LOOKUP.test(action)) return "";
@@ -279,16 +303,19 @@ function issuerForCurrentReport(text) {
 
 function* institutionTransactionReports(text, unverifiedLinks) {
   const identifiesAction = clause => Boolean(linkedDestination(clause, unverifiedLinks)) ||
+    formName.test(clause) || requiresRecipientIdentity(clause) ||
     reportsWorkerCashCollection(clause) || reportsAppointedCashHandover(clause);
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
     for (const { body, previous, next } of currentReceivedRequests(record, issuerForCurrentReport, identifiesAction)) {
       if (!openDirectedReport(body) || closedRemainder.test(next)) continue;
+      if (recordedSelfClaim.test(previous) && requiresRecipientIdentity(body)) yield SIG_PERSONAL_INFO;
       const current = issuerForCurrentReport(body);
       const previousSender = current ? null : issuerForCurrentReport(previous);
       if (!current && (!previousSender || !receivedArtifactHere.test(previous))) continue;
       const { role, unit } = (current ?? previousSender).groups;
       const action = current ? body.slice(current.index + current[0].length) : body;
       if (!openDirectedReport(action)) continue;
+      if (current && !ORDINARY_LOOKUP.test(body) && suppliedApplicationForm(action, unverifiedLinks)) yield SIG_LINK;
       // 같은 수신 기록의 본문이 직접 지정한 목적지만 이전 발신 표시와 결합한다.
       const arrived = receivedArtifactHere.test(current ? body : previous);
       const destination = arrived && !ORDINARY_LOOKUP.test(current ? body : previous) && linkedDestination(action, unverifiedLinks);
@@ -419,7 +446,7 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     else signals.add(signal);
   }
   for (const signal of institutionTransactionReports(text, unverifiedLinks)) {
-    if (signal === SIG_LINK || signal === SIG_CALL_THIS_NUMBER) addAgencyAction(signal);
+    if (signal === SIG_LINK || signal === SIG_CALL_THIS_NUMBER || signal === SIG_PERSONAL_INFO) addAgencyAction(signal);
     else signals.add(signal);
   }
   if (hasStructuredInstallation(text)) addAgencyAction(SIG_APP_INSTALL);
