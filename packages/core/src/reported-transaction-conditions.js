@@ -200,6 +200,34 @@ function bindsOtherOwnerToPayment(previous, clause, context, following) {
   return Boolean(move && move.index <= 12 && !notMovingMoney.test(instruction.slice(0, move.index)));
 }
 
+const otherPersonOwnsAccount = /다른\s*(?:사람|이|개인|담당자|직원)(?:의)?\s*(?:명의|이름)(?:의|인|로)?\s*(?:계좌|통장)(?=\s|[,.!?]|[은는이가을를로에]|으로|$)/u;
+const previouslyReportedAccount = /^(?:이미\s*(?:받(?:은|았던)|안내(?:한|된|받은)|제시(?:한|된)|지정(?:한|된)|적(?:힌|은|어\s*둔)|확인(?:한|된)|표시(?:된|한)|보낸|고지(?:한|된)|기재(?:된|한)|언급(?:한|된)|알려\s*준))\s*/u;
+const theAccountJustNamed = /^(?:그|이|해당|같은)\s*(?:(?:안내|기록|문자)(?:에|에서)\s*(?:적힌|제시한|표시한|나온)\s*)?(?:계좌|통장)(?:에는|에서|의|은|는|이|가)(?=\s|$)/u;
+const despiteExistingAccount = /^본인\s*(?:계좌|통장)(?:가|이|는|은)\s*(?:따로\s*)?(?:있는데도|있음에도(?:\s*불구하고)?)(?=\s|[,，])/u;
+const checksPastInstructions = /(?:요청|요구|지시)(?:의)?\s*(?:유무|여부)|(?:기록|내역)(?:을|를|에서)?\s*(?:검색|조회|대조)/u;
+const independentPaymentAccount = /(?:다른|별도|새로운|추가)\s*(?:거래|계약|계좌|통장)/u;
+const unrelatedHumanPayee = /(?:거래|계약)\s*(?:상대(?:방)?|당사자|업체)(?:가|이|은|는)?\s*(?:아닌|아니라)\s*(?:(?:(?:다른|그|한|낯선)\s*)?(?:사람|이|개인|직원|인물|담당자|분)|타인|제\s*[3삼](?:자|의\s*(?:사람|인물)))(?:에게|한테|께|쪽으로)/u;
+
+function bindsNamedAccountToAnotherPayee(prior, clause, context, next) {
+  if (SWITCH.test(clause) || CLOSED_REQUEST.test(context) || NO_PAYMENT.test(context) ||
+      REVERSE_OR_AUTHORIZED.test(context + " " + next) || samePaymentDemandEnded.test(next) ||
+      (!MONEY_OBJECT.test(prior) && !/(?:결제|입금|이체|송금|납부)/u.test(prior)) ||
+      !otherPersonOwnsAccount.test(prior) || checksPastInstructions.test(clause)) return false;
+  const statedEarlier = previouslyReportedAccount.exec(clause);
+  const fromReference = statedEarlier ? clause.slice(statedEarlier[0].length) : clause;
+  // 본인 통장이 따로 있다고 대조한 경우에는 뒤에 지목한 타인이 실제 수취인이다.
+  const account = statedEarlier
+    ? despiteExistingAccount.exec(fromReference) ?? /^(?:계좌|통장)(?:의|은|는|이|가)(?=\s|$)/u.exec(fromReference)
+    : theAccountJustNamed.exec(fromReference);
+  if (!account || independentPaymentAccount.test(clause)) return false;
+  const direction = fromReference.slice(account[0].length);
+  const payee = unrelatedHumanPayee.exec(direction);
+  if (!payee) return false;
+  const after = direction.slice(payee.index + payee[0].length);
+  const directive = putMoneyInAccount.exec(after);
+  return Boolean(directive && directive.index <= 12 && !notMovingMoney.test(after.slice(0, directive.index)));
+}
+
 export function addReportedTransactionConditions(text, signals) {
   const clauses = text.split(SENTENCES).map(value => value.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
@@ -215,6 +243,7 @@ export function addReportedTransactionConditions(text, signals) {
     }
     if (routedToOtherParty(clause) || bindsOtherOwnerToPayment(prior, clause, context, next) ||
         namedPaymentToOutsider(clause, context) || mismatchInContinuation(prior, clause, context) ||
+        bindsNamedAccountToAnotherPayee(prior, clause, context, next) ||
         explicitlyReassignedAccount(clause, next, context) || currentlyReported(context) && !NO_PAYMENT.test(context) && !REVERSE_OR_AUTHORIZED.test(context) &&
         ORIGINAL_RECIPIENT.test(prior) && MISMATCH.test(prior) && INDIVIDUAL_DESTINATION.test(clause)) {
       signals.add(SIG_THIRD_PARTY_ACCOUNT);
