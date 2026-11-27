@@ -2,15 +2,15 @@ import { isCardCallbackNumber } from "./card-sender.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { hasOpenInstallationReport, ORDINARY_LOOKUP, startsOtherOrganizer } from "./reported-notice-fields.js";
-import { currentReceivedRequests } from "./received-message.js";
+import { currentReceivedRequests, isReceivedContinuation } from "./received-message.js";
 import {
   SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_CASH_HANDOVER,
   SIG_LINK, SIG_LOAN_CASH_PICKUP, SIG_PERSONAL_INFO,
 } from "./signals.js";
 
-const authority = String.raw`(?:${INVESTIGATIVE}|수사\s*기관|(?:금융\s*)?감독\s*기관|(?:시|군|구|도)청|관공서|공공\s*(?:기관|보험)|민원\s*(?:창구|접수(?:처|\s*부서)?|조정\s*기관)|(?:세금|세무|과세)|(?:금융\s*(?:기관|회사)|은행)|(?:복지|행정)\s*기관)`;
+const authority = String.raw`(?:${INVESTIGATIVE}|수사\s*기관|(?:금융\s*)?감독\s*기관|(?:시|군|구|도)청|관공서|공공\s*(?:기관|보험)|민원\s*(?:창구|접수(?:처|\s*부서)?|조정\s*기관)|(?:세금|세무(?:\s*(?:기관|서))?|과세)|(?:금융\s*(?:기관|회사)|은행)|(?:복지|행정)\s*기관)`;
 const issuerLabel = new RegExp(String.raw`^(?<role>${authority})(?=\s|$)`, "u");
-const declaredAuthority = new RegExp(String.raw`(?<role>${authority})(?:\s+[가-힣]{1,12}){0,4}?\s*(?:[을를]?\s*자처|이름(?:을)?\s*(?:댔|대며|대면서)|(?:이?라고|이라|이?라는|이라며)\s*(?:(?:스스로|자신을?|자기를?)\s*)?(?:소개|밝히|밝힌|밝혔|적힌|표시)|(?:이?라는|이라며)(?=\s*(?:수신|문자|연락|안내|메시지|쪽지))|에서\s*(?:발송한|보낸))`, "u");
+const declaredAuthority = new RegExp(String.raw`(?<role>${authority})(?:의)?(?:\s+[가-힣]{1,12}){0,4}?\s*(?:[을를]?\s*자처|이름(?:을)?\s*(?:댔|대며|대면서)|(?:이?라고|이라|이?라는|이라며)\s*(?:(?:스스로|자신을?|자기를?)\s*)?(?:소개|밝히|밝힌|밝혔|적힌|표시)|(?:이?라는|이라며)(?=\s*(?:수신|문자|연락|안내|메시지|쪽지))|(?:담당했|맡았)다고\s*(?:소개|밝힌|밝히|밝혔)|에서\s*(?:발송한|보낸))`, "u");
 const receivingContext = /(?:문자|메시지|알림|답장|답신|통지|안내|연락|쪽지|발신|보낸\s*쪽|수신)/u;
 const notCurrent = /(?:피싱|사기|사칭|피해)\s*(?:예방|교육|사례)|(?:예방|교육|가상|모의|참고)\s*(?:자료|사례|연습|문구|용)|(?:극본|대본|역할극)|(?:문구|표기|항목|내용)(?:은|는|이|가)?\s*(?:참고|예시|가정)(?:였|이었|입니다|에\s*불과)|(?:실제로?\s*)?(?:회신|설치|제출)\s*(?:요청|요구)(?:은|는|이|가)?\s*없(?:습|었|어요|다)|(?:요청|요구|안내)(?:은|는|이|가|을|를)?\s*(?:(?:제가|이미|어제)\s*){0,3}(?:거절|철회|취소)|(?:접수|상담)(?:는|이|가)?\s*(?:이미\s*)?(?:종료|완료)(?:됐|되었)/u;
 const anotherTopic = /^(?:(?:이와|그와)는?\s*별개로|한편|별건으로|(?:다른|별도)\s*(?:쪽지|문자|기관|업체|담당자)|(?:지난번|예전|이전)(?:에는|에|의)\s*)/u;
@@ -23,12 +23,21 @@ function claimedIssuer(text) {
 }
 
 const quoteBoundary = /[,，;；]\s*(?=(?:(?:이와|그와)는?\s*별개로|한편|별건으로|(?:다른|별도)\s*(?:쪽지|문자|기관|업체|담당자)))/u;
-function* narrativeFrames(text) {
-  for (const { body, previous, next } of currentReceivedRequests(text, claimedIssuer, requiresRecipientInstallation)) {
+const conversation = /(?:[와과]|하고)\s*(?:(?:먼저|앞서|방금|아까|직접)\s*)?(?:통화|전화)(?:했|하였|한|하고)/u;
+const anotherCallParticipant = /(?:다른|별도(?:의)?)\s*(?:기관|사람|담당자|발신자|발신처|업체)(?:이|가|에서|에게서|한테서)/u;
+const senderSpecifiedApp = /(?:상대(?:방)?|발신자|보낸\s*사람|그\s*사람)(?:가|이)\s*(?:정해\s*준|지정한|보낸|고른|알려\s*준)\s*(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를)?\s*(?:내|제|수신자(?:의)?|받은\s*사람(?:의)?)\s*(?:휴대\s*(?:폰|전화)|스마트폰|기기|컴퓨터)(?:에|에서)\s*설치(?:하라|하도록|해야)/u;
+function* narrativeFrames(text, unverifiedLinks) {
+  const identifiesRequest = body => requiresRecipientInstallation(body) ||
+    directsToUnverifiedAddress(body, unverifiedLinks);
+  for (const { body, previous, next } of currentReceivedRequests(text, claimedIssuer, identifiesRequest)) {
     if (notCurrent.test(body) || startsOtherOrganizer(body) || closedRemainder.test(next)) continue;
     const action = body.split(quoteBoundary, 1)[0];
-    const issuer = claimedIssuer(action) || claimedIssuer(previous);
-    if (issuer) yield { issuer, action, next };
+    // 이어 받은 안내에 같은 상대가 지정한 앱이 있을 때만 앞선 통화의 발신자를 연결한다.
+    const continuedCall = isReceivedContinuation(action) && senderSpecifiedApp.test(action) && !anotherCallParticipant.test(action) &&
+      conversation.test(previous) && !notCurrent.test(previous) && !anotherTopic.test(previous);
+    const callIssuer = continuedCall ? declaredAuthority.exec(previous)?.groups.role : "";
+    const issuer = claimedIssuer(action) || claimedIssuer(previous) || callIssuer;
+    if (issuer) yield { issuer, action, next, continuedCall };
   }
 }
 
@@ -54,12 +63,16 @@ function* structuredFrames(text) {
 }
 
 const appointmentProcedure = /(?:예약\s*내역|(?:면담|상담|접수|심사|배정|신청)(?:\s*(?:예약|일시|시간|결과|상태|내용|절차)))/u;
+const namedAddress = /^\s*(?:주소|링크|페이지)(?:에서|로|에)(?:만)?\s*(?:신청|입력|등록|접수|확인)\s*절차(?:을|를)?\s*(?:밟으라|진행하라|진행하도록|거치라|밟아야|거쳐야)/u;
+const bodyAddress = /(?:본문|문자|안내문?|메시지)(?:의|에\s*(?:적힌|실린|있는))\s*$/u;
 const useAddress = /^\s*(?:에서|으로|로|에)\s*(?:(?:신청|입력|등록|접수|확인)(?:을|를)?\s*(?:하라(?:고|는)?|해야|하도록)|(?:로그인|접속)(?:하라(?:고|는)?|해야|하도록))/u;
 function directsToUnverifiedAddress(action, unverifiedLinks) {
   if (!unverifiedLinks.length || ORDINARY_LOOKUP.test(action)) return false;
   for (const token of action.matchAll(/\S+/gu)) {
     const after = action.slice(token.index + token[0].length);
-    if (!useAddress.test(after) || !appointmentProcedure.test(action.slice(0, token.index))) continue;
+    const before = action.slice(0, token.index);
+    if (!(useAddress.test(after) && appointmentProcedure.test(before)) &&
+        !(namedAddress.test(after) && bodyAddress.test(before))) continue;
     const { complete, candidates } = inspectLinkCandidates(token[0]);
     if (complete && candidates.length === 1 && ["http:", "https:"].includes(candidates[0].protocol) &&
         unverifiedLinks.includes(candidates[0].raw)) return true;
@@ -124,11 +137,14 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     signals.add(SIG_AGENCY_IMPERSONATION);
     signals.add(signal);
   };
-  for (const { issuer, action, next } of narrativeFrames(text)) {
+  for (const { issuer, action, next, continuedCall } of narrativeFrames(text, unverifiedLinks)) {
     if (directsToUnverifiedAddress(action, unverifiedLinks)) addAgencyAction(SIG_LINK);
     if (directsToNoticeNumber(action)) addAgencyAction(SIG_CALL_THIS_NUMBER);
     if (privateReply.test(action)) addAgencyAction(SIG_PERSONAL_INFO);
-    if (hasOpenInstallationReport(action, next, requiresRecipientInstallation)) addAgencyAction(SIG_APP_INSTALL);
+    if (hasOpenInstallationReport(action, next, notice => requiresRecipientInstallation(notice) ||
+        continuedCall && senderSpecifiedApp.test(notice) && !staffInstallation.test(notice) && !noInstallation.test(notice))) {
+      addAgencyAction(SIG_APP_INSTALL);
+    }
     if (investigator.test(issuer) && reportsInvestigativeCash(action)) signals.add(SIG_CASH_HANDOVER);
   }
   for (const { issuer, sender, heading, fields } of structuredFrames(text)) {
