@@ -3,6 +3,30 @@ import assert from "node:assert/strict";
 import { extractCodeSignals } from "../src/extract.js";
 import { SIG_AVOID_VOICE, SIG_FAMILY_IMPERSONATION, SIG_NEW_NUMBER } from "../src/signals.js";
 
+describe("발신자가 빌려 쓰는 기기와 해지한 이전 연락처", () => {
+  for (const text of [
+    "어머니, 저예요. 친구 폰 빌려서 문자 보내요.",
+    "아빠 나 휴대폰 고장 나서 동료 거로 보내.",
+    "누나, 이 번호로 문자해. 전에 쓰던 번호는 해지됐어.",
+    "형님 저 막내인데요. 번호 바꿨어요.",
+  ]) it(text, () => {
+    const { signals } = extractCodeSignals(text);
+    assert.ok(signals.includes(SIG_FAMILY_IMPERSONATION) && signals.includes(SIG_NEW_NUMBER));
+  });
+  it("본인의 기기 고장을 알리는 정중한 자기소개만으로는 새 번호를 추정하지 않는다", () => {
+    const { signals } = extractCodeSignals("아버지 저예요 폰이 고장나서 컴퓨터를 켰어요.");
+    assert.ok(signals.includes(SIG_FAMILY_IMPERSONATION) && !signals.includes(SIG_NEW_NUMBER));
+  });
+  for (const text of [
+    "어머니, 저예요. 친구 폰 빌려서 사진 보내 줘.",
+    "아빠, 내 친구가 휴대폰 고장 나서 동료 거로 보내.",
+    "누나, 이 번호로 문자해. 전에 쓰던 번호는 그대로야.",
+    "아빠, 이 번호로 문자해. 원래 번호는 해지하지 마.",
+    "형님, 예전에 번호 바꿨어요. 지금은 원래 번호를 씁니다.",
+    "누나, 어제 친구 폰 빌려서 문자 보냈어.",
+  ]) it(text, () => assert.ok(!extractCodeSignals(text).signals.includes(SIG_NEW_NUMBER)));
+});
+
 describe("빌린 휴대폰으로 직접 연락했고 그 기기로 통화하기 어렵다는 설명", () => {
   for (const text of [
     "누나, 나 친구 휴대폰을 빌려서 문자 보내요. 전화는 빌린 폰이라 받을 수가 없어요.",

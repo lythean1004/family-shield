@@ -54,14 +54,14 @@ const NOTICE = '(?:민원|전자|고객님|귀하|본인|대표\\s*(?:번호|연
 
 // 경찰청 메신저피싱 예방 자료의 가족 호칭·휴대폰 고장 수법.
 // https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1007&q_bbscttSn=20211222092717359
-const FAMILY_GREETING = /^\s*(?:엄마|아빠|어머니|아버지|할머니|할아버지|누나|언니|형|오빠|여보|자기야)(?=[\s,.!~]|$)[\s,.!~]*/;
+const FAMILY_GREETING = /^\s*(?:엄마|아빠|어머니|아버지|할머니|할아버지|누나|누님|언니|형님|형|오빠|여보|자기야)(?=[\s,.!~]|$)[\s,.!~]*/;
 const PHONE_DAMAGE = /(?:^\s*|(?:^|\s)(?:나|내|제)\s*)(?:(?:휴대폰|핸드폰|폰)(?:이|가)?\s*(?:액정(?:이)?\s*)?|액정(?:이)?\s*)(?:고장(?:이)?\s*(?:나서|났어|났는데)|깨(?:져서|졌어|졌는데))/;
 const ALTERNATE_CONTACT = /번호(?:를|가)?\s*(?:바꿨어|바뀌었어|바뀌어서)|새\s*번호(?:야|예요|입니다)|(?:새\s*번호|임시\s*(?:번호|폰)|(?:빌린|친구)\s*(?:휴대폰|핸드폰|폰))(?:으로|로)\s*(?:문자|연락|메시지)(?:해|드려|한다)/;
 const REPORTED_SPEECH = /[?‘“"'「]|(?:그때|지난번|예전에)|(?:다는|라는)\s*(?:말|문자|연락)|라고\s*(?:시작|말|하)|(?:었다|났다|다고)\s*(?:하더라|했)|(?:사칭|피싱)\s*(?:문자|예방|주의)|(?:하|되)?지\s*(?:마|말|않)/;
 const SELF_RELATION = /^(?:(?:나|저)(?:는)?\s*)?(?:(?:큰|작은|막내)?(?:아들|딸)|손자|손녀|손주|동생)(?:인데|이야|야|이에요|예요|입니다)/;
 const FIRST_PERSON = /^(?:나야|저예요|저에요|나|저)(?=[\s.,!~]|$)/;
 const REPLACED_DEVICE = /(?:휴대폰|핸드폰|폰)(?:을)?\s*바꿨어/;
-const OWN_OPENING = /^(?:(?:이거|이게|이건)\s*)?(?:나야|내다|나는|내가|제가|저는|나|저|내|제)(?=[\s,.!~ㅠㅜ]|$)/;
+const OWN_OPENING = /^(?:(?:이거|이게|이건)\s*)?(?:나야|내다|나는|내가|제가|저는|저예요|저에요|접니다|나|저|내|제)(?=[\s,.!~ㅠㅜ]|$)/;
 const OTHER_SUBJECT = /(?:친구|동생|언니|형|기사님|아이|직원)(?:는|은|가|이)\s+/;
 const NEW_CONTACT = /새로\s*(?:받은|만든|개통한)\s*번호(?:예요|야|입니다|니까|인데|\s*저장)/;
 const BORROWED = "(?:임시\\s*(?:번호|폰)|(?:빌린|친구|동생|지인|동료)\\s*(?:휴대폰|핸드폰|폰))";
@@ -71,7 +71,9 @@ const SAVE_CONTACT = /이\s*번호(?:를|로)?\s*저장(?:해|하세)/;
 const OWN_DEVICE_EVENT = /(?:휴대폰|핸드폰|폰)(?:이|가|을)?\s*(?:떨어뜨려|떨어트려|잃어버려|물에\s*빠[져졌지]|배터리(?:가)?\s*(?:나가|방전))|새\s*(?:휴대폰|핸드폰|폰)\s*개통\s*(?:전이라|중이|하는데)/;
 const ACTIVATING_ELSEWHERE = /새\s*(?:휴대폰|핸드폰|폰)\s*개통\s*(?:전이라|중이라)[^.!?\n]{0,16}이\s*번호로\s*(?:문자|보내)(?!\s*(?:주|줘|달))/;
 const CONFIRMS_CALL = /^(?:방금|아까|조금\s*전(?:에)?)\s*(?:전화|통화)(?:드린|한)\s*(?:사람|거|건|게)?\s*(?:나|저)(?:야|예요|\s*맞(?:아|습니다))/;
-const SENDING_FROM_LOANED_PHONE = /(?:친구|동료|지인|동생)\s*(?:휴대폰|핸드폰|폰)(?:을)?\s*빌(?:려(?:서)?|리가)\s*(?:(?:문자|메시지)(?:를)?\s*)?(?:보낸다|보내요|보냅니다|연락(?:드려요|해요))(?=[\s,.!~]|$)/;
+const SENDING_FROM_LOANED_PHONE = /(?:친구|동료|지인|동생|옆\s*사람)\s*(?:휴대폰|핸드폰|폰)(?:을)?\s*빌(?:려(?:서)?|리가)\s*(?:(?:문자|메시지)(?:를)?\s*)?(?:보낸다|보내요?|보냅니다|연락(?:드려요|해요))(?!\s*(?:줘|주|달|보라))(?=[\s,.!~]|$)/;
+const USING_OTHERS_DEVICE = /(?:친구|동료|지인|동생)\s*(?:꺼|거)(?:로|라)\s*(?:(?:문자|메시지)(?:를)?\s*)?보내(?:요)?(?!\s*(?:줘|주|달))(?=[\s,.!~]|$)/;
+const CLOSED_NUMBER_ROUTE = /^이\s*번호로\s*(?:문자|연락)(?:해요?|주세요)[\s.!~,]*(?:원래|예전|전에\s*쓰던)\s*번호(?:는|가|를)?\s*해지(?:했|됐|되었)(?:어요?|습니다)(?=[\s.!~,]|$)/;
 const LOANED_PHONE_NO_CALL = /^(?:지금(?:은)?\s*)?(?:전화|통화)(?:는|가|를|도)?\s*(?:빌린|남의|친구|동료|지인)\s*(?:휴대폰|핸드폰|폰|거|꺼)(?:이?라(?:서)?|여서)\s*(?:(?:못|몬)\s*받(?:는다|아요?|습니다)|받을\s*수(?:가)?\s*없(?:어요?|습니다))[\s.!~]*$/;
 
 function senderStatement(opening) {
@@ -87,6 +89,7 @@ function addFamilySignals(input, signals) {
   if (!greeting) return;
   const opening = input.slice(greeting[0].length, greeting[0].length + 100);
   const statement = senderStatement(opening);
+  const ownDamage = Boolean(statement) && PHONE_DAMAGE.test(statement.replace(OWN_OPENING, "").trimStart());
   // 발신자가 다른 사람의 기기를 빌려 연락했다는 설명과, 그 기기로는 통화하지 못한다는 자기 진술이 모두 있어야 한다.
   const openingClauses = opening.match(/[^.!?\n]+[.!?]?/g) ?? [];
   const cutMidClause = input.length > greeting[0].length + opening.length && !/[.!?\n]$/.test(opening);
@@ -98,13 +101,14 @@ function addFamilySignals(input, signals) {
   }
   if (!/번호(?:는|가)?\s*(?:그대로|같아)/.test(opening) &&
       (NEW_CONTACT.test(statement) || USING_BORROWED.test(statement) || ACTIVATING_ELSEWHERE.test(statement) ||
+       SENDING_FROM_LOANED_PHONE.test(statement) || (ownDamage && USING_OTHERS_DEVICE.test(statement)) || CLOSED_NUMBER_ROUTE.test(opening) ||
        (REPLACED_DEVICE.test(statement) && SAVE_CONTACT.test(statement)))) {
     signals.add(SIG_FAMILY_IMPERSONATION);
     signals.add(SIG_NEW_NUMBER);
   }
   const clauses = openingClauses.slice(0, 2);
   const first = clauses[0]?.trim() ?? "";
-  if (OWN_DEVICE_EVENT.test(statement) || (CONFIRMS_CALL.test(first) &&
+  if (ownDamage || OWN_DEVICE_EVENT.test(statement) || (CONFIRMS_CALL.test(first) &&
       !REPORTED_SPEECH.test(first) && !/라고\s*(?:적힌|쓰인)/.test(first))) signals.add(SIG_FAMILY_IMPERSONATION);
   if (!REPORTED_SPEECH.test(first) && SELF_RELATION.test(first)) signals.add(SIG_FAMILY_IMPERSONATION);
   const self = !REPORTED_SPEECH.test(first) && FIRST_PERSON.test(first);
