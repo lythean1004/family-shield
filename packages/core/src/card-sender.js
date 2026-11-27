@@ -13,7 +13,7 @@ const senderCards = new Map(
 const SERVICE_CHANGE = /(?:배송지|수령지|주소|결제|승인)[^.!?\n]{0,12}?(?:수정|정정|변경|취소)\s*(?:신청|양식|접수|요청|부탁|필요|해\s*(?:주|줘)|하(?:세|십|시)|바랍|후\s*재배송)(?!\s*(?:(?:하)?지\s*(?:마|말|않)|(?:은|는|이|가)\s*(?:사칭|사기|피싱)))/;
 
 // 금융위·경찰청 등 합동 예방 안내의 택배·기관 발신 사칭 유형. https://www.fsc.go.kr/no010101/87779
-export function hasCardServiceRequest(text, { externalLink, sensitiveRequest, directedCallback }) {
+export function hasCardServiceRequest(text, { externalLink, sensitiveRequest, directedCallback, personalReply }) {
   const opening = text.trimStart().replace(/^(?:\[(?:Web발신|국제발신|국외발신)\]\s*)+/i, "");
   const sender = /^\[([^\]\n]{1,30})\]\s*/.exec(opening) ??
     /^([가-힣a-z0-9]{2,24}?)(?:입니다(?=[\s.!]|$)|\s+(?=배송|결제|민원|공지|서비스\s*안내))/i.exec(opening);
@@ -21,5 +21,5 @@ export function hasCardServiceRequest(text, { externalLink, sensitiveRequest, di
   if (!card) return false;
   const body = opening.slice(sender[0].length).trimStart();
   if (/^[.!:\s]*(?:(?:보이스|메신저)?피싱|스미싱|사칭)\s*(?:문자\s*)?(?:주의|예방|교육|경고)/.test(body)) return false;
-  return (directedCallback && Boolean(card.callback_contact)) || (externalLink && (sensitiveRequest || SERVICE_CHANGE.test(body)));
+  return personalReply || (directedCallback && Boolean(card.callback_contact)) || (externalLink && (sensitiveRequest || SERVICE_CHANGE.test(body)));
 }

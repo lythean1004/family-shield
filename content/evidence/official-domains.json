@@ -116,6 +116,7 @@
     {
       "id": "EV-DOM-NHIS",
       "name": "국민건강보험공단",
+      "sender_names": ["국민건강보험공단", "국민건강보험"],
       "official_domains": [
         "nhis.or.kr"
       ],
