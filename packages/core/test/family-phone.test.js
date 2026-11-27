@@ -25,6 +25,24 @@ describe("발신자가 지금 쓰는 번호를 설명하는 말", () => {
   ]) it(text, () => assert.ok(!extractCodeSignals(text).signals.includes(SIG_NEW_NUMBER)));
 });
 
+describe("본인의 단말 상태와 직전 통화를 설명하는 가족", () => {
+  for (const text of [
+    "어머니, 나 집에 오는 길에 휴대폰 떨어뜨려서 화면이 안 보여.",
+    "여보 나야. 내 폰 배터리가 방전됐어.",
+    "아빠, 방금 전화한 사람 저 맞아요. 공연 잘 끝났어요.",
+    "엄마, 나 새 휴대폰 개통 전이라 이 번호로 보내요. 안부 전해.",
+  ]) it(text, () => assert.ok(extractCodeSignals(text).signals.includes(SIG_FAMILY_IMPERSONATION)));
+  it("새 단말을 기다리며 지금 쓰는 다른 연락처를 밝힌 경우만 번호 변경을 인정한다", () => {
+    assert.ok(extractCodeSignals("언니, 나 새폰 개통 전이라 이 번호로 보내.").signals.includes(SIG_NEW_NUMBER));
+    assert.ok(!extractCodeSignals("언니, 나 새폰 개통 중이야. 번호는 그대로야.").signals.includes(SIG_NEW_NUMBER));
+  });
+  for (const text of [
+    "어머니, 제 친구가 휴대폰 떨어뜨려서 수리 맡겼대요.",
+    "아빠, 아까 전화한 사람 저 맞아요 라고 적힌 교육 예시예요.",
+    "여보, 지난번에 내 폰 배터리가 방전됐었던 거 기억나?",
+  ]) it(text, () => assert.ok(!extractCodeSignals(text).signals.includes(SIG_FAMILY_IMPERSONATION)));
+});
+
 describe("가족에게 신분을 밝히는 발신자", () => {
   for (const text of [
     "어머니, 저 큰딸인데요. 주말에 뵐게요.",
