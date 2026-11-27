@@ -159,6 +159,17 @@ function relayArguments(text, argument) {
 
 const speakerAsRecipient = "(?:자기|자신|발신자|발신인|상대(?:방)?)(?:에게|한테|쪽으로)";
 const receiverOwnedCode = deliveredToRecipient.source + "\\s*(?:" + oneTimeConfirmationValue + "|" + credential + ")(?:을|를)";
+const respondingParty = /^(?:발신(?:자|인)|상대(?:방)?|상담원|(?:(?:[\p{L}]{1,12}\s+){0,2}(?:문의|질문)(?:에|에는)\s*(?:(?:답(?:변)?|응답)(?:하던|한|하는|해\s*(?:준|주던|주는)))|답장(?:을)?\s*(?:쓴|쓰던|보낸|보내\s*(?:준|주던)))\s*(?:사람|담당자|쪽))(?:이|가|은|는)\s+/u;
+const requiresPersonalReceipt = new RegExp("^" + receiverOwnedCode +
+  "\\s+(?:자기가|자신이|본인이)\\s*(?:(?:직접|꼭)\\s*)?(?:(?:전달|인계|전송)\\s*)?받아야(?:만)?\\s*" +
+  "(?:한다|된다)(?:고|며)\\s*(?:말했|설명했|밝혔|답했|했)(?:다|습니다|어요)[.。!]?\\s*$", "iu");
+
+function claimsRecipientsCode(clause) {
+  if (inactiveReport.test(clause) || supportIllustration.test(clause)) return false;
+  const speaker = respondingParty.exec(clause);
+  return Boolean(speaker && requiresPersonalReceipt.test(clause.slice(speaker[0].length)));
+}
+
 const receivedCodeAndDestination = new RegExp("^(?:" + receiverOwnedCode + "\\s+" + speakerAsRecipient +
   "|" + speakerAsRecipient + "\\s+" + receiverOwnedCode + ")\\s+", "iu");
 const proceedsWhenIssuerReceives = /^(?:전달|인계|전송)받(?:아야(?:만)?|은\s*뒤에만)\s*(?:(?:접수|처리|신청|확인|상담)(?:\s*절차)?|절차)(?:가|이|는|은)?\s*(?:된다|가능하다|진행된다)(?:고|는|며)\s*(?:했|하였|말했|설명했|적었|알렸|안내했)/u;
@@ -222,25 +233,27 @@ function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
   const hasOwnedCode = deliveredToRecipient.test(text);
   const hasAccessCode = hasReportedAccessCode.test(text);
   if (hasOwnedCode || hasAccessCode) {
-    const identifiesIssuer = clause => currentRelayIssuer.test(clause) || relayReportLead.test(clause) ||
+    const identifiesIssuer = clause => currentRelayIssuer.test(clause) || relayReportLead.test(clause) || readHandoff(clause).claimed ||
       (hasAccessCode && (supportOfferIssuer.test(clause) || reportedAccessIssuer.test(clause)));
     const observations = new Map();
     // 수신 문맥 판별 콜백에서 읽은 절은 결과를 채택할 때 다시 분석하지 않는다.
     function readHandoff(clause) {
       if (!observations.has(clause)) observations.set(clause, {
         owned: hasOwnedCode && (reportsRelayWithExplicitArguments(clause) || reportsIssuerContingentHandoff(clause)),
+        claimed: hasOwnedCode && claimsRecipientsCode(clause),
         remote: hasAccessCode && reportsSupportCodeToIssuer(clause),
       });
       return observations.get(clause);
     }
     const identifiesHandoff = clause => {
       const handoff = readHandoff(clause);
-      return handoff.owned || handoff.remote;
+      return handoff.owned || handoff.claimed || handoff.remote;
     };
     for (const { body, previous, next } of currentReceivedRequests(text, identifiesIssuer, identifiesHandoff)) {
       if (withdrewCodeRelay.test(next)) continue;
       const handoff = readHandoff(body);
       if (handoff.owned) return true;
+      if (handoff.claimed && !supportIllustration.test(previous) && !supportIssuerWithdrawal.test(next)) return true;
       if (handoff.remote && !supportIssuerWithdrawal.test(next) && !supportIllustration.test(previous) &&
           ![previous, body, next].some(receiverInitiatedSupport)) return true;
     }
