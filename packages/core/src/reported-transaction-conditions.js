@@ -228,6 +228,32 @@ function bindsNamedAccountToAnotherPayee(prior, clause, context, next) {
   return Boolean(directive && directive.index <= 12 && !notMovingMoney.test(after.slice(0, directive.index)));
 }
 
+const feeForCheckingDeal = /(?:거래|계약)(?:을|를|의)?\s*(?:확인|검증)(?:하기\s*위한|을\s*위한|용)?\s*(?:비용|수수료|부담금|확인료|검증비)/u;
+const mustPayVerificationFee = /^(?:을|를|부터)?\s*(?:(?:먼저|미리|따로|별도로)\s*)?(?:내야|(?:입금|이체|송금|납부|지불)해야)(?:만)?/u;
+const continuesAfterVerificationFee = /^(?:[,，]\s*)?(?:(?:그제야|비로소|그때부터|다음에)\s*)?(?:(?:해당|그|본|실제|실)\s*)?(?:거래|계약|절차)(?:를|을|이|가)?\s*(?:진행|계속|시작|이어)(?:(?:할|갈)\s*(?:수|조건)|한다|되는|할\s*때|된다|갈\s*수|가게|진행)/u;
+const earlierVerificationCondition = /(?:거래|계약|절차)(?:를|을|이|가)?\s*(?:진행|계속|시작|이어가)(?:하)?기?\s*(?:위한|위해|위해서|하려는)\s*(?:전제|조건)(?:이|가|은|는|[:：])?/u;
+const ordinaryVerificationService = /(?:선택\s*사항|필수(?:가|는)?\s*아니|조건(?:은|는|이|가)?\s*아니|내지\s*않아도|납부하지\s*않아도)|(?:법정|공식\s*공시|기존\s*계약으로\s*확정된|이미\s*확인한)\s*[^.!?\n]{0,12}(?:수수료|비용|계약)/u;
+
+const potentiallyPayingSeller = /(?:업체|회사|판매자|발주자|상대(?:방)?)(?:가|이|은|는)(?=\s|$)/u;
+const imposesVerificationCondition = /(?:조건|전제)(?:을|를)\s*(?:[\p{L}]{1,5}\s+)?(?:내걸|내밀|붙였|걸었|내놨|제시했|요구했)/u;
+const explicitlyPaysOwnFee = /(?:자기|자신|회사|업체)(?:가|이|의)?\s*(?:직접|스스로|부담할|부담하는|별도\s*부담)/u;
+
+function requiresVerificationFeeBeforeContinuing(clause, context, next) {
+  if (!currentlyReported(context) || NO_PAYMENT.test(context) || CONFIRMATION_FIRST.test(context) ||
+      ordinaryInvoice.test(context) || ordinaryVerificationService.test(context) ||
+      paysWorker.test(context) || samePaymentDemandEnded.test(next)) return false;
+  const fee = feeForCheckingDeal.exec(clause);
+  if (!fee) return false;
+  const before = clause.slice(0, fee.index);
+  if (explicitlyPaysOwnFee.test(before) ||
+      potentiallyPayingSeller.test(before) && !imposesVerificationCondition.test(clause) && !explicitWorker.test(before)) return false;
+  const paymentAndOutcome = clause.slice(fee.index + fee[0].length);
+  const payment = mustPayVerificationFee.exec(paymentAndOutcome);
+  if (!payment) return false;
+  return continuesAfterVerificationFee.test(paymentAndOutcome.slice(payment[0].length).trimStart()) ||
+    earlierVerificationCondition.test(before);
+}
+
 export function addReportedTransactionConditions(text, signals) {
   const clauses = text.split(SENTENCES).map(value => value.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
@@ -238,7 +264,7 @@ export function addReportedTransactionConditions(text, signals) {
     if (EXAMPLE.test(context) || EXAMPLE.test(next) && !SWITCH.test(next)) continue;
     if (paymentBeforeOutcome(clause) || paymentBeforeOutcome(context) || bindsPaymentBeforeCounterpartyCheck(prior, clause, context, next) ||
         reportedUpfrontGate(context) || demandsPaymentBeforeVerification(clause) || paymentBeforeBasicInformation(clause, context) ||
-        workerPaysBeforeAssignment(clause, context)) {
+        workerPaysBeforeAssignment(clause, context) || requiresVerificationFeeBeforeContinuing(clause, context, next)) {
       signals.add(SIG_PREPAYMENT);
     }
     if (routedToOtherParty(clause) || bindsOtherOwnerToPayment(prior, clause, context, next) ||
