@@ -320,6 +320,7 @@ const reportCashRole = new RegExp(String.raw`(?<![\p{L}\p{N}])(?<role>(?:${INVES
   String.raw`(?:이?라는|이?라고\s*(?:한|밝힌|소개한|말한)|(?:[을를]\s*)?자처한)\s*` +
   String.raw`(?:발신(?:자|인)|사람|상대(?:방)?|쪽)(?:이|가|은|는|에게|한테|에서)?(?=[\s,，]|$)`, "u");
 const meetForDelivery = /(?:직접\s*)?(?:만나(?:서|는\s*(?:자리|곳)(?:에서|에)?)?|대면(?:해서|으로)?)(?=\s|$)/u;
+const visitingCashRecipient = /(?:^|\s)(?:방문(?:하는|할)|찾아(?:오는|올))\s*(?:직원|담당자|대리인|요원|수사관)(?:에게|한테)(?:만)?\s*(?:직접\s*)?$/u;
 const directedHandover = /(?:건네|넘겨|인계해|전달해|교부해)(?:야|라(?:고|는)|\s*달라)|(?:인계하|전달하|교부하|넘기)(?:라고|라는|도록)/u;
 const returnToReceiver = /(?:제게|저에게|내게|나에게|수신자에게)(?:만)?\s*(?:직접\s*)?$/u;
 const anotherCashPayer = /(?:^|[\s,，])(?:직원|담당자|발신(?:자|인)|상대(?:방)?|제삼자)(?:이|가|은|는)(?=[\s,，]|$)/u;
@@ -333,7 +334,7 @@ function requiresCashAtMeeting(action) {
   if (!delivery || delivery.index > 54) return false;
   const beforeDelivery = afterCash.slice(0, delivery.index);
   const meeting = action.slice(Math.max(0, cash.index - 42), cash.index) + " " + beforeDelivery;
-  return meetForDelivery.test(meeting) && !anotherCashPayer.test(meeting) &&
+  return (meetForDelivery.test(meeting) || visitingCashRecipient.test(beforeDelivery)) && !anotherCashPayer.test(meeting) &&
     !returnToReceiver.test(beforeDelivery) && !otherDeliveryObject.test(beforeDelivery);
 }
 
@@ -353,7 +354,8 @@ function requiresLoanPickup(action, issuerClause) {
 function* reportedCashTransfers(text) {
   const issuer = clause => openDirectedReport(clause) && roleBelongsToReportedSource(clause) &&
     (reportCashRole.exec(clause) || issuerForCurrentReport(clause));
-  const request = clause => requiresCashAtMeeting(clause) || cashMedium.test(clause) && reportsPickupPlan.test(clause);
+  // 이 단계에서는 현금 요구 후보만 찾는다. 지급자와 인수자는 발신자 소개를 뺀 본문에서 확인한다.
+  const request = clause => cashMedium.test(clause) && (directedHandover.test(clause) || reportsPickupPlan.test(clause));
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
     for (const { body, previous, next } of currentReceivedRequests(record, issuer, request)) {
       if (!openDirectedReport(body) || asksAboutCollection.test(body) || closedRemainder.test(next)) continue;
