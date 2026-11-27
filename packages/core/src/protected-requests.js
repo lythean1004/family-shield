@@ -29,7 +29,10 @@ function externalOnly(parsed) {
 
 const humanRecipient = "(?:대화\\s*상대(?:방)?|상대(?:방)?|자기|(?:그|다른)\\s*(?:사람|분)|(?:상담|접수)\\s*(?:자|원|직원|담당자)|담당자|직원)(?:에게|한테)";
 const reportedRelay = new RegExp(credential + "(?:을|를|만)?\\s*(?:그대로\\s*)?" + humanRecipient +
-  "\\s*(?:그대로\\s*)?(?:불러|알려|읽어|전달해|보내|넘겨|말해)\\s*(?:달라고|달라는|달라네|달래|줘야)", "iu");
+  "\\s*(?:그대로\\s*)?(?:불러|알려|읽어|전달해|보내|넘겨|말해)\\s*(?:달라고|달라는|달라네|달래|줘야)", "giu");
+const dramaSetting = /(?:낭독극|연극|역할극|희곡|대본|극본)(?:에서(?:는)?|\s*속(?:에서|의)?)[^,，.!?\n]{0,28}$/;
+const dramaLine = /^\s*(?:대사|지문|장면|배역|역할)(?:을|를|이|가|은|는)?(?=\s|$)/;
+const endedRelay = /^\s*(?:요청|요구|부탁|문구|안내)(?:은|는|이|가)?\s*(?:있었|나왔|적혀\s*있었)(?:지만|는데|고)\s*(?:(?:그|해당)\s*)?(?:절차|접수|신청|업무)(?:는|가|이|은)?\s*(?:이미\s*)?(?:끝났|종료됐|마감됐|완료됐|마쳤)/;
 const inactiveReport = /(?:요청|요구|부탁)(?:을|를)?\s*(?:이미\s*)?(?:거절|취소|철회)|(?:예방|보안)\s*(?:교육|강의)|(?:수업|교육|연수)에서|(?:예시|사례)(?:로|예요|입니다)|(?:역할극|극본|대본)\s*(?:대본|속|연습)|(?:하는|그런)\s*(?:일|경우)(?:이|가)?\s*없|(?:달라고|요구|부탁|요청)\s*한\s*적(?:이|은)?\s*없|(?:절차|접수)(?:가|는)?\s*(?:종료|마감|완료)됐|하지\s*(?:말|마|않)|(?:필요|의무)(?:가|는)?\s*없/;
 const documentPair = new RegExp("(?:" + identityCopy + together + bankCopy + "|" + bankCopy + together + identityCopy + ")");
 const requiredCopies = /^\s*(?:이|가|을|를)?\s*(?:(?:함께|한꺼번에|모두|둘\s*다)\s*)?(?:내라|내야|보내야|(?:제출|첨부|접수|등록)해야|들어가|포함(?:돼|되|된)|(?:이?라고|이래|이랍니다|입니다))/;
@@ -40,11 +43,21 @@ function hasNamedDestination(text) {
   return [...text.matchAll(destinationField)].some(match => externalOnly(inspectLinkCandidates(match.groups.token)));
 }
 
+function hasCurrentReportedRelay(clause) {
+  for (const match of clause.matchAll(reportedRelay)) {
+    const before = clause.slice(0, match.index);
+    const after = clause.slice(match.index + match[0].length);
+    if (endedRelay.test(after) || (dramaSetting.test(before) && dramaLine.test(after))) continue;
+    return true;
+  }
+  return false;
+}
+
 export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
   const clauses = text.split(clauseBreak).map(clause => clause.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
     if (inactiveReport.test(clause)) continue;
-    if (reportedRelay.test(clause)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
+    if (hasCurrentReportedRelay(clause)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
     if (!hasUnverifiedLink) continue;
     const pair = documentPair.exec(clause);
     if (!pair || !requiredCopies.test(clause.slice(pair.index + pair[0].length))) continue;

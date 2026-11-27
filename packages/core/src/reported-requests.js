@@ -22,6 +22,7 @@ const availabilityBefore = /(?:자리|매물|물건|좌석|예약|양도)(?:가\
 const availabilityAfter = /^\s*(?:만\s*)?(?:자리|좌석|대여|예약|양도|신청|거래)(?:가\s*되는지|\s*(?:가능\s*)?(?:여부|유무))(?:를)?\s*(?:알려|확인)/;
 const institutionPayee = /(?:업체|회사|가게|매장|사업자|법인)(?:의)?\s*(?:계좌|통장|이름|명의|장부)(?:가\s*아니라|\s*대신)\s*/g;
 const alternateAccount = /^(?!(?:제|내|저의|나의)\s)(?:[가-힣]{1,8}(?:의)?\s+)?개인\s*(?:명의\s*)?(?:통장|계좌)(?:로|으로|에)\s*(?:(?:대금|[가-힣]{1,6}비)(?:을|를)?\s*)?(?:보내|넣으|부치|입금하|송금하|이체하)(?:라|래)/;
+const taughtTransfer = /^(?:고|는|면서)?\s*(?:문구|대목|문장|예문)(?:을|를|은|는)?\s*[^,，.!?\n]{0,24}(?:교육|수업|강의|퀴즈|문제집|교재|연습)(?:에서|로)\s*(?:읽|다뤘|배웠|소개|봤|나왔|풀)/;
 const illustrativeTransaction = /(?:가상|가정한|예시)\s*(?:거래|상황|사례)|(?:제가|내가)\s*[^.!?\n]{0,16}(?:에게|한테)\s*(?:요청|안내)/;
 
 const socialSupport = /(?:가족|친구|이웃|지인|주위|주변|다른\s*사람|평소\s*(?:연락|상의|상담)하던\s*(?:사람|이들)|누구(?:와|하고|에게)도)/;
@@ -48,6 +49,16 @@ function hasCurrentAdvance(topic) {
   return false;
 }
 
+function hasAlternateAccountRequest(topic) {
+  if (illustrativeTransaction.test(topic) || /(?:거절했|취소했|철회했)/.test(topic)) return false;
+  for (const payee of topic.matchAll(institutionPayee)) {
+    const tail = topic.slice(payee.index + payee[0].length);
+    const transfer = alternateAccount.exec(tail);
+    if (transfer && !taughtTransfer.test(tail.slice(transfer[0].length))) return true;
+  }
+  return false;
+}
+
 function addConditions(passage, signals) {
   const clauses = passage.split(/\.(?=\s|$)|[!?\n]+|(?:끝났|완료됐|완료했|마쳤|처리됐)(?:고|지만|는데)\s+/u);
   for (const clause of clauses) {
@@ -61,8 +72,7 @@ function addConditions(passage, signals) {
     if (holder && instructionToPay.test(clause.slice(holder.index + holder[0].length, holder.index + holder[0].length + 32))) {
       signals.add(SIG_THIRD_PARTY_ACCOUNT);
     }
-    if (topics.some(topic => !illustrativeTransaction.test(topic) && !/(?:거절했|취소했|철회했)/.test(topic) &&
-        [...topic.matchAll(institutionPayee)].some(payee => alternateAccount.test(topic.slice(payee.index + payee[0].length))))) {
+    if (topics.some(hasAlternateAccountRequest)) {
       signals.add(SIG_THIRD_PARTY_ACCOUNT);
     }
 
