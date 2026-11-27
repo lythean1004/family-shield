@@ -31,7 +31,7 @@ import { classifyCallback } from "./callback-number.js";
 import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
 import { addReportedProtectedRequests, hasCredentialDisclosure, hasDocumentBundle } from "./protected-requests.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover, hasLoanCashPickup } from "./cash-handover.js";
-import { ACCOUNT_NUMBER, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
+import { ACCOUNT_NUMBER, hasAmountObjectAsk, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
 import { reportedRequestSignals } from "./reported-requests.js";
 import { addReportedContactRestrictions } from "./reported-contact-restrictions.js";
 import { addReportedFamilySignals } from "./reported-family.js";
@@ -66,6 +66,7 @@ const FAMILY_GREETING = /^\s*(?:엄마|아빠|어머니|아버지|할머니|할�
 const PHONE_DAMAGE = /(?:^\s*|(?:^|\s)(?:나|내|제)\s*)(?:(?:휴대폰|핸드폰|폰)(?:이|가)?\s*(?:액정(?:이)?\s*)?|액정(?:이)?\s*)(?:고장(?:이)?\s*(?:나서|났어|났는데)|깨(?:져서|졌어|졌는데))/;
 const ALTERNATE_CONTACT = /번호(?:를|가)?\s*(?:바꿨어|바뀌었어|바뀌어서)|새\s*번호(?:야|예요|입니다)|(?:새\s*번호|임시\s*(?:번호|폰)|(?:빌린|친구)\s*(?:휴대폰|핸드폰|폰))(?:으로|로)\s*(?:문자|연락|메시지)(?:해|드려|한다)/;
 const REPORTED_SPEECH = /[?‘“"'「]|(?:그때|지난번|예전에)|(?:다는|라는)\s*(?:말|문자|연락)|라고\s*(?:시작|말|하)|(?:었다|났다|다고)\s*(?:하더라|했)|(?:사칭|피싱)\s*(?:문자|예방|주의)|(?:하|되)?지\s*(?:마|말|않)/;
+const DIRECT_RELATION = /^(?:[나저](?:는)?\s*)?(?:(?:큰|작은|맏|막내|첫째|둘째|친|외)\s*)?(?:아들|딸|손자|손녀|손주|동생|형|형님|누나|언니|오빠|아내|남편|배우자|조카|막내)(?:인데(?:요)?|이야|야|이에요|예요|입니다)(?=[\s,.!~ㅋㅎㅠㅜ]|$)/u;
 const SELF_RELATION = /^(?:(?:나|저)(?:는)?\s*)?(?:(?:큰|작은|막내)?(?:아들|딸)|손자|손녀|손주|동생)(?:인데|이야|야|이에요|예요|입니다)/;
 const FIRST_PERSON = /^(?:나야|저예요|저에요|나|저)(?=[\s.,!~]|$)/;
 const REPLACED_DEVICE = /(?:휴대폰|핸드폰|폰)(?:을)?\s*바꿨어/;
@@ -84,6 +85,44 @@ const USING_OTHERS_DEVICE = /(?:친구|동료|지인|동생)\s*(?:꺼|거)(?:로
 const CLOSED_NUMBER_ROUTE = /^이\s*번호로\s*(?:문자|연락)(?:해요?|주세요)[\s.!~,]*(?:원래|예전|전에\s*쓰던)\s*번호(?:는|가|를)?\s*해지(?:했|됐|되었)(?:어요?|습니다)(?=[\s.!~,]|$)/;
 const LOANED_PHONE_NO_CALL = /^(?:지금(?:은)?\s*)?(?:전화|통화)(?:는|가|를|도)?\s*(?:빌린|남의|친구|동료|지인)\s*(?:휴대폰|핸드폰|폰|거|꺼)(?:이?라(?:서)?|여서)\s*(?:(?:못|몬)\s*받(?:는다|아요?|습니다)|받을\s*수(?:가)?\s*없(?:어요?|습니다))[\s.!~]*$/;
 
+const separateFamilyActivity = /^(?:한편|별도로|그와\s*별개로|다른\s*(?:사람|발신자|연락처)|(?:친구|이웃|직원|담당자|상담원|동료)(?:는|가|이|은)\s)|(?:예방|교육)\s*(?:자료|안내|사례|내용)|(?:요청|부탁)(?:을|를|은|는)?\s*(?:거절|철회|취소)/u;
+const voucherMoneyObject = /상품권|기프트\s*카드|구글\s*플레이\s*카드|기프티콘|교환권|충전권|금액권/u;
+const voucherCodeRelay = /(?:핀(?:\s*(?:번호|코드))?|번호|코드|바코드|뒷면)(?:만|을|를)?\s*(?:(?:나|저)(?:에게|한테)\s*)?(?:찍어\s*)?(?:(?:보내|알려|공유해|전달해|읽어)\s*(?:줘|주라|주세요|달라|줄래|줄\s*수|주면|주실)|줘|줄\s*수)/iu;
+const deniedVoucherRelay = /(?:주|보내|알려|공유하|전달하)(?:지\s*(?:말|마|않)|면\s*안)|(?:필요|요청)(?:가|은|는)?\s*없/u;
+const identifiedVoucherCode = /^\s*(?:그|해당)\s*(?:상품권(?:의)?\s*)?(?:코드|핀|번호|바코드)/iu;
+const otherCode = /(?:예약|운송장|주문|접수|승차|인증|좌석|응모)\s*(?:번호|코드)/u;
+
+function hasDirectVoucherRelay(text) {
+  const clauses = text.split(/[.!?。…\r\n]+/u);
+  return clauses.some((clause, index) => {
+    if (!voucherCodeRelay.test(clause) || deniedVoucherRelay.test(clause) || otherCode.test(clause)) return false;
+    if (voucherMoneyObject.test(clause)) return true;
+    return identifiedVoucherCode.test(clause) && voucherMoneyObject.test(clauses[index - 1] ?? "");
+  });
+}
+function directFamilyRequest(text) {
+  const greeting = FAMILY_GREETING.exec(text);
+  const opening = text.slice(greeting?.[0].length ?? 0).trimStart();
+  const clauses = opening.split(/[.!?。…\r\n]+/u).map(part => part.trim()).filter(Boolean);
+  const claim = opening.match(/^[^.!?。…\r\n]+[.!?。…]?/u)?.[0] ?? "";
+  if (!DIRECT_RELATION.test(claim) || REPORTED_SPEECH.test(claim)) return "";
+  const context = clauses.slice(0, 4);
+  if (context.some(clause => separateFamilyActivity.test(clause))) return "";
+  return context.join(". ");
+}
+const paymentArchive = /(?:결산\s*표|정산\s*표|장부|회의록|옛날\s*(?:서류|문서)|전시\s*(?:자료|기록)|예시\s*(?:자료|서식))[^.!?\n]{0,52}(?:줄(?:이|을)|문형|문장|문구|대목|표현|보관|옮겼|옮긴|베껴|베꼈|필사)/u;
+const archivedPaymentQuote = /(?:라는|했다는|하라는|달라는|하라고\s*한|해\s*달라고\s*한)\s*(?:당시\s*)?(?:표시였|기록이었|문구였|문장이었|대목이었|항목이었|줄이)/u;
+const inactivePaymentProposal = /(?:의견|제안|안건|요청|요구|부탁)(?:은|는|이|가)?\s*(?:(?:이미|앞서|그때)\s*)?(?:거절(?:됐|되었)|부결(?:됐|되었)|취소(?:됐|되었)|철회(?:됐|되었)|없던\s*일이\s*됐)/u;
+
+function hasDirectMoneyRequest(text) {
+  const clauses = text.split(/[.!?。…\r\n]+/u).map(clause => clause.trim()).filter(Boolean);
+  return clauses.some((clause, index) => {
+    if (inactivePaymentProposal.test(clause) || paymentArchive.test(clause) ||
+        archivedPaymentQuote.test(clause) && paymentArchive.test(clauses[index - 1] ?? "")) return false;
+    return hasAmountObjectAsk(clause) || PATTERNS[SIG_MONEY].some(pattern => pattern.test(clause)) ||
+      requestedPayments(clause).money;
+  });
+}
 function senderStatement(opening) {
   if (!OWN_OPENING.test(opening)) return "";
   const contact = opening.split(/(?:근데|그런데|그나저나)/, 1)[0];
@@ -291,7 +330,8 @@ export function extractCodeSignals(text, options = {}) {
   // 끝 4자리 비교
   const { senderLast4, registeredLast4 } = options;
   const isLast4 = (v) => typeof v === "string" && /^\d{4}$/.test(v);
-  if (isLast4(senderLast4) && isLast4(registeredLast4) && senderLast4 !== registeredLast4) {
+  const numberMismatch = isLast4(senderLast4) && isLast4(registeredLast4) && senderLast4 !== registeredLast4;
+  if (numberMismatch) {
     signals.add(SIG_NEW_NUMBER);
   }
 
@@ -300,7 +340,16 @@ export function extractCodeSignals(text, options = {}) {
   addReportedProtectedRequests(input, signals, unverifiedLink);
   for (const signal of reportedRequestSignals(input)) signals.add(signal);
   addReportedFamilySignals(input, signals);
-  addFamilyRequestContextSignals(input, signals);
+  addFamilyRequestContextSignals(input, signals, { numberMismatch });
+  const directRequest = directFamilyRequest(input);
+  if (directRequest && numberMismatch && hasDirectMoneyRequest(directRequest)) {
+    signals.add(SIG_FAMILY_IMPERSONATION);
+    signals.add(SIG_MONEY);
+  }
+  if (directRequest && hasDirectVoucherRelay(directRequest)) {
+    signals.add(SIG_FAMILY_IMPERSONATION);
+    signals.add(SIG_GIFTCARD);
+  }
   addReportedNoticeFields(input, signals, { unverifiedLinks: outside.map(candidate => candidate.raw) });
   addInstitutionRequestContext(input, signals);
   return {

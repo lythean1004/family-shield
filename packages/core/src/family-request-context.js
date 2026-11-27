@@ -3,6 +3,7 @@ import {
   SIG_GIFTCARD, SIG_ISOLATION, SIG_MONEY, SIG_NEW_NUMBER, SIG_PERSONAL_INFO,
   SIG_PREPAYMENT, SIG_SECRECY, SIG_THIRD_PARTY_ACCOUNT, SIG_URGENCY,
 } from "./signals.js";
+import { hasAmountObjectAsk } from "./payment-request.js";
 
 const relation = "(?:(?:큰|작은|맏|막내|첫째|둘째|친|외|사촌|여|남)\\s*)?" +
   "(?:아들|딸|손자|손녀|손주|엄마|어머니|아빠|아버지|할머니|할아버지|할매|할배|동생|언니|오빠|형님|형|누나|누님|배우자|남편|아내|삼촌|숙모|이모|고모|조카|사촌|친척|자매|형제|막내)";
@@ -59,6 +60,14 @@ const privateInfo = `(?:주민\\s*(?:등록\\s*)?번호|신분증|(?:신분|신�
 const deviceApp = "(?:앱|어플(?:리케이션)?|프로그램)";
 const paymentAsk = directed(money, "보내|옮겨|부쳐|빌려|마련해|보태|내|(?:납부|대납|지급|송금|입금|이체)(?:하|할|해)?");
 const giftAsk = directed(gift, "보내|내놓|넘겨|사|(?:구매|구입|확보|전달)(?:하|할|해)?", "gu");
+const voucherUse = "(?:모바일\\s*)?(?:상품권|기프트\\s*카드|금액권|충전권|교환권)(?:의)?\\s*" +
+  "(?:(?:사용|교환|충전|등록)\\s*)?(?:사용\\s*값|코드|핀|PIN|번호|바코드)";
+const toSender = "(?:(?:자기|자신|본인|그쪽|발신자|그\\s*사람)(?:에게|한테|에게로|으로|로)\\s*)?";
+const voucherRelay = new RegExp(
+  voucherUse + objectEnding + toSender + modifier +
+  "(?:알려|보내|읽어|불러|넘겨|(?:전송|전달|공유)(?:하|해|할)?)\\s*" + actionEnding, "giu",
+);
+const voucherReportDenial = /(?:주|하|보내|알리|전하)(?:면\s*안|지\s*(?:말|마|않))|(?:번호|코드|핀)[^.!?]{0,18}(?:필요|요구)(?:가|는)?\s*없/iu;
 const privateAsk = directed(privateInfo, "보내|알려|읽어|(?:공유|제시|제출|전달)(?:하|할|해)?");
 const installAsk = new RegExp(
   `${deviceApp}${objectEnding}${modifier}(?:설치(?:하|할|해|를)?|깔아|내려받아|다운로드(?:하|할|해|를)?)\\s*${actionEnding}`, "u",
@@ -113,14 +122,15 @@ function hasActiveGiftObject(value, pattern) {
     !absentObject.test(value.slice(item.index + item[0].length)));
 }
 
-function requestsIn(context, fieldContext) {
+function requestsIn(context, fieldContext, numberMismatch) {
   const found = new Set();
   for (const clause of context) {
     if (closed.test(clause) || recipientAsks.test(clause)) continue;
     const hasPositiveAction = !actionNegation.test(clause);
     const object = fieldContext ? requestField.exec(clause) : null;
-    if (paymentAsk.test(clause) && hasPositiveAction) found.add(SIG_MONEY);
+    if (paymentAsk.test(clause) && hasPositiveAction || numberMismatch && hasAmountObjectAsk(clause)) found.add(SIG_MONEY);
     if ((hasPositiveAction && hasActiveGiftObject(clause, giftAsk)) ||
+        (!voucherReportDenial.test(clause) && hasActiveGiftObject(clause, voucherRelay)) ||
         (object && hasActiveGiftObject(clause.slice(object[0].length), giftObject))) found.add(SIG_GIFTCARD);
     if (privateAsk.test(clause) && hasPositiveAction) found.add(SIG_PERSONAL_INFO);
     if (installAsk.test(clause) && hasPositiveAction) found.add(SIG_APP_INSTALL);
@@ -136,7 +146,7 @@ function requestsIn(context, fieldContext) {
 }
 
 /** 발신자를 표시한 명사구·간접인용과 같은 연락의 현재 요구만 결합한다. */
-export function addFamilyRequestContextSignals(text, signals) {
+export function addFamilyRequestContextSignals(text, signals, { numberMismatch = false } = {}) {
   const clauses = text.split(/\.(?=\s|$)|[!?。…\r\n]+/u).map(clause => clause.trim()).filter(Boolean);
   for (const [index, start] of clauses.entries()) {
     if (!isSource(start) || isOtherSource(start) || illustrative.test(start)) continue;
@@ -151,7 +161,7 @@ export function addFamilyRequestContextSignals(text, signals) {
 
     const heading = recipientField.test(previous) ? clauses[index - 2] ?? "" : previous;
     const fieldContext = senderField.test(start) && documentaryField.test(heading);
-    const found = requestsIn(context, fieldContext);
+    const found = requestsIn(context, fieldContext, numberMismatch);
     const changed = context.some(clause => newContact.test(clause)) && !context.some(clause => sameContact.test(clause));
     const pressure = found.has(SIG_MONEY) && context.some(clause => urgency.test(clause) && urgentRequirement.test(clause));
     const secret = found.has(SIG_MONEY) && context.some(clause => secrecy.test(clause) && secrecyRequirement.test(clause));
@@ -161,7 +171,7 @@ export function addFamilyRequestContextSignals(text, signals) {
     }
     const highRiskRequest = [SIG_GIFTCARD, SIG_DELETE_APP, SIG_ISOLATION, SIG_CREDENTIAL_DISCLOSURE,
       SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT].some(signal => found.has(signal));
-    if (!highRiskRequest && !pressure && !secret && !(changed && found.size)) continue;
+    if (!highRiskRequest && !pressure && !secret && !(changed && found.size) && !(numberMismatch && found.has(SIG_MONEY))) continue;
 
     signals.add(SIG_FAMILY_IMPERSONATION);
     if (changed) signals.add(SIG_NEW_NUMBER);
