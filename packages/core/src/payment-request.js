@@ -26,6 +26,12 @@ const separateHolder = new RegExp(counterpartyParent + "(?:의)?\\s*(?:통장|�
 const relatedPayeeField = new RegExp("(?:예금주|" + ACCOUNT_NUMBER + ")[^.!?\\n()]{0,18}\\(\\s*(?:총무|회장|담당자)(?:의)?\\s*" + relative + "\\s*\\)");
 const requestedAccount = new RegExp("(?:이|아래|다음)\\s*(?:계좌|통장)(?:로|으로|에)\\s*" +
   "(?:(?:금일|오늘|내일)까지\\s*)?(?:좀\\s*)?" + remitTo);
+const feePurpose = /(?:수강료|수업료|학원비|교재비|회비|참가비)/;
+const ownCardBlocked = /(?:제|저의|내)\s*카드(?:가|는)?\s*(?:정지(?:돼|되[어었])|막혀)(?![가-힣]{0,4}\s*(?:않|아니|풀려|해제))/;
+const coverFee = new RegExp("(?:원장|선생|총무|회장)(?:님)?(?:의)?\\s*(?:계좌|통장)(?:로|으로)\\s*" +
+  "(?:" + shortUnit + "\\s*)?(?:먼저|대신)\\s*보내\\s*주(?:시면|면)\\s*" +
+  "(?:오늘|내일|모레|주말)(?:에)?\\s*(?:(?:직접|바로)\\s*)?" +
+  "(?:갚을게요?|돌려(?:드릴|줄)게요?|찾아뵙고\\s*(?:바로\\s*)?드릴게요?)" + end);
 const toAccount = new RegExp("(?:계좌|통장)(?:로|으로|에)\\s*(?:(?:바로|좀|지금|대신)\\s*){0,2}보내" +
   "(?:\\s*" + polite + "|(?=\\s*(?:[0-9]+\\s*만?\\s*원|$)))" + end);
 const oneTransfer = /(?:송금|이체)(?:을|를)?\s*(?:한\s*(?:번|건)|하나)만\s*(?:부탁(?:해|할게요?|드릴게요?|드려요|드립니다)?|해\s*(?:줘|주세요))(?=[\s,.!?~ㅋㅎ]|$)/;
@@ -97,6 +103,11 @@ export function requestedPayments(text) {
     // 대여할 물건과 받는 계좌가 따로 언급될 수 있어, 금전 차용을 부탁한 같은 절이나 바로 다음 절만 본다.
     if ((loanRequest || previous?.loanRequest) && namedAccount.test(clause)) thirdPartyAccount = true;
     const blocked = unavailable.test(clause);
+    // 자기 카드로 못 낸 비용을 다른 사람 계좌에 먼저 내 달라고 하고 직접 갚겠다는 요청.
+    if (feePurpose.test(clause) && ownCardBlocked.test(clause) && coverFee.test(clause) && !preventionNotice.test(text)) {
+      money = true;
+      thirdPartyAccount = true;
+    }
     const accountRequest = requestedAccount.test(clause);
     if ((blocked && substitute.test(clause)) ||
         ((accountRequest || previous?.accountRequest) && separateHolder.test(clause)) ||
