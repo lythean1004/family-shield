@@ -11,6 +11,20 @@ const desk = /(?:담당\s*(?:수사관|조사관)|전담\s*(?:상담실|창구|�
 const deskAction = /^[ \t)）]*(?:에게|으로|로)[ \t]*(?:(?:직접|바로|즉시)[ \t]*)?(?:연락\s*(?:바랍니다|하십시오|주세요)|전화\s*(?:하시어|주시면|주시기\s*바랍니다))(?=[\s.,!?]|$)/;
 const reportRisk = /(?:명의\s*도용|분실\s*신고)[^.!?\n]{0,24}$/;
 const verifyByPhone = /^[ \t]*(?:으로|로)[ \t]*확인\s*(?:바랍니다|해\s*주세요|하십시오)(?=[\s.,!?]|$)/;
+const callbackField = /(?:상담|문의|회신|접수|연락)(?:\s*(?:창구|연락처|번호)|은|는|이|가)?[\s:：☎]*$/u;
+const onlyNumber = /^\s*(?:(?:이|해당|그|지정된)\s*)?(?:전화\s*)?(?:번호|연락처)(?:로만|으로만|에서만|에만)\s*(?:(?:상담|접수|연락|통화|처리)(?:이|가)?\s*)?(?:가능|진행|처리|받을\s*수)/u;
+const noResponseAtNumber = /^\s*(?:로|으로|에)\s*(?:(?:오늘|금일|내일|오전|오후|기한\s*(?:내|안에)|(?:\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?|\d{1,2}\s*시간)\s*(?:까지|이내|안에)?)\s*){0,3}(?:(?:연락|전화|통화|회신|응답)(?:이|가|을|를)?\s*(?:없으면|하지\s*않으면|(?:없을|없는|하지\s*않을|하지\s*않는)\s*(?:시|경우|때))|미\s*(?:연락|회신|응답)\s*(?:시|경우|때))/u;
+const coerciveConsequence = /^[\s,，:：]*(?:(?:즉시|별도(?:로)?|추가(?:로)?)\s*)?(?:(?:법적|형사|사법)\s*(?:절차|조치)|(?:계좌|거래|이용)\s*(?:제한|정지)|압류|동결|고발|고소|체포|구속)(?:\s*조치)?(?:가|를|에|은|는)?\s*(?:실시|진행|시작|들어|취해|취하|이루어|예정|됩니다|합니다|한다|한다고|하겠|하라는|함(?:이|을)?|됨|$)/u;
+const noExclusiveRoute = /(?:가능(?:한\s*(?:것|게)|하)?|조건|요건|뜻|요구)(?:은|는|이|가)?\s*(?:사실이\s*)?(?:아니|않)|다른\s*(?:번호|연락처|창구)(?:로도|에서도)\s*(?:가능|연결)/u;
+const rejectedCallback = /(?:요청|요구|안내)(?:은|는|이|가|을|를)?\s*(?:(?:제가|내가|어제|이미|앞서)\s*){0,3}(?:거절|철회|취소)(?:했|됐|하였|되었|함)/u;
+const separateCallback = /(?:^|[\s,，])(?:(?:그와|이와)(?:는)?\s*별개로|별건으로|다른\s*(?:단체|발신자|사업자|기관)의\s*(?:상담|문의|접수|연락))/u;
+const callbackComparison = /비교\s*(?:연습|교육|수업|자료)|(?:가상의?\s*번호|가정한\s*번호)|(?:예|예시|가정)(?:를|로)\s*(?:읽|소개|비교|들었)|가정(?:하면|했을\s*때)/u;
+const newCallbackNotice = /^(?:(?:오늘|방금|이번에|새로)\s*(?:(?:받은|온|도착한)\s*(?:문자|메시지|연락|안내)|(?:문자|메시지|연락|안내)(?:가|를)?\s*(?:왔|받았)))/u;
+const historicalCallback = /(?:^|[\s,，\]])(?:당시|지난\s*(?:달|주|해|번)|작년|예전|과거)(?:의|에는|에)?\s*(?:[가-힣]{1,12}\s+){0,3}(?:상담|문의|접수|회신|연락)(?:은|는|이|가)?\s*[:：]?\s*$/u;
+const pastAvailability = /^\s*(?:했|하였|되었|됐|하던|되던|했던|한지|한\s*(?:여부|이유))/u;
+const closedCallbackChannel = /^(?:그|이|해당|같은)\s*(?:창구|상담|접수|연락처)(?:은|는|이|가)?\s*(?:(?:이미|작년에?|지난\s*(?:달|주|해)|이전에?)\s*)?(?:폐쇄|종료|중단)(?:됐|되었)/u;
+const deniedConsequence = /(?:하는|되는|될|할|하겠다는|할\s*수\s*있는)?\s*(?:일|계획|예정|의사|사실|가능성)(?:은|는|이|가)?\s*(?:없|아니)|(?:되|하)지는?\s*않|(?:하는지|하는\s*건지)|(?:여부|가능성)(?:를|을)?\s*(?:검토|문의|질문)/u;
+const callbackStatementBreak = /[.!?。\r\n]+/u;
 const foreignHeader = /^\s*(?:\[Web발신\]\s*)?(?:\[(?:국외|국제|해외)\s*발신\]|(?:국외|국제|해외)\s*발신\s*[:：])/i;
 const paymentRecorded = /(?:결제(?:가)?|(?:카드|결제)\s*승인(?:이)?)\s*완료(?:되었습니다|됐습니다|됨)?(?=[\s,(:/]|$)(?!\s*(?:예정|(?:전|후|시)(?:에|에는)?(?:\s|$)|취소|대기|실패))/;
 const notMine = "(?:본인(?:의|이|께서)?\\s*(?:(?:한|하신)\\s*)?(?:결제|거래|승인)(?:가|이)?\\s*(?:아닌\\s*경우|아닐\\s*(?:경우|시)|아니(?:면|라면))|" +
@@ -37,6 +51,28 @@ function hasForeignPaymentCallback(text, targets) {
   });
 }
 
+function hasConstrainedCallback(text, { start, end }) {
+  const prior = text.slice(Math.max(0, start - 160), start).split(callbackStatementBreak);
+  const before = prior.at(-1);
+  const previous = prior.at(-2) ?? "";
+  const [after, following = ""] = text.slice(end, end + 160).split(callbackStatementBreak, 2);
+  const next = following.trimStart();
+  if (teaching.test(text) || separateCallback.test(before) || historicalCallback.test(before) ||
+      callbackComparison.test(before + " " + after) ||
+      !newCallbackNotice.test(before.trimStart()) && callbackComparison.test(previous) ||
+      rejectedCallback.test(after) ||
+      /^(?:그|이|해당|같은)\s+/.test(next) && rejectedCallback.test(next) ||
+      closedCallbackChannel.test(next)) return false;
+
+  const availability = callbackField.test(before) && onlyNumber.exec(after);
+  if (availability && !noExclusiveRoute.test(after) && !pastAvailability.test(after.slice(availability[0].length))) return true;
+
+  const condition = noResponseAtNumber.exec(after);
+  if (!condition) return false;
+  const consequence = after.slice(condition[0].length).trimEnd();
+  return coerciveConsequence.test(consequence.slice(0, 44)) && !deniedConsequence.test(consequence);
+}
+
 export function classifyCallback(text, legacyPatterns) {
   const targets = Array.from(text.matchAll(NUMBER), m => {
     const number = digits(m[0]);
@@ -51,7 +87,8 @@ export function classifyCallback(text, legacyPatterns) {
     if (REPORTED_TARGET.test(after)) return false;
     if (BEFORE_NUMBER.test(before) || AFTER_NUMBER.test(after)) return true;
     if (/[‘“"'「][^’”"'」]*$/.test(before) || /^[^.!?\n]{0,35}[’”"'」]/.test(after)) return false;
-    return (desk.test(before) && deskAction.test(after)) || (reportRisk.test(before) && verifyByPhone.test(after));
+    return (desk.test(before) && deskAction.test(after)) || (reportRisk.test(before) && verifyByPhone.test(after)) ||
+      hasConstrainedCallback(text, t);
   });
   if (directed) return { signal: true, directed, foreignPayment };
   if (!targets.some(t => t.known)) return { signal: legacyPatterns.some(re => re.test(text)), directed, foreignPayment };
