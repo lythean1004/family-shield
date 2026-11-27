@@ -99,6 +99,8 @@ const inUseApp = /(?:이미\s*있던|기존|(?:사용|이용)\s*중인|쓰던|�
 const otherAppRecipient = /(?:관리자|직원|운영자|전산\s*담당자|기사|제삼자)(?:에게|한테|의)\s*[^.!?\n]{0,28}$/u;
 const senderReport = /(?:상대(?:방)?|발신(?:자|인)|상담(?:자|원)|보낸\s*(?:사람|쪽|곳))(?:가|이|는|은|의)?(?=[\s,.:]|$)/u;
 const removalProcedure = /^(?:삭제|제거)(?:하는\s*(?:절차|단계|순서)(?:를|을)\s*(?:요구|요청|지시)|(?:를|을)\s*(?:선행|필수|첫|우선)\s*(?:절차|단계|순서|조건)(?:로|으로)\s*(?:정|지정|요구))/u;
+const appObjectModifier = /^\s*(?:(?:먼저|완전히|우선)\s*)?$/u;
+const transactionRequiresRemoval = /^(?:지워|없애|(?:삭제|제거)(?:를)?\s*(?:해|하여))야(?:만)?\s*(?:(?:매물|물품|대금|해당|그)\s*)?(?:거래|결제|계약|정산|지급)(?:를|을|이|가|는|은)?\s*(?:(?:다시|계속)\s*)?(?:이어\s*갈|계속할|진행할|재개할|마칠|할)\s*수\s*있(?:다고|다는|다며)\s*(?:했|말했|설명했|알렸|안내했|내용|설명)/u;
 const ordinaryRemoval = /(?:약관|이용\s*규정|정상\s*(?:교체|전환|정비)|공식\s*(?:앱\s*)?(?:장터|마켓)|삭제\s*(?:여부|이력|기록)|(?:삭제|제거)하는\s*(?:절차|단계|순서)(?:가|는)?\s*(?:필요한지|있는지))/u;
 const senderClosedRemoval = /^(?:(?:발신(?:자|인)|상대(?:방)?)(?:가|이)\s*(?:그|해당|같은|이)\s*(?:(?:삭제|제거)\s*)?(?:요구|요청|지시)(?:를|을)?\s*(?:철회|취소)|(?:그|해당|같은|이)\s*(?:(?:삭제|제거)\s*)?(?:요구|요청|지시)(?:는|가|이|은)?\s*(?:이미\s*)?(?:철회|취소)(?:됐|되었))/u;
 
@@ -117,10 +119,12 @@ function mandatesContextualRemoval(clause, previous, next, hasReport) {
     const leading = clause.slice(0, object.index);
     return OTHER_APPLICATION.test(before) || otherAppRecipient.test(leading) ? null : leading;
   };
-  const protectionRemoved = related(clause, protection, deletion, ({ before, after, object }) => {
+  const protectionRemoved = related(clause, protection, deletion, ({ before, between, after, object }) => {
     const leading = possibleRecipientApp(object, before);
-    return leading !== null && inUseApp.test(leading) && (hasReport || senderReport.test(leading)) &&
-      !NOT_REQUEST.test(after) && removalProcedure.test(after);
+    if (leading === null || !inUseApp.test(leading) || NOT_REQUEST.test(after)) return false;
+    if ((hasReport || senderReport.test(leading)) && removalProcedure.test(after)) return true;
+    const action = clause.slice(object.index + object[0].length + between.length);
+    return senderReport.test(leading) && appObjectModifier.test(between) && transactionRequiresRemoval.test(action);
   }, ["", "부터", "을", "를", "의"]);
   if (protectionRemoved) return true;
 
