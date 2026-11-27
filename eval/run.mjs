@@ -29,6 +29,9 @@ const flag = (name, def) => {
 const NO_AI = argv.includes("--no-ai");
 const MODEL = flag("--model", "gemini-3.1-flash-lite");
 const TIMEOUT_MS = Number(flag("--timeout", "3000"));
+const PROMPT_VERSION = flag("--prompt", "v1");
+// 지정하지 않으면 보내지 않는다(모델 기본값)
+const TEMPERATURE = flag("--temperature", "") === "" ? undefined : Number(flag("--temperature", ""));
 const OUT_PATH = flag("--out", null);
 const DATA_PATH = flag("--data", join(here, "dev.jsonl"));
 // 일관성(PRD 15-2): 같은 케이스를 N번 돌려 판정이 모두 같은 비율. 첫 번째 실행으로 나머지 지표를 잰다.
@@ -52,7 +55,7 @@ const cases = (synthetic?.text ?? readFileSync(resolve(DATA_PATH), "utf8"))
 
 const ai = NO_AI
   ? null
-  : { model: MODEL, apiKey: API_KEY, baseUrl: BASE_URL, timeoutMs: TIMEOUT_MS, promptVersion: "v1" };
+  : { model: MODEL, apiKey: API_KEY, baseUrl: BASE_URL, timeoutMs: TIMEOUT_MS, promptVersion: PROMPT_VERSION, temperature: TEMPERATURE };
 
 console.log(`모델: ${NO_AI ? "(AI 끔)" : MODEL}  제한: ${TIMEOUT_MS}ms  케이스: ${cases.length}건`);
 console.log("-".repeat(80));
@@ -143,6 +146,8 @@ const aiOk = rows.filter((r) => !r.fallback_used).length;
 const summary = {
   run_at: new Date().toISOString(),
   model: NO_AI ? null : MODEL,
+  prompt_version: NO_AI ? null : PROMPT_VERSION,
+  temperature: NO_AI ? null : (TEMPERATURE ?? null),
   timeout_ms: TIMEOUT_MS,
   cases: n,
   pass: rows.filter((r) => r.pass).length,

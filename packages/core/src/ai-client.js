@@ -79,6 +79,39 @@ const SYSTEM_PROMPT = [
   "- 숫자 4자리 이상 연속, URL은 설명에 넣지 않는다.",
 ].join("\n");
 
+// v2(2026-11-28): v1은 신호 ID만 주고 뜻을 알려 주지 않았다. 각 신호의 뜻과, 회사 사칭도 기관 사칭으로
+// 보는 운영자 결정(2026-11-27)을 덧붙인다. 판정은 여전히 규칙 코드가 한다. 사실·연락처는 넣지 않는다
+const SIGNAL_GUIDE_V2 = [
+  "신호 뜻(문자를 보낸 사람이 실제로 한 말과 요구만 표시한다):",
+  "- SIG_FAMILY_IMPERSONATION: 보낸 사람이 가족·친척(아들·딸·엄마·손주 등)이라고 밝힘",
+  "- SIG_AGENCY_IMPERSONATION: 보낸 사람이 공공기관(검찰·경찰·법원·금융감독원·국세청·건강보험 등)이나 회사(은행·카드사·택배사·통신사·쇼핑몰·결제업체 등)라고 밝힘. 진짜인지는 판단하지 않는다",
+  "- SIG_NEW_NUMBER: 폰 고장·분실·액정 파손·임시폰·번호 변경 등으로 평소와 다른 번호나 계정을 쓴다고 함",
+  "- SIG_MONEY: 송금·이체·입금·결제·납부 등 돈을 보내라고 요구",
+  "- SIG_GIFTCARD: 상품권·기프트카드를 사거나 핀번호를 보내라고 요구",
+  "- SIG_PERSONAL_INFO: 신분증 사진, 주민번호, 계좌·카드 번호, 비밀번호, 인증번호 같은 개인·금융정보를 보내거나 입력하라고 요구",
+  "- SIG_APP_INSTALL: 앱·파일 설치, 원격제어 앱 설치를 요구",
+  "- SIG_DELETE_APP: 앱이나 기록을 지우라고 지시",
+  "- SIG_PREPAYMENT: 대출·환급·당첨·취업 등을 이유로 수수료·보증금·세금을 먼저 내라고 요구",
+  "- SIG_THIRD_PARTY_ACCOUNT: 본인이나 공식 기관이 아닌 다른 사람 명의 계좌, ‘안전계좌·보호계좌’로 보내라고 요구",
+  "- SIG_URGENCY: 오늘 안·즉시·몇 시간 안 등 시간 압박이나 불이익 위협",
+  "- SIG_SECRECY: 가족·은행·다른 사람에게 알리지 말라고 요구",
+  "- SIG_ISOLATION: 혼자 있는 곳으로 가라, 다른 전화를 받지 말라 등 고립 요구",
+  "- SIG_AVOID_VOICE: 통화가 안 된다며 문자로만 이야기하자고 함",
+  "- SIG_CALL_THIS_NUMBER: 문자에 적힌 번호로 전화하거나 문의하라고 유도",
+  "주의: 예방 안내가 사기 수법 문구를 인용하거나 지난 일을 이야기할 때는 그 문구의 요구를 신호로 표시하지 않는다.",
+  "회사·기관을 자처하면 impersonation_type은 agency다.",
+].join("\n");
+
+const SYSTEM_PROMPTS = {
+  v1: SYSTEM_PROMPT,
+  v2: `${SYSTEM_PROMPT}\n${SIGNAL_GUIDE_V2}`,
+};
+
+/** 알 수 없는 버전은 v1으로 처리한다(서버 설정 오타가 AI를 끄지 않게). */
+export function systemPromptFor(promptVersion) {
+  return SYSTEM_PROMPTS[promptVersion] ?? SYSTEM_PROMPTS.v1;
+}
+
 /**
  * @param {{
  *   message: string,
@@ -103,11 +136,13 @@ export async function extractSignals({
   apiKey,
   baseUrl = DEFAULT_BASE_URL,
   allowedCardIds = new Set(),
+  temperature,
 }) {
   const startedAt = Date.now();
   const meta = {
     model,
     prompt_version: promptVersion,
+    temperature: Number.isFinite(temperature) ? temperature : null,
     latency_ms: 0,
     timed_out: false,
   };
@@ -130,10 +165,12 @@ export async function extractSignals({
   const body = {
     model,
     max_tokens: 1024,
+    // 지정하지 않으면 보내지 않는다(중계 서버·모델 기본값). 0이면 같은 문자에 같은 답을 내도록 흔들림을 줄인다
+    ...(Number.isFinite(temperature) ? { temperature } : {}),
     messages: [
       {
         role: "system",
-        content: `${SYSTEM_PROMPT}\n\nprompt_version=${promptVersion}`,
+        content: `${systemPromptFor(promptVersion)}\n\nprompt_version=${promptVersion}`,
       },
       { role: "user", content: `${cardsXml}\n<message>${safeMessage}</message>` },
     ],

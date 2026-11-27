@@ -159,3 +159,22 @@ describe("AI 클라이언트 - 실패하면 ok:false", () => {
   });
 });
 
+
+// 2026-11-28: 프롬프트 버전과 temperature 매개변수
+import { systemPromptFor } from "../src/ai-client.js";
+describe("프롬프트 버전·temperature", () => {
+  it("v2는 신호 뜻과 회사 사칭 기준을 담고, 모르는 버전은 v1으로 처리한다", () => {
+    assert.match(systemPromptFor("v2"), /SIG_AGENCY_IMPERSONATION: .*택배사/);
+    assert.equal(systemPromptFor("v9"), systemPromptFor("v1"));
+    assert.doesNotMatch(systemPromptFor("v1"), /신호 뜻/);
+  });
+  for (const [temperature, expected] of [[0, 0], [undefined, undefined]]) {
+    it(`temperature ${temperature}`, async () => {
+      let sent;
+      const fetchImpl = async (_url, init) => { sent = JSON.parse(init.body); return { ok: false, status: 500 }; };
+      await extractSignals({ message: "x", model: "m", apiKey: "k", fetchImpl, temperature, promptVersion: "v2" });
+      assert.equal(sent.temperature, expected);
+      assert.match(sent.messages[0].content, /신호 뜻/);
+    });
+  }
+});
