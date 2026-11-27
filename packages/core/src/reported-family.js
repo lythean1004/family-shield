@@ -146,6 +146,21 @@ function hasCurrentRequest(clause, signal, pattern) {
   return false;
 }
 
+// Read a request to take over payment of a stated expense as a directed object.
+const payableExpense = "(?:지출(?:금|액)?|경비|(?:병원|진료|치료|교육|수강|학원|교재|수리|교통|숙박|이용|통신|생활|참가)\\s*(?:비|료))";
+const delegatedExpense = new RegExp(
+  "(?<![\\p{L}\\p{N}_])" + payableExpense + "(?:을|를)\\s*대신\\s*" +
+  "(?:내|치러|부쳐|보내|(?:송금|입금|이체|납부|부담|대납|결제|지불|지급)(?:해|하))\\s*" +
+  "(?:달(?:라고|라는|라며|랬)|[으이]?라(?:고|는|며))", "gu",
+);
+const reportedExpenseOwner = /(?:^|[,，]\s*)(?:제가|내가|저는|나는|수신자(?:는|가)|받은\s*사람(?:은|이)|보호자(?:가|는)|제\s*[삼3]자(?:가|는))\s/u;
+const receivedExpenseRequest = /(?:요구|요청|부탁)(?:을|를)\s*(?:받았|받은|전달받았)/u;
+
+function hasDelegatedExpense(clause) {
+  return (!reportedExpenseOwner.test(clause) || receivedExpenseRequest.test(clause)) &&
+    hasCurrentRequest(clause, SIG_MONEY, delegatedExpense);
+}
+
 function hasVoiceRefusal(clause) {
   return VOICE.test(clause) && VERIFY.test(clause) && VOICE_REFUSAL.test(clause) &&
     !RECIPIENT_REFUSAL.test(clause);
@@ -174,13 +189,25 @@ export function reportedFamilyVoiceResponse(clause) {
       !offersIdentityCheckLater.test(response) && !completedIdentityCall.test(response));
 }
 
+const attemptedCall = /(?:전화|통화)(?:를)?\s*(?:걸(?:었|어\s*(?:봤|보았)|어\s*보)|시도(?:했|해\s*봤)|해\s*(?:봤|보았))/u;
+const unrelatedCallTarget = /(?:다른\s*(?:사람|번호|담당자|기관)|상담원|안내\s*창구|안내\s*데스크|고객\s*센터)(?:에|에게|한테|로)(?=\s|$)/u;
+const otherCallInitiator = /(?:^|[\s,，])(?:발신자|발신인|상대(?:방)?|보낸\s*사람|보호자|제\s*[삼3]자)(?:이|가|은|는)\s*[^.!?,，\n]{0,18}(?:전화|통화)(?:를)?\s*(?:걸|시도|해)/u;
+const replyFromClaimant = /^(?:(?:그|같은)\s*)?(?:상대(?:방)?|발신자|발신인|그\s*사람|보낸\s*사람)(?:이|가|은|는)\s+/u;
+const forbidsCall = /(?:전화|통화)(?:는|를)?\s*하지\s*말(?:고|라고|라는|라며)/u;
+
+function respondedToCurrentCall(clause, reply) {
+  return attemptedCall.test(clause) && !unrelatedCallTarget.test(clause) && !otherCallInitiator.test(clause) &&
+    replyFromClaimant.test(reply) && forbidsCall.test(reply) && claimantWrittenResponse.test(reply) &&
+    !hasOtherSource(reply) && !offersIdentityCheckLater.test(reply) && !completedIdentityCall.test(reply);
+}
+
 function hasWrittenOnlyResponse(context) {
   return context.some((clause, index) => {
     const reply = context[index + 1];
     if (!reply || DENIAL.test(clause) || DENIAL.test(reply) || clause.endsWith("?") || reply.endsWith("?")) return false;
-    return voiceChallenge.test(clause) && !independentVoiceChallenge.test(clause) &&
-      writtenOnlyReply.test(reply) && !temporaryVoiceLimit.test(reply) &&
-      !laterVoiceOffer.test(reply) && !closedVoiceRecord.test(reply);
+    if (independentVoiceChallenge.test(clause) || temporaryVoiceLimit.test(reply) ||
+        laterVoiceOffer.test(reply) || closedVoiceRecord.test(reply)) return false;
+    return voiceChallenge.test(clause) && writtenOnlyReply.test(reply) || respondedToCurrentCall(clause, reply);
   });
 }
 
@@ -209,7 +236,7 @@ export function addReportedFamilySignals(text, signals) {
       !active.some(clause => NEGATED_CONTACT.test(clause));
     const requested = new Set(REQUESTS.filter(([signal, pattern]) =>
       active.some(clause => hasCurrentRequest(clause, signal, pattern))).map(([signal]) => signal));
-    if (active.some(clause => PAYMENT_DEADLINE.test(clause))) requested.add(SIG_MONEY);
+    if (active.some(clause => PAYMENT_DEADLINE.test(clause) || hasDelegatedExpense(clause))) requested.add(SIG_MONEY);
     const voice = active.some(hasVoiceRefusal) || hasWrittenOnlyResponse(context);
     const groupedSecret = active.some(clause => secretPaymentReceipt.test(clause));
     if (groupedSecret) requested.add(SIG_MONEY);
