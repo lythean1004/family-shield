@@ -190,8 +190,10 @@ const displayedSupportCode = "(?:원격\\s*(?:지원|제어|접속|상담)\\s*(?
   "(?:(?:일회용|1\\s*회용|일회성|1\\s*회성)\\s*)?(?:연결|접속|지원|인증)\\s*(?:코드|번호|값)|" +
   "(?:일회용|1\\s*회용|일회성|1\\s*회성)\\s*원격\\s*(?:지원|제어|접속)\\s*(?:코드|번호|값))";
 const directAccessCode = "(?:(?:일회용|1\\s*회용|일회성)\\s*(?:접속|연결|인증|확인)\\s*(?:값|코드|번호|숫자)|" +
-  "원격\\s*(?:지원|접속|제어|연결)\\s*(?:(?:인증|확인|검증|승인|보안|임시|등록)\\s*)?(?:값|코드|번호|암호))";
-const accessValueOrigin = "(?:" + deliveredToRecipient.source + "|(?:(?:방금|막|오늘|지금|새로|직접|문자로|알림으로)\\s*)?(?:받은|수신한|온|도착한|표시된|뜬))";
+  "원격\\s*(?:지원|접속|제어|연결)\\s*(?:용\\s*)?(?:(?:인증|확인|검증|승인|보안|임시|등록)\\s*)?(?:값|코드|번호|암호))";
+const ownedAccessDisplay = /(?:내|제|나의|저의|수신자(?:의)?)\s*(?:화면|표시창)(?:에|에서)\s*(?:나온|표시된|보이는|뜬)/u;
+const helperOffer = /^(?:(?:[\p{L}]{1,12})(?:으로|로)\s+)?(?:도와\s*(?:준다는|주겠다는)|돕겠다는|(?:함께|같이)\s*봐\s*(?:준다는|주겠다는))\s*(?:사람|쪽|이)(?:이|가|은|는)\s+/u;
+const accessValueOrigin = "(?:" + ownedAccessDisplay.source + "|" + deliveredToRecipient.source + "|(?:(?:방금|막|오늘|지금|새로|직접|문자로|알림으로)\\s*)?(?:받은|수신한|온|도착한|표시된|뜬))";
 const hasReportedAccessCode = new RegExp(displayedSupportCode + "|" + directAccessCode, "iu");
 const reportedAccessIssuer = /^(?:[\p{L}\p{N}·-]{1,12}\s+){0,4}[\p{L}\p{N}]{0,12}(?:하겠다는|한다는|한다며|한다고\s*한|해\s*준다는|해\s*주겠다는)\s*(?:사람|이|직원|상대)(?:이|가|은|는)\s+/u;
 const deliveryToIssuer = "(?:자신|자기|본인|발신(?:자|인)|보낸\\s*사람|상대(?:방)?)(?:에게|한테|\\s*쪽(?:으로|에))";
@@ -210,7 +212,8 @@ const earlierSupportBooking = /^(?:제가|저는|내가|나는|수신자(?:가|�
 
 function reportsSupportCodeToIssuer(clause) {
   if (inactiveReport.test(clause) || otherRelayTopic.test(clause) || supportIllustration.test(clause) || clause.endsWith("?")) return false;
-  const lead = relayReportLead.exec(clause) ?? supportOfferIssuer.exec(clause) ?? reportedAccessIssuer.exec(clause);
+  const lead = relayReportLead.exec(clause) ?? supportOfferIssuer.exec(clause) ?? reportedAccessIssuer.exec(clause) ??
+    (ownedAccessDisplay.test(clause) ? helperOffer.exec(clause) : null);
   if (!lead) return false;
   const request = clause.slice(lead[0].length);
   const predicate = supportRelayPredicate.exec(request);
@@ -234,7 +237,8 @@ function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
   const hasAccessCode = hasReportedAccessCode.test(text);
   if (hasOwnedCode || hasAccessCode) {
     const identifiesIssuer = clause => currentRelayIssuer.test(clause) || relayReportLead.test(clause) || readHandoff(clause).claimed ||
-      (hasAccessCode && (supportOfferIssuer.test(clause) || reportedAccessIssuer.test(clause)));
+      (hasAccessCode && (supportOfferIssuer.test(clause) || reportedAccessIssuer.test(clause) ||
+        ownedAccessDisplay.test(clause) && helperOffer.test(clause)));
     const observations = new Map();
     // 수신 문맥 판별 콜백에서 읽은 절은 결과를 채택할 때 다시 분석하지 않는다.
     function readHandoff(clause) {
