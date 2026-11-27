@@ -34,6 +34,7 @@ import { INVESTIGATIVE, hasInvestigativeCashHandover, hasLoanCashPickup } from "
 import { ACCOUNT_NUMBER, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
 import { reportedRequestSignals } from "./reported-requests.js";
 import { addReportedFamilySignals } from "./reported-family.js";
+import { addFamilyRequestContextSignals } from "./family-request-context.js";
 import { addReportedNoticeFields } from "./reported-notice-fields.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
@@ -296,6 +297,7 @@ export function extractCodeSignals(text, options = {}) {
   addReportedProtectedRequests(input, signals, unverifiedLink);
   for (const signal of reportedRequestSignals(input)) signals.add(signal);
   addReportedFamilySignals(input, signals);
+  addFamilyRequestContextSignals(input, signals);
   addReportedNoticeFields(input, signals, { unverifiedLinks: outside.map(candidate => candidate.raw) });
   return {
     signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }),

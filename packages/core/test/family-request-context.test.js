@@ -1,0 +1,88 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { extractCodeSignals } from "../src/extract.js";
+import { decide } from "../src/rule-engine.js";
+import {
+  SIG_APP_INSTALL, SIG_CREDENTIAL_DISCLOSURE, SIG_DELETE_APP,
+  SIG_FAMILY_IMPERSONATION, SIG_GIFTCARD, SIG_ISOLATION, SIG_MONEY,
+  SIG_NEW_NUMBER, SIG_PERSONAL_INFO, SIG_PREPAYMENT,
+  SIG_SECRECY, SIG_THIRD_PARTY_ACCOUNT, SIG_URGENCY,
+} from "../src/signals.js";
+
+const families = [
+  ["연락처를 수식하는 인용 명사구",
+    "누님이란 처음 보는 연락처의 쪽지에는 수신자 부담의 이체 요청이 기록돼 있었다.",
+    [SIG_NEW_NUMBER, SIG_MONEY]],
+  ["상대가 스스로 소개한 발신자",
+    "모르는 연락처로 말을 건 사람이 사촌이라더군요. 채팅은 제 신원 확인 서류를 발신자에게 제출하라는 요청으로 기록했습니다.",
+    [SIG_NEW_NUMBER, SIG_PERSONAL_INFO]],
+  ["화면 표시와 발신자의 연락처 설명",
+    "대화 목록에는 조카 이름이 표시됐다. 발신자는 새로 사용 중인 연락처라 했고 수신 기기에 프로그램을 설치할 것을 요구했던 것으로 분류했다.",
+    [SIG_NEW_NUMBER, SIG_APP_INSTALL]],
+  ["요청의 대상이 적힌 별도 줄",
+    "받은 쪽지 분류\n발신자 역할: 작은아들\n요구한 내용: 수신자가 가진 교환권",
+    [SIG_GIFTCARD]],
+  ["수신자 필드가 사이에 놓인 발신·요구 기록",
+    "〈쪽지 검토 요약〉\n받는이: 할머니\n보내는 사람 역할: 손주\n요청 대상: 수신자가 보관 중인 교환권",
+    [SIG_GIFTCARD]],
+  ["대화 캡션과 전달 요청",
+    "【조카】 대화 요약 · 보관해 둔 충전 카드를 발신자에게 전달하라는 요구를 받았다.",
+    [SIG_GIFTCARD]],
+  ["지급과 기한을 명사형으로 요약",
+    "동생이라더군요. 생활비 이체 요청과 함께 기한을 곧바로 지켜야 한다는 조건을 덧붙인 것으로 분류했다.",
+    [SIG_MONEY, SIG_URGENCY]],
+  ["화면에 표시된 가족과 지급·비공개 조건",
+    "채팅 상대 이름이 손녀로 표시됐다. 수신자 부담의 금액을 요구하면서 배우자에게 알리지 않는 걸 전제로 삼았다.",
+    [SIG_MONEY, SIG_SECRECY]],
+  ["가족 명의의 연락에서 관계를 끊으라는 요구",
+    "사촌이라고 온 쪽지의 주된 요구는 제가 다른 친척과 연락하지 않는 것이었습니다.",
+    [SIG_ISOLATION]],
+  ["기기 알림에 온 자격정보를 발신자에게 넘기는 요구",
+    "삼촌이라더군요. 수신 기기에 표시된 로그인 코드의 낭독을 발신자가 요구했다고 분류했다.",
+    [SIG_CREDENTIAL_DISCLOSURE, SIG_PERSONAL_INFO]],
+  ["보호 도구를 없애라는 요청",
+    "발신자는 오빠라고 적혀 있었다. 휴대전화에 설치된 보호 프로그램을 제거할 것을 요청했다고 기록했다.",
+    [SIG_DELETE_APP]],
+  ["지급 상대가 발신자와 다른 요청",
+    "쪽지의 작성자는 외삼촌으로 표시되어 있었다. 먼저 대금을 납부하라는 요구가 담겼고 수취 계좌는 작성자 지인의 개인 계좌라고 적혀 있었다.",
+    [SIG_MONEY, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT]],
+];
+
+for (const [name, message, expectedSignals] of families) {
+  test(name, () => {
+    const { signals } = extractCodeSignals(message);
+    const verdict = decide({ signals_final: signals, signals_code: signals });
+    assert.equal(verdict.level, "위험", signals.join(", "));
+    for (const signal of [SIG_FAMILY_IMPERSONATION, ...expectedSignals]) assert.ok(signals.includes(signal), signal);
+  });
+}
+
+const ordinary = [
+  ["호칭과 안부", "삼촌, 나 조카입니다. 탁자 위 꽃 잘 받았어요."],
+  ["친족이 보낸 입금 완료 알림", "고모가 모임 비용을 정산했다고 알려 줬어요. 영수증을 같이 확인했습니다."],
+  ["기기 변경 확인", "처음 쓰는 새 번호에서 엄마라더군요. 그래서 원래 연락처로 전화해 실제 가족임을 확인했어요."],
+  ["공연 속 역할", "낭독극에서 사촌이라 부르는 등장인물이 있었어요. 공연 소품인 교환권도 무대에 놓였어요."],
+  ["수신자가 한 요청", "외삼촌이라고 온 쪽지에는 공연이 끝났다는 말만 적혔었어요. 제가 생활비 정산을 부탁했습니다."],
+  ["서로 다른 사람이 올린 내용", "대화 목록에 조카 이름이 표시됐다. 별도로 동료가 본인 확인 서류 제출을 요청했다고 적어 두었다."],
+  ["요청 목적어 뒤에 놓인 수신자 주체", "외삼촌이란 사람이 보낸 연락은 안부였어요. 교환권은 제가 전시 소품으로 부탁했어요."],
+  ["다른 장소에서 온 별개 공지", "대화 목록에 조카 이름이 표시됐다. 문화회관에서 보낸 문자에는 교환권을 요청하는 항목이 적혔다."],
+  ["정산과 별개인 물품 요청", "조카라고 적힌 낯선 번호의 문자에는 돈은 모두 정산했다고 나오고 부엌 물품 목록을 보내 달라는 부탁만 적혀 있었어요."],
+  ["앱 소개와 설치의 구분", "발신자는 사촌이라더군요. 처음 쓰는 연락처의 쪽지에서 사진 앱 소개를 부탁했어요."],
+  ["삭제 기록과 별개인 자료 요청", "아들이라고 온 쪽지에는 보호 프로그램 삭제 기록만 보관해 달라는 요청이 있었어요."],
+  ["통화 기록과 별개인 사진 요청", "동생이라더군요. 다른 가족과 연락을 끊은 건 작년 영화 이야기이고 이번 부탁은 행사 사진 정리였어요."],
+  ["장난임이 명시된 가족 역할", "친구가 장난으로 자기를 동생이라더군요. 농담으로 정원 관리비를 요구하는 척했습니다."],
+  ["보호 도구와 혼동할 수 있는 가짜 도구의 삭제", "손녀라고 적힌 쪽지에서 가짜 보안 프로그램 제거를 요청했다고 기록했다."],
+  ["이미 취소한 설치", "보내는 사람은 아들이라고 적혀 있었다. 새 연락처는 맞지만 프로그램 설치 요구는 철회됐어요."],
+  ["가족이 공유한 예방 자료", "가족 이름이 문자에 표시되더라도 기기 인증정보를 건네면 안 된다는 내용의 예방 교육 자료를 받았다."],
+  ["잠시 통화가 어려운 일정", "고모, 나 조카예요. 강의 중이라 지금 전화 받기 어려워요. 끝나고 제가 다시 전화할게요."],
+  ["별도 서식의 가족 항목", "친족 연락처 갱신표\n작성자: 삼촌\n요청 항목: 정원 수업 희망 시간"],
+  ["가족 기록 사진의 코드", "손녀가 가족 앨범 정리 중에 예전 표의 응시 코드를 종이로 가렸다고 알려 주었어요."],
+  ["요구가 없다는 확인", "딸이라더군요. 기기에 표시된 수신자 인증 코드 요구는 없었어요."],
+];
+
+for (const [name, message] of ordinary) {
+  test(name, () => {
+    const { signals } = extractCodeSignals(message);
+    assert.equal(decide({ signals_final: signals, signals_code: signals }).level, "확인필요", signals.join(", "));
+  });
+}
