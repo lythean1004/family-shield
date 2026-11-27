@@ -117,7 +117,49 @@ function reportsCodeHandoffToIssuer(clause) {
   return Boolean(match && !valueDescriptorOnly.test(match[0]));
 }
 
+const relayReportLead = /^(?:발신자|발신인|보낸\s*(?:사람|이)|상대(?:방)?|상담원)(?:(?<subject>가|이|은|는)|의\s*(?<request>요구|요청|지시)(?:가|이|은|는))\s+/u;
+const relayReportPredicate = /\s*(?:전달하|전송하|인계하|건네|넘기|전하|알리)(?:라(?:고|는|며)|도록)\s*(?<ending>[^.!?\n]*)[.!?]?$/u;
+const relayRequestEnding = /^(?:요구|요청|지시)(?:를|을)?\s*(?:(?:했|하였)(?:다|습니다|어요|음)|(?:했|하였)다고\s*(?:적었|기록했)(?:다|습니다|어요|음)|한\s*(?:경우|내용)(?:이었|였)(?:다|습니다|어요|음))$/u;
+const nominalRelayEnding = /^(?:것|내용)(?:이었|였)(?:다|습니다|어요|음)$/u;
+const explicitStaffDestination = "(?:" + assignedRecipient + "|발신(?:인|자)|상대(?:방)?|보낸\\s*사람|(?:다른|지정한|지목한)\\s*(?:사람|분))(?:에게|한테|께|쪽으로)";
+const relayArgument = new RegExp(
+  "^\\s*(?:(?<agent>제가|내가|수신자가|받은\\s*사람이)|" +
+  "(?<value>" + deliveredToRecipient.source + "\\s*(?:" + oneTimeConfirmationValue + "|" + credential + ")(?:을|를))|" +
+  "(?<destination>" + explicitStaffDestination + "))(?=\\s|$)", "iu",
+);
+const withdrewCodeRelay = /^(?:그|같은|이|해당)\s*(?:요구|요청|지시)(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:(?:철회|취소)(?:됐|되었)|(?:발신자|발신인|상대(?:방)?)(?:가|이)\s*(?:철회|취소)(?:했|하였))/u;
+
+function reportsRelayWithExplicitArguments(clause) {
+  if (inactiveReport.test(clause) || localEntry.test(clause) || otherRelayTopic.test(clause)) return false;
+  const lead = relayReportLead.exec(clause);
+  if (!lead) return false;
+  const request = clause.slice(lead[0].length);
+  const predicate = relayReportPredicate.exec(request);
+  if (!predicate) return false;
+  const ending = predicate.groups.ending.trim();
+  if (!(lead.groups.request ? nominalRelayEnding : relayRequestEnding).test(ending)) return false;
+
+  // 조사가 붙은 수신자 주어, 인증값 목적어, 사람 목적지가 동일한 인용문의 전달 동사에 걸려야 한다.
+  const argumentsInQuote = new Set();
+  let rest = request.slice(0, predicate.index).trim();
+  while (rest) {
+    const match = relayArgument.exec(rest);
+    if (!match) return false;
+    const { agent, value } = match.groups;
+    const role = agent ? "agent" : value ? "value" : "destination";
+    if (argumentsInQuote.has(role)) return false;
+    argumentsInQuote.add(role);
+    rest = rest.slice(match[0].length).trimStart();
+  }
+  return argumentsInQuote.size === 3;
+}
+
 function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
+  if (deliveredToRecipient.test(text)) {
+    for (const { body, next } of currentReceivedRequests(text, clause => relayReportLead.test(clause), reportsRelayWithExplicitArguments)) {
+      if (!withdrewCodeRelay.test(next) && reportsRelayWithExplicitArguments(body)) return true;
+    }
+  }
   if (relayOrderFromIssuer.test(text)) {
     for (const { body } of currentReceivedRequests(text, value => currentRelayIssuer.test(value), reportsCodeHandoffToIssuer)) {
       if (reportsCodeHandoffToIssuer(body)) return true;
