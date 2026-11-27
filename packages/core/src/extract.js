@@ -34,6 +34,7 @@ import { addReportedProtectedRequests, hasCredentialDisclosure, hasDocumentBundl
 import { INVESTIGATIVE, hasInvestigativeCashHandover, hasLoanCashPickup } from "./cash-handover.js";
 import { ACCOUNT_NUMBER, hasAmountObjectAsk, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
 import { acceptsDirectInstallation, reportedRequestSignals } from "./reported-requests.js";
+import { reportsReceivedInstallation } from "./reported-installation.js";
 import { addReportedContactRestrictions } from "./reported-contact-restrictions.js";
 import { addReportedFamilySignals } from "./reported-family.js";
 import { addFamilyRequestContextSignals } from "./family-request-context.js";
@@ -342,6 +343,7 @@ function extractRawCodeSignals(text, options) {
   if (options.inputComplete !== false) addReportedContactRestrictions(input, signals);
   addReportedProtectedRequests(input, signals, unverifiedLink, inspection);
   for (const signal of reportedRequestSignals(input)) signals.add(signal);
+  if (reportsReceivedInstallation(input)) signals.add(SIG_APP_INSTALL);
   addReportedFamilySignals(input, signals);
   addFamilyRequestContextSignals(input, signals, { numberMismatch });
   const directRequest = directFamilyRequest(input);
