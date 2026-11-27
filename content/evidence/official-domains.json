@@ -4,6 +4,12 @@
     {
       "id": "EV-DOM-EPOST",
       "name": "우체국(우정사업본부)",
+      "sender_names": ["우체국", "우체국택배", "우체국소포"],
+      "sender_names_evidence": {
+        "source_url": "https://parcel.epost.go.kr/parcel/use_guide/noscript_faq_q2a.jsp",
+        "service_url": "https://ibot.epost.go.kr/chatbot/",
+        "checked_at": "2026-11-27"
+      },
       "callback_contact": {
         "numbers": ["1588-1300"],
         "source_url": "https://ibot.epost.go.kr/chatbot/",

@@ -241,10 +241,11 @@ export function extractCodeSignals(text, options = {}) {
   if (callback.signal) signals.add(SIG_CALL_THIS_NUMBER);
   const disclosure = personalDisclosure(input);
   if (disclosure.requested) signals.add(SIG_PERSONAL_INFO);
-  const externalLink = signals.has(SIG_LINK) && !signals.has(SIG_OFFICIAL_LINK) &&
-    inspection.candidates.some(c => c.complete && !isShortener(c.host) && !isOfficialLink(c.raw));
-  if ((externalLink || callback.directed || disclosure.reply) && hasCardServiceRequest(input, {
-    externalLink, directedCallback: callback.directed, personalReply: disclosure.reply,
+  const outside = inspection.candidates.filter(c => c.complete && !isOfficialLink(c.raw));
+  const unverifiedLink = signals.has(SIG_LINK) && outside.length > 0;
+  const externalLink = unverifiedLink && outside.some(c => !isShortener(c.host));
+  if ((unverifiedLink || callback.directed || disclosure.reply) && hasCardServiceRequest(input, {
+    externalLink, unverifiedLink, directedCallback: callback.directed, personalReply: disclosure.reply,
     sensitiveRequest: signals.has(SIG_APP_INSTALL) || signals.has(SIG_PERSONAL_INFO),
   })) {
     signals.add(SIG_AGENCY_IMPERSONATION);

@@ -4,6 +4,24 @@ import { extractCodeSignals } from "../src/extract.js";
 import { decide } from "../src/rule-engine.js";
 import { SIG_AGENCY_IMPERSONATION } from "../src/signals.js";
 
+describe("확인되지 않은 주소에서 반송·거래 취소를 처리하는 발신 주장", () => {
+  const outside = "https://review.invalid/box";
+  const tagged = text => extractCodeSignals(text).signals.includes(SIG_AGENCY_IMPERSONATION);
+  for (const text of [
+    `우체국택배: 모의 배송 서식 / 주소지 불일치로 반송 예정. ${outside}`,
+    `[CJ대한통운] 시험 필드 / 주소 오류로 반송됩니다. ${outside}`,
+    `[우체국소포] 시험 필드 / 주소 불일치로 배달 보류. 내일까지 처리하지 않으면 반송 예정입니다. ${outside}`,
+    `[현대카드] 모의 승인 내역 / 결제 취소를 원하시면 여기에서 처리. ${outside}`,
+  ]) it(text, () => assert.ok(tagged(text)));
+  for (const text of [
+    `[CJ대한통운] 배송이 끝났습니다. 배송 조회 ${outside}`,
+    `[현대카드] 결제 취소가 완료되었습니다. ${outside}`,
+    `[현대카드] 사칭 주의. 결제 취소를 원하시면 여기를 누르라는 문구입니다. ${outside}`,
+    `[동네 그림교실] 도록 주소 오류로 반송됩니다. ${outside}`,
+    "[우체국] 주소지 불일치로 반송 예정입니다.",
+  ]) it(text, () => assert.ok(!tagged(text)));
+});
+
 describe("근거 카드의 발신자 표기와 외부 주소", () => {
   const link = "https://catalog.invalid/spring";
   for (const title of [
