@@ -32,6 +32,7 @@ import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.j
 import { hasCredentialDisclosure, hasDocumentBundle } from "./protected-requests.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover, hasLoanCashPickup } from "./cash-handover.js";
 import { ACCOUNT_NUMBER, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
+import { reportedRequestSignals } from "./reported-requests.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
 /** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
@@ -289,5 +290,6 @@ export function extractCodeSignals(text, options = {}) {
     signals.add(SIG_NEW_NUMBER);
   }
 
+  for (const signal of reportedRequestSignals(input)) signals.add(signal);
   return { signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }) };
 }
