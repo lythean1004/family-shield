@@ -219,11 +219,44 @@ function requiresSeparationBeforeReply(text) {
   });
 }
 
+const consultationParty = nounPattern("(?:(?:다른|나머지)\\s*(?:참가자|참여자|회원|사람)|주변\\s*사람|가족|친구|동료|지인)");
+const consultationParticles = new Set(["와", "과", "하고", "랑", "에게", "한테", "와는", "과는", "하고는", "에게는", "한테는"]);
+const requestingSpeaker = /^(?:(?:그|같은)\s+)?(?:상대(?:방)?|발신(?:자|인)|보낸\s*사람|응답한\s*사람|담당자)(?:가|이|은|는)\s*(?:제게|수신자에게)?\s*$/u;
+// 문의 주어가 생략되면 목적격 주제만 허용한다. 다른 사람을 주어로 한 질문은 연결하지 않는다.
+const recipientInquiry = /^(?:(?:제가|내가|수신자가)\s+)?(?:(?:[가-힣]+(?<![이가은는도만])\s+)*[가-힣]+(?:을|를)\s+)?(?:문의하자|물었더니|질문했더니)[,，]?\s*$/u;
+const consultationCutoff = new RegExp(
+  "^(?:(?:상의하|의논하|상담하|조언을\\s*구하)지\\s*못\\s*(?:하게|하도록)|" +
+  "(?:상의할|의논할|상담할|조언을\\s*구할)\\s*수\\s*없(?:게|도록))\\s+" +
+  "(?:연락|통화|접촉)(?:을|를)?\\s*(?:끊고|끊은\\s*(?:뒤|후)|(?:중단|단절)(?:하고|한\\s*(?:뒤|후)))\\s+" +
+  "(?:혼자(?:서)?|단독으로)\\s*(?:판단하|결정하|대응하|처리하|응대하)라", "u");
+const activeCutoffDemand = /^고\s*(?:(?:말|요구|요청|지시)했|했)(?:다|습니다|어요|음)[.!。]?$/u;
+const receivedCutoffDemand = /^는\s*(?:요구|요청|지시)(?:가|이)\s*있었(?:다|습니다|어요|다고\s*(?:한다|했다))[.!。]?$/u;
+const anotherReport = /^(?:별건으로|(?:그|이)와(?:는)?\s*별개로)\s*(?:다른|별도의)\s+/u;
+
+function hasExplicitConsultationCutoff(clauses) {
+  const [clause, following] = clauses;
+  // 부가 설명이 이 요구의 역할이나 효력을 바꿀 수 있다. 다음 절이 별건으로 시작할 때만 분리한다.
+  if (!clause || clauses.length > 2 || following && !anotherReport.test(following) ||
+      NARROW_CONTEXT.test(clause) || SELF_REQUEST.test(clause) || allowedSupport.test(clause)) return false;
+  for (const party of clause.matchAll(consultationParty)) {
+    if (!consultationParticles.has(party.groups.particle)) continue;
+    const opening = clause.slice(0, party.index);
+    const action = clause.slice(party.index + party[0].length).trimStart();
+    const cutoff = consultationCutoff.exec(action);
+    if (!cutoff) continue;
+    const report = action.slice(cutoff[0].length);
+    if (requestingSpeaker.test(opening) && activeCutoffDemand.test(report) ||
+        recipientInquiry.test(opening) && receivedCutoffDemand.test(report)) return true;
+  }
+  return false;
+}
+
 /** 현재 받은 연락에서 대상과 명령, 말한 사람을 연결해 기존 R9 신호를 보강한다. */
 export function addReportedContactRestrictions(text, signals) {
   const clauses = text.split(CLAUSE).map(value => value.trim()).filter(Boolean);
   if (clauses.some(clause => TEACHING.test(clause))) return;
-  if (mustContinueWithoutSupport(clauses) || requiresSeparationBeforeReply(text)) signals.add(SIG_ISOLATION);
+  if (mustContinueWithoutSupport(clauses) || requiresSeparationBeforeReply(text) ||
+      hasExplicitConsultationCutoff(clauses)) signals.add(SIG_ISOLATION);
   if (marketplaceResponderDemandsRemoval(text)) signals.add(SIG_DELETE_APP);
 
   for (const [index, clause] of clauses.entries()) {
