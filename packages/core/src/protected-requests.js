@@ -24,15 +24,24 @@ const deniedProgram = new RegExp(combinedPrograms + "(?:\\s*(?:신청|접수|모
   "(?:(?:[을를]\\s*위한)?\\s*(?:절차|목적|서류|양식))?\\s*(?:[은는이가]|[과와](?:는)?)?\\s*" +
   "(?:아니|아닌|아닙|아님|무관|(?:관련|관계)(?:이|가)?\\s*없)", "gu");
 const applicationContext = new RegExp(program + "(?:[에을를의로]\\s*)?\\s*" +
-  "(?:신청|모집|등록|채용|접수|수급|수령|참여|대상자|서류|양식|서식|안내|알림|공고|문의|상담|제안|" +
-  "연습\\s*양식|필요한\\s*서류|이?라(?:는|고\\s*한)\\s*(?:문자|연락|안내)|" +
-  "(?:(?:[\\d,]+\\s*)?[천만억]?\\s*원\\s*)?지급\\s*(?:대상|신청|안내))" +
+  "(?:신청|모집|등록|채용|접수|수급|수령|참여|서류|양식|서식|연습\\s*양식|필요한\\s*서류|" +
+  "지원(?:하(?:기|려)|할)\\s*(?:위한\\s*)?(?:신청|절차)|" +
+  "(?:(?:[\\d,]+\\s*)?[천만억]?\\s*원\\s*)?지급(?:을)?\\s*(?:대상|신청))" +
   "|(?:재택\\s*채용|체험단\\s*모집)", "u");
+const programNotice = new RegExp(program + "(?:의)?\\s*(?:안내|알림|공고|문의|상담|제안|대상자|" +
+  "이?라(?:는|고\\s*한)\\s*(?:문자|연락|안내))", "u");
+const intakeDocument = /(?:신청|접수|모집)\s*(?:확인\s*)?(?:양식|서식|폼|서류|주소|링크)|신청에\s*(?:쓰라고|사용하도록)\s*(?:제공한|보낸)\s*(?:미확인\s*)?(?:양식|서식|폼)|(?:안내|공고)(?:에는|에서|에)\s*(?:서류|자료)(?:를|을)\s*제출하는\s*(?:주소|링크)/u;
+const offeredByMessage = new RegExp(program + "이?라(?:는|고\\s*한)\\s*(?:문자|메시지|안내)", "u");
+const intakeCounter = /(?:신청|접수)처(?:라(?:고)?\s*(?:적힌|지정된)|[로는은가이]|[\s:：])/u;
+const feedbackPurpose = /(?:만족도|의견|이용\s*경험)\s*(?:설문|조사|수집)|(?:이용자|독자|신청자)\s*(?:대상\s*)?(?:설문|조사)|(?:대상(?:으로)?|분에게|분들의)\s*(?:하는\s*)?설문/u;
 const programFieldValue = new RegExp(program + "(?:입니다|임)?[.。]?\\s*$", "u");
 
 function hasApplicationPurpose(text) {
-  const affirmed = text.replace(deniedProgram, " ");
-  return applicationContext.test(affirmed) || purposeHeading.test(affirmed) && programFieldValue.test(affirmed);
+  const affirmed = text.replace(deniedProgram, " ").split(/(?:그와|이와)\s*별개로|이번에(?:는)?\s*새로/u).at(-1);
+  if (feedbackPurpose.test(affirmed)) return false;
+  return applicationContext.test(affirmed) || purposeHeading.test(affirmed) && programFieldValue.test(affirmed) ||
+    programNotice.test(affirmed) && intakeDocument.test(affirmed) ||
+    offeredByMessage.test(affirmed) && intakeCounter.test(affirmed);
 }
 const identityCopy = "(?:신분증|주민등록증|운전면허증)\\s*(?:(?:앞면|뒷면|앞뒤)\\s*)?(?:사진|사본)";
 const bankCopy = "(?:(?:(?:급여|입금|지급)(?:을)?\\s*)?받(?:으실|을)\\s*(?:계좌(?:\\s*번호)?|통장\\s*사본)|통장\\s*사본)";
@@ -628,10 +637,12 @@ export function addReportedProtectedRequests(text, signals, hasUnverifiedLink, i
     const pair = documentPair.exec(clause);
     if (!pair || !requiredCopies.test(clause.slice(pair.index + pair[0].length))) continue;
     const previous = clauses[index - 1] ?? "";
-    if (!hasApplicationPurpose(clause) && (!hasApplicationPurpose(previous) || inactiveReport.test(previous) || topicBoundary.test(clause))) continue;
     const afterPair = clause.slice(pair.index + pair[0].length);
     const next = clauses[index + 1] ?? "";
-    if (hasNamedDestination(afterPair) || (!topicBoundary.test(next) && !inactiveReport.test(next) && hasNamedDestination(next))) {
+    const nextDestination = !topicBoundary.test(next) && !inactiveReport.test(next) && hasNamedDestination(next);
+    const purpose = (inactiveReport.test(previous) || topicBoundary.test(clause) ? "" : previous) +
+      " " + clause + (nextDestination ? " " + next : "");
+    if ((hasNamedDestination(afterPair) || nextDestination) && hasApplicationPurpose(purpose)) {
       signals.add(SIG_DOCUMENT_BUNDLE);
     }
   }
