@@ -1,15 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { analyze } from "../src/pipeline.js";
+import { OFFICIAL_DOMAIN_CARDS } from "../src/lookalike.js";
+import { OFFICIAL_LINK_HOST_CARDS } from "../src/official-links.js";
 import {
   SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER, SIG_CASH_HANDOVER,
   SIG_FOREIGN_PAYMENT_CALLBACK, SIG_LOAN_CASH_PICKUP, SIG_OFFICIAL_LINK,
 } from "../src/signals.js";
 
 const invalidPage = "https://reading.example.invalid";
-const knownOfficial = "https://www.hometax.go.kr";
+const knownOfficial = "https://" + OFFICIAL_LINK_HOST_CARDS.find(card => card.status === "source_checked").hosts[0];
 const syntheticNumber = "000-0000-0000";
-const knownOfficialNumber = "126";
+const knownOfficialNumber = OFFICIAL_DOMAIN_CARDS.filter(card => card.status === "source_checked")
+  .flatMap(card => card.callback_contact?.numbers ?? []).find(number => number.replace(/\D/g, "").length >= 8);
+assert.ok(knownOfficialNumber, "공식 연락처 제외 시험에 쓸 긴 번호가 근거 카드에 있어야 합니다.");
 const utilityNotice = "공공 서비스 관리 부서를 자처한 곳에서 처리 결과 안내가 왔습니다.";
 const telecomNotice = "통신업체의 상담 직원을 자처한 메시지를 받았습니다.";
 const financeNotice = "대출을 맡은 은행 담당자 명의로 안내가 왔습니다.";

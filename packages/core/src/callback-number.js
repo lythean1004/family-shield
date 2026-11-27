@@ -97,6 +97,48 @@ function hasReportedForeignPaymentCallback(text, targets) {
   return false;
 }
 
+const reportBlockBreak = /\r?\n[ \t]*\r?\n/u;
+const reportClauseBreak = /(?<!\d)\.|\.(?!\d)|[!?。\r\n]+/u;
+const summaryHeading = /^(?:(?<foreign>국외|해외|국제)\s*발신\s*(?:알림|안내|문자|통지|메시지)|수신\s*(?:내역|기록|문자|알림)|받은\s*(?:안내|문자|알림))\s*(?:(?:발췌|분류)\s*)?(?:요약|메모|기록)$/u;
+const summaryOrigin = /^(?:문자|알림|통지|안내|메시지)(?:에|에는)\s*(?:국외|해외|국제)\s*발신으로\s*표시(?:됨|됐음|되었음|되었습니다)$/u;
+const approvalSource = /^(?:국외|해외|국제)\s*발신으로\s*표시된\s*(?:문자|알림|통지|안내|메시지)(?:에|에는)\s*/u;
+const approvalReport = /^(?:카드\s*)?(?:결제|거래)\s*승인\s*(?:(?:건|사실|완료)\s*(?:으로|로)\s*(?:표시|기록)(?:됨|됐음|되었음|되었습니다)|통보(?:가\s*있었음|를\s*받았음)|(?:됨|됐음|되었음|되었습니다))$/u;
+const summaryNotMine = new RegExp(
+  "^(?:" + notMine + "|(?:본인|수신자|(?:카드\\s*)?명의자)(?:의|이|가)?\\s*(?:(?:한|하신)\\s*)?" +
+    "(?:결제|거래|승인)(?:가|이)?\\s*아닐\\s*때)(?=[\\s,，]|$)[\\s,，]*", "u");
+const summaryCancelRole = /^(?:(?:결제|거래|승인)\s*)?취소(?:할|용|(?:를)?\s*위한)?\s*(?:(?:접수|문의|상담)\s*)?(?:연락처|전화(?:번호)?|번호|문의처|접수처)(?:로|으로|로는)?\s*[:：]?\s*(?:(?:미확인|확인되지\s*않은|검증되지\s*않은)\s*)?$/u;
+const summaryNumberAssignment = /^(?:이|가|은|는)?\s*(?:(?:(?:그|같은|해당)\s*(?:문자|알림|통지|메시지)(?:의\s*본문)?|(?:같은|해당)\s*본문|본문)(?:에|에서))\s*(?:지정|기재|표시|명시)(?:됨|됐음|되었음|되었습니다|돼\s*있었음)$/u;
+const summaryStepClosed = /^(?:(?:그|이|해당|같은)\s*)?(?:취소|접수)\s*(?:요청|안내|절차|접수|지시)(?:을|를|은|는|이|가)?\s*(?:(?:발신자(?:가|는)|이미)\s*){0,2}(?:거절|철회|종료|완료|중단|취소)/u;
+
+function hasForeignReceiptSummary(text, targets) {
+  if (teaching.test(text) || memoExample.test(text)) return false;
+  return targets.some(({ start, end, known, long }) => {
+    if (known || !long) return false;
+    const before = text.slice(0, start).split(reportBlockBreak).at(-1);
+    const after = text.slice(end).split(reportBlockBreak, 1)[0];
+    const prefix = before.split(reportClauseBreak).map(clause => clause.trim()).filter(Boolean);
+    if (prefix.length < 3 || prefix.length > 4) return false;
+
+    // 요약의 발신 표시, 승인 사실, 취소 연락처를 같은 수신 항목에서만 연결한다.
+    const [heading, ...body] = prefix;
+    const summary = summaryHeading.exec(heading);
+    if (!summary) return false;
+    const route = body.pop();
+    const approval = body.pop();
+    const source = approvalSource.exec(approval);
+    const separateOrigin = body.length === 1 && summaryOrigin.test(body[0]);
+    if (body.length && !separateOrigin || !summary.groups.foreign && !source && !separateOrigin ||
+        !approvalReport.test(approval.slice(source?.[0].length ?? 0))) return false;
+
+    const condition = summaryNotMine.exec(route);
+    if (!condition || !summaryCancelRole.test(route.slice(condition[0].length))) return false;
+    const [assignment, following = ""] = after.split(reportClauseBreak, 2);
+    const next = following.trimStart();
+    return summaryNumberAssignment.test(assignment.trimEnd()) &&
+      !memoWithdrawn.test(next) && !summaryStepClosed.test(next) && !memoExample.test(next);
+  });
+}
+
 function hasConstrainedCallback(text, { start, end }) {
   const prior = text.slice(Math.max(0, start - 160), start).split(callbackStatementBreak);
   const before = prior.at(-1);
@@ -125,7 +167,8 @@ export function classifyCallback(text, legacyPatterns) {
     return { start: m.index, end: m.index + m[0].length, known: official.has(number), long: number.length >= 8 };
   });
   // R19는 별도의 로컬 근거다. 기존 회신·기관 신호를 바꾸거나 해외 AI 전송 대상을 늘리지 않는다.
-  const foreignPayment = hasForeignPaymentCallback(text, targets) || hasReportedForeignPaymentCallback(text, targets);
+  const foreignPayment = hasForeignPaymentCallback(text, targets) || hasReportedForeignPaymentCallback(text, targets) ||
+    hasForeignReceiptSummary(text, targets);
   const directed = targets.some(t => {
     if (t.known || !t.long) return false;
     const before = text.slice(Math.max(0, t.start - 48), t.start);
