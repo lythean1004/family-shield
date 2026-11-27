@@ -1,4 +1,4 @@
-import { currentReceivedRequests } from "./received-message.js";
+import { currentReceivedRequests, isReceivedContinuation } from "./received-message.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { isCardCallbackNumber, isCardSenderName, isCardSenderService } from "./card-sender.js";
 import { hasOpenInstallationReport, startsOtherOrganizer } from "./reported-notice-fields.js";
@@ -286,6 +286,14 @@ function addReceivedInstitutionRequests(text, signals) {
   }
 }
 
+const earlierCall = /(?:전화|통화)(?:가|이|를|을)?\s*(?:왔|받았|받은|한|했|하였|하면서|하고|를\s*마친)|(?:전화|통화)(?:로|에서)\s*(?:[가-힣]+\s*){0,3}(?:소개|밝|설명)/u;
+const writtenFollowup = /^(?:(?:전화|통화)(?:가|는|를)?\s*)?(?:끝난|마친|종료한)\s*(?:뒤|후)(?:에)?\s*(?:온|받은|도착한|수신한)\s*(?:문자|메시지|안내문?|통지|알림|답장|회신)/u;
+const attributedToEarlierCaller = /(?:같은|(?:방금|앞서|아까)\s*(?:전화|통화)한)\s*(?:발신(?:자|인|처)|상대(?:방)?|사람|보낸\s*쪽)(?:이|가|은|는|에게서|한테서)(?=\s|$)/u;
+
+function followsReportedCall(issuer, action) {
+  return earlierCall.test(issuer) && (isReceivedContinuation(action) || writtenFollowup.test(action));
+}
+
 export function addInstitutionRequestContext(text, signals) {
   addReceivedInstitutionRequests(text, signals);
   addLevyInstallation(text, signals);
@@ -312,11 +320,12 @@ export function addInstitutionRequestContext(text, signals) {
         signals.add(SIG_AGENCY_IMPERSONATION);
         signals.add(SIG_PERSONAL_INFO);
       }
-      if (reported && hasOpenInstallationReport(action, clauses[index + offset + 1] ?? "", hasSoftwareRequest)) {
+      const sameSource = !offset || !followsReportedCall(clause, action) || attributedToEarlierCaller.test(action);
+      if (sameSource && reported && hasOpenInstallationReport(action, clauses[index + offset + 1] ?? "", hasSoftwareRequest)) {
         signals.add(SIG_AGENCY_IMPERSONATION);
         signals.add(SIG_APP_INSTALL);
       }
-      if (hasPrivateCallback(action)) {
+      if (sameSource && hasPrivateCallback(action)) {
         signals.add(SIG_AGENCY_IMPERSONATION);
         signals.add(SIG_CALL_THIS_NUMBER);
       }
