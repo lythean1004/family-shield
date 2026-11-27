@@ -146,6 +146,7 @@
     {
       "id": "EV-DOM-GOV",
       "name": "정부 기관(정부24 등)",
+      "sender_names": ["정부24"],
       "official_domains": [
         "gov.kr",
         "go.kr"
@@ -205,6 +206,7 @@
     {
       "id": "EV-DOM-SKT",
       "name": "SK텔레콤",
+      "sender_names": ["SK텔레콤", "SKT"],
       "official_domains": [
         "sktelecom.com",
         "tworld.co.kr",

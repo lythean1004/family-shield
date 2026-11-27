@@ -24,7 +24,8 @@ import {
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
 import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
-import { allLinksOfficial } from "./official-links.js";
+import { allLinksOfficial, isOfficialLink } from "./official-links.js";
+import { hasCardServiceRequest } from "./card-sender.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
 /** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
@@ -188,6 +189,12 @@ export function extractCodeSignals(text, options = {}) {
     if (patterns.some((re) => re.test(input))) signals.add(signal);
   }
 
+  // 단축 서비스는 최종 목적지를 알 수 없다. 단순 조회와 구분되는 처리 요구에만 발신자 신호를 더한다.
+  if (signals.has(SIG_LINK) && !signals.has(SIG_OFFICIAL_LINK) &&
+      hasCardServiceRequest(input, signals.has(SIG_APP_INSTALL) || signals.has(SIG_PERSONAL_INFO)) &&
+      inspection.candidates.some(c => c.complete && !isShortener(c.host) && !isOfficialLink(c.raw))) {
+    signals.add(SIG_AGENCY_IMPERSONATION);
+  }
   addFamilyPhoneSignals(input, signals);
 
   // 끝 4자리 비교
