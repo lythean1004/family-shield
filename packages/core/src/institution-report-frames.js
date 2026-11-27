@@ -2,6 +2,7 @@ import { classifyCallback } from "./callback-number.js";
 import { personalDisclosure } from "./personal-disclosure.js";
 import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
 import { INVESTIGATIVE, readInvestigativeCashDocument } from "./cash-handover.js";
+import { recognizedIssuedNoticeActions } from "./issued-institution-actions.js";
 import { readInstitutionIssuer } from "./institution-request-context.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { isOfficialLink, readUnregisteredAddressDirection } from "./official-links.js";
@@ -892,6 +893,7 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     else signals.add(signal);
   }
   for (const signal of reportedRouteChanges(text, unverifiedLinks)) addAgencyAction(signal);
+  for (const signal of recognizedIssuedNoticeActions(text)) addAgencyAction(signal);
   if (installFromDirectPatterns) {
     for (const signal of sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPatterns)) addAgencyAction(signal);
   }
