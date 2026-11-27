@@ -603,13 +603,18 @@ function* cashRecordFacts(blocks) {
   }
 }
 
+const unperformedPickupNote = /[,，]\s*(?:(?:다만|그리고)\s*)?(?:(?:예정된|실제(?:로)?)\s*){0,2}(?:방문|수거|회수|수령)(?:은|는|이|가|을|를)?\s*아직\s*(?:실제로\s*)?(?:하지|이행되지|이뤄지지)\s*않았(?:다|습니다|음|다고\s*(?:기록했|기록됐|확인했|확인됐)다|다는\s*(?:상태\s*)?(?:기록|메모)(?:이|가)?\s*(?:남았다|있었다|기록됐다))\s*[.!。]?\s*$/u;
+
 export function* cashEventSignals(text, blocks = structuredRecordBlocks(text)) {
   for (const { role, unit, action, source, speakerHere, previous, next } of currentCashReports(text, couldDescribeCashTransaction, alternateCashSource)) {
     if (!openDirectedReport(action) || hasClosedCashPickupPlan(next)) continue;
     const branchPickup = speakerHere ? pendingBranchPickup(action, source, previous, next) : "";
-    const evidence = cashEventEvidence(branchPickup || action, {
-      investigative: investigator.test(role),
-      financialStaff: Boolean(branchPickup) || (financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? ""),
+    const investigative = investigator.test(role);
+    const financialStaff = Boolean(branchPickup) || (financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "");
+    const reportedPlan = branchPickup || action;
+    // 같은 수신 보고에서 방문·수거의 실행 여부는 그에 앞서 확인한 계획과 따로 읽는다.
+    const evidence = cashEventEvidence(financialStaff && !investigative ? reportedPlan.replace(unperformedPickupNote, "") : reportedPlan, {
+      investigative, financialStaff,
       loanFromSource: loanRoleContext.test(source),
       sourceInClause: speakerHere,
     });

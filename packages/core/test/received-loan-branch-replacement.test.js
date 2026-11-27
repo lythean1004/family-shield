@@ -6,6 +6,22 @@ import { SIG_LOAN_CASH_PICKUP } from "../src/signals.js";
 const lender = "대출을 받은 곳의 상환 담당자라고 밝히면서 ";
 const pickup = "남은 상환금을 영업점에서 받지 않고, 직원이 방문해서 현찰로 수거하겠다는 답신을 보냈습니다.";
 
+const reported = (lender + pickup).replace(/\.$/u, "");
+for (const [name, text, expected] of [
+  ["같은 절의 미방문 기록", reported + ", 예정된 방문은 아직 하지 않았습니다.", true],
+  ["같은 절의 미수거 기록", reported + ", 실제 수거는 아직 하지 않았습니다.", true],
+  ["아직 수령하지 않았다는 후속 메모", reported + ", 수령을 아직 하지 않았다는 기록이 남았다.", true],
+  ["미방문 이후 같은 수거 계획을 철회", reported + ", 예정된 방문은 아직 하지 않았습니다. 해당 수거 계획은 철회됐습니다.", false],
+  ["도서관 방문 일정의 미이행", "도서관에 자료를 받으러 가기로 한 날입니다. 예정된 방문은 아직 하지 않았습니다.", false],
+  ["창구에서 이뤄지는 일반 상환", "창구 상환을 예약한 기록이며, 예정된 방문은 아직 하지 않았습니다.", false],
+]) {
+  test(name, async () => {
+    const result = await analyze({ text, ai: null });
+    assert.equal(result.fired_rules.includes("R18"), expected);
+    assert.equal(result.level === "위험", expected);
+  });
+}
+
 for (const [name, text] of [
   ["기존 대출처의 담당 주장을 같은 직원 방문 수거와 결합", lender + pickup],
   ["해당 지점 직원이 창구 납부를 대체해 대출금을 방문 수령",
