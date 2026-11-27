@@ -23,6 +23,32 @@ const isReceivedMessage = text => received.test(text) && !inactive.test(text);
 const isInactiveRequest = text => inactive.test(text) || notDirected.test(text) || reportedDenial.test(text);
 const isSeparateRequest = text => unrelated.test(text);
 
+const tableRow = /^\|\s*(?<field>[^|]+?)\s*\|\s*(?<value>[^|]+?)\s*\|$/u;
+const tableDivider = /^\|\s*:?-{3,}:?\s*\|\s*:?-{3,}:?\s*\|$/u;
+
+export function receivedFieldLines(text) {
+  const lines = text.split(/\r?\n/u).map(line => line.trim());
+  const fields = [];
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    if (!line) continue;
+    if (!tableRow.test(line) || !tableDivider.test(lines[index + 1] ?? "")) {
+      fields.push(line);
+      continue;
+    }
+    // 헤더와 구분선은 필드가 아니다. 한 표 안에서 두 칸이 모두 있는 행만 읽는다.
+    index += 2;
+    for (; index < lines.length; index++) {
+      const row = tableRow.exec(lines[index]);
+      if (!row || !row.groups.field.trim() || !row.groups.value.trim()) break;
+      fields.push(row.groups.field + ": " + row.groups.value);
+    }
+    fields.push("");
+    index--;
+  }
+  return fields;
+}
+
 function fromSameNarrator(neighbor, speaker) {
   if (!neighbor || (speaker && neighbor.speaker && speaker !== neighbor.speaker)) return "";
   return neighbor.body;

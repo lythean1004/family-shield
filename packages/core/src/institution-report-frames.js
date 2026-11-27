@@ -2,7 +2,7 @@ import { isCardCallbackNumber } from "./card-sender.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { hasOpenInstallationReport, ORDINARY_LOOKUP, startsOtherOrganizer } from "./reported-notice-fields.js";
-import { currentReceivedRequests, isReceivedContinuation } from "./received-message.js";
+import { currentReceivedRequests, isReceivedContinuation, receivedFieldLines } from "./received-message.js";
 import {
   SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_CASH_HANDOVER,
   SIG_LINK, SIG_LOAN_CASH_PICKUP, SIG_PERSONAL_INFO,
@@ -27,7 +27,7 @@ const conversation = /(?:[와과]|하고)\s*(?:(?:먼저|앞서|방금|아까|�
 const anotherCallParticipant = /(?:다른|별도(?:의)?)\s*(?:기관|사람|담당자|발신자|발신처|업체)(?:이|가|에서|에게서|한테서)/u;
 const senderSpecifiedApp = /(?:상대(?:방)?|발신자|보낸\s*사람|그\s*사람)(?:가|이)\s*(?:정해\s*준|지정한|보낸|고른|알려\s*준)\s*(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를)?\s*(?:내|제|수신자(?:의)?|받은\s*사람(?:의)?)\s*(?:휴대\s*(?:폰|전화)|스마트폰|기기|컴퓨터)(?:에|에서)\s*설치(?:하라|하도록|해야)/u;
 function* narrativeFrames(text, unverifiedLinks) {
-  const identifiesRequest = body => requiresRecipientInstallation(body) ||
+  const identifiesRequest = body => requestsDesignatedPrivateReply(body) || requiresRecipientInstallation(body) ||
     directsToUnverifiedAddress(body, unverifiedLinks);
   for (const { body, previous, next } of currentReceivedRequests(text, claimedIssuer, identifiesRequest)) {
     if (notCurrent.test(body) || startsOtherOrganizer(body) || closedRemainder.test(next)) continue;
@@ -42,10 +42,10 @@ function* narrativeFrames(text, unverifiedLinks) {
 }
 
 const recordedNotice = /(?:수신|받은|받았)|(?:문자|안내|알림|통지|수신함)\s*[^.!?\n]{0,18}(?:항목|분류|미리보기|요약|기록)/u;
-const issuerField = /^(?:(?:발신(?:자|처)?|발행처|보낸\s*(?:곳|이|사람))(?:\s*(?:표기|표시|소개|주장))?)(?:\s*[|:：]\s*|[ \t]+)(?<value>\S.*)$/u;
-const relevantField = /^(?<label>(?:요청|요구)\s*항목|해야\s*할\s*일|(?:처리\s*)?목적|용도|(?:대출\s*)?상환\s*(?:수단|방식|방법)|(?:수거|회수|납부)\s*(?:방식|방법))(?:\s*[|:：]\s*|[ \t]+)(?<value>\S.*)$/u;
+const issuerField = /^(?:(?:발신(?:자|처)?(?:가\s*(?:주장|내세운|밝힌)(?:한)?\s*(?:소속|역할|기관))?|발행처|보낸\s*(?:곳|이|사람))(?:\s*(?:표기|표시|소개|주장))?)(?:\s*[|:：]\s*|[ \t]+)(?<value>\S.*)$/u;
+const relevantField = /^(?<label>받은\s*(?:요청|요구)|(?:요청|요구)\s*(?:항목|사항|내용)|해야\s*할\s*일|(?:처리\s*)?목적|용도|(?:대출\s*)?상환\s*(?:수단|방식|방법)|(?:수거|회수|납부)\s*(?:방식|방법))(?:\s*[|:：]\s*|[ \t]+)(?<value>\S.*)$/u;
 function* structuredFrames(text) {
-  const lines = text.split(/[\r\n]+/u).map(line => line.trim()).filter(Boolean);
+  const lines = receivedFieldLines(text);
   for (const [index, line] of lines.entries()) {
     const heading = lines[index - 1] ?? "";
     if (!recordedNotice.test(heading) || notCurrent.test(heading)) continue;
@@ -58,7 +58,10 @@ function* structuredFrames(text) {
       if (!field || notCurrent.test(row) || anotherTopic.test(row)) break;
       fields.push(field.groups);
     }
-    if (fields.length && !closedRemainder.test(lines[index + 1 + fields.length] ?? "")) yield { issuer, sender, heading, fields };
+    const latestStatus = lines[index + 1 + fields.length] ?? "";
+    if (fields.length && !closedRemainder.test(latestStatus.replace(dispositionField, ""))) {
+      yield { issuer, sender, heading, fields };
+    }
   }
 }
 
@@ -93,6 +96,12 @@ function directsToNoticeNumber(action) {
 }
 
 const privateReply = /(?:이|같은|해당)?\s*(?:회신|답장)(?:란)?(?:에|으로|로)\s*(?:제|저의|내|수신자의)\s*(?:생년월일|출생\s*일자)\s*(?:과|와|및|,|·)\s*(?:기본\s*)?(?:인적\s*사항|성명|이름|주소|연락처)(?:을|를)?\s*(?:기입|작성|입력|적)(?:하라(?:는|고)?|으라(?:는|고)?|하라고|어\s*달라|해야)/u;
+const requestedPrivateMaterial = /(?:개인\s*(?:정보|신상\s*정보)|주민\s*등록\s*번호|신분증|여권\s*(?:사본|사진|번호)|계좌\s*(?:번호|비밀번호))(?=\s|를|을|가|이|의)/u;
+const designatedReply = /^\s*(?:(?:을|를)|(?:가|이)?\s*(?:담긴|포함된)\s*(?:서류|자료|사본|사진)(?:을|를)?)?\s*(?:발신자|발신처|상대(?:방)?|보낸\s*사람)(?:가|이)\s*(?:지정한|정해\s*준|보낸)\s*(?:회신처|답장\s*(?:주소|채널|계정)|별도\s*(?:회신|제출)\s*(?:주소|채널|접수처))(?:으로|로|에)(?:만)?\s*(?:내|보내|전달하|제출하|회신하|첨부하)(?:라(?:고|는)|야)(?=\s|$)/u;
+function requestsDesignatedPrivateReply(action) {
+  const material = requestedPrivateMaterial.exec(action);
+  return Boolean(material && designatedReply.test(action.slice(material.index + material[0].length)));
+}
 const remoteInstall = /(?:원격\s*(?:지원|제어))\s*(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를)?\s*설치/u;
 const extraInstall = /(?:별도(?:의)?|외부(?:의)?|추가(?:로)?)\s*(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를)?\s*설치/u;
 const receiverProcedure = /(?:접수|처리|심사|검토|상담|열람|신청|확인)(?:를|을)?\s*(?:이어가|진행하|받|계속하|하)려면/u;
@@ -117,6 +126,8 @@ function reportsInvestigativeCash(action) {
     ownCash.test(action.slice(Math.max(0, handover.index - 24), handover.index))));
 }
 
+const receivedCashDemand = /^\s*(?:현금|현찰)(?:을|은)?\s*(?:(?:준비|마련)(?:해|해서|한\s*뒤)\s*)?(?:(?:직접\s*)?만나(?:서)?\s+|대면(?:해|해서)?\s*)(?:인계하|전달하|건네|넘기)(?:라(?:고|는)|도록)(?=\s|$)/u;
+const dispositionField = /^(?:처리|진행|조치|요청)\s*상태\s*[:：]\s*/u;
 const repayment = /(?:대출(?:금)?|융자금)\s*(?:상환|갚)|^(?:상환금|상환액)(?:\s|$)/u;
 const cashOnly = /^(?:현금|현찰)(?:으로|을|은)?$/u;
 const fieldCash = /(?:현금을?|현찰)(?=[을은\s]|$)/u;
@@ -140,7 +151,7 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
   for (const { issuer, action, next, continuedCall } of narrativeFrames(text, unverifiedLinks)) {
     if (directsToUnverifiedAddress(action, unverifiedLinks)) addAgencyAction(SIG_LINK);
     if (directsToNoticeNumber(action)) addAgencyAction(SIG_CALL_THIS_NUMBER);
-    if (privateReply.test(action)) addAgencyAction(SIG_PERSONAL_INFO);
+    if (privateReply.test(action) || requestsDesignatedPrivateReply(action)) addAgencyAction(SIG_PERSONAL_INFO);
     if (hasOpenInstallationReport(action, next, notice => requiresRecipientInstallation(notice) ||
         continuedCall && senderSpecifiedApp.test(notice) && !staffInstallation.test(notice) && !noInstallation.test(notice))) {
       addAgencyAction(SIG_APP_INSTALL);
@@ -151,5 +162,9 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     if (fields.some(({label, value}) => /항목|해야\s*할\s*일/u.test(label) && remoteInstall.test(value) &&
         !staffInstallation.test(value) && !noInstallation.test(value))) addAgencyAction(SIG_APP_INSTALL);
     if (financialIssuer.test(issuer) && reportsLoanCollection(fields, sender, heading)) signals.add(SIG_LOAN_CASH_PICKUP);
+    if (investigator.test(issuer) && fields.some(({ label, value }) => /요청|요구/u.test(label) &&
+        receivedCashDemand.test(value) && !cashReturn.test(value) && !notCurrent.test(value))) {
+      signals.add(SIG_CASH_HANDOVER);
+    }
   }
 }
