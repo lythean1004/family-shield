@@ -19,7 +19,7 @@ import { findLookalikes } from "./lookalike.js";
 import {
   SIG_LINK, SIG_SHORT_URL, SIG_LOOKALIKE_DOMAIN, SIG_APP_INSTALL, SIG_MONEY,
   SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
-  SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT, SIG_OFFICIAL_LINK,
+  SIG_FAMILY_IMPERSONATION, SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT, SIG_OFFICIAL_LINK,
   SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
@@ -45,6 +45,26 @@ const INVESTIGATIVE = '(?:대검찰청|검찰(?:청)?|지검|경찰(?:청|서)?|
 const NOT_PROHIBITION = '(?!\\s*(?:주)?(?:하)?지\\s*(?:마|않))';
 const PHONE = '0\\d{1,2}[-\\s]?\\d{3,4}[-\\s]?\\d{4}';
 const NOTICE = '(?:민원|전자|고객님|귀하|본인|대표\\s*(?:번호|연락처)|확인\\s*절차|환급|미환급|피해|고지|통지|송달|과태료|범칙금|신원|건강검진|예방접종|사건|수사|공문|알림|안내|압류|납부|지급|영장|출석|체포|구속)';
+
+// 경찰청 메신저피싱 예방 자료의 가족 호칭·휴대폰 고장 수법.
+// https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1007&q_bbscttSn=20211222092717359
+const FAMILY_GREETING = /^\s*(?:엄마|아빠|어머니|아버지|할머니|할아버지|누나|언니|형|오빠|여보|자기야)(?=[\s,.!~]|$)[\s,.!~]*/;
+const PHONE_DAMAGE = /(?:^\s*|(?:^|\s)(?:나|내|제)\s*)(?:(?:휴대폰|핸드폰|폰)(?:이|가)?\s*(?:액정(?:이)?\s*)?|액정(?:이)?\s*)(?:고장(?:이)?\s*(?:나서|났어|났는데)|깨(?:져서|졌어|졌는데))/;
+const ALTERNATE_CONTACT = /번호(?:를|가)?\s*(?:바꿨어|바뀌었어|바뀌어서)|새\s*번호(?:야|예요|입니다)|(?:새\s*번호|임시\s*(?:번호|폰)|(?:빌린|친구)\s*(?:휴대폰|핸드폰|폰))(?:으로|로)\s*(?:문자|연락|메시지)(?:해|드려|한다)/;
+const REPORTED_PHONE = /[?‘“"'「]|(?:그때|지난번|예전에)|(?:다는|라는)\s*(?:말|문자|연락)|(?:었다|났다|다고)\s*(?:하더라|했)|(?:사칭|피싱)\s*(?:문자|예방|주의)|(?:하|되)?지\s*(?:마|말|않)/;
+
+function addFamilyPhoneSignals(input, signals) {
+  const greeting = FAMILY_GREETING.exec(input);
+  if (!greeting) return;
+  const opening = input.slice(greeting[0].length, greeting[0].length + 100);
+  const clauses = opening.match(/[^.!?\n]+[.!?]?/g) ?? [];
+  for (const clause of clauses.slice(0, 2)) {
+    if (REPORTED_PHONE.test(clause)) continue;
+    const changedContact = ALTERNATE_CONTACT.test(clause);
+    if (changedContact || PHONE_DAMAGE.test(clause)) signals.add(SIG_FAMILY_IMPERSONATION);
+    if (changedContact) signals.add(SIG_NEW_NUMBER);
+  }
+}
 
 const PATTERNS = {
   [SIG_AGENCY_IMPERSONATION]: [
@@ -167,6 +187,8 @@ export function extractCodeSignals(text, options = {}) {
   for (const [signal, patterns] of Object.entries(PATTERNS)) {
     if (patterns.some((re) => re.test(input))) signals.add(signal);
   }
+
+  addFamilyPhoneSignals(input, signals);
 
   // 끝 4자리 비교
   const { senderLast4, registeredLast4 } = options;

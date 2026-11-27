@@ -19,6 +19,7 @@ export const SIG_MONEY              = "SIG_MONEY";
 export const SIG_GIFTCARD           = "SIG_GIFTCARD";
 export const SIG_PERSONAL_INFO      = "SIG_PERSONAL_INFO";
 export const SIG_NEW_NUMBER         = "SIG_NEW_NUMBER";
+export const SIG_FAMILY_IMPERSONATION = "SIG_FAMILY_IMPERSONATION";
 // 발신 기관 주장·번호 유도는 코드 사전으로도 보완(2026-10-28 사용자 승인).
 export const SIG_AGENCY_IMPERSONATION = "SIG_AGENCY_IMPERSONATION";
 export const SIG_CALL_THIS_NUMBER   = "SIG_CALL_THIS_NUMBER";
@@ -27,7 +28,6 @@ export const SIG_CALL_THIS_NUMBER   = "SIG_CALL_THIS_NUMBER";
 export const SIG_DELETE_APP         = "SIG_DELETE_APP";
 export const SIG_PREPAYMENT         = "SIG_PREPAYMENT";
 export const SIG_THIRD_PARTY_ACCOUNT= "SIG_THIRD_PARTY_ACCOUNT";
-export const SIG_FAMILY_IMPERSONATION = "SIG_FAMILY_IMPERSONATION";
 export const SIG_URGENCY            = "SIG_URGENCY";
 export const SIG_SECRECY            = "SIG_SECRECY";
 export const SIG_ISOLATION          = "SIG_ISOLATION";

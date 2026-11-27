@@ -343,8 +343,8 @@ P0은 시연에 꼭 필요한 것, P1은 프로토타입 범위, P2는 후속 �
 | SIG_PREPAYMENT | 대출·환급 명목의 선입금 요구 | AI |
 | SIG_THIRD_PARTY_ACCOUNT | 개인 계좌로 입금하거나 갚으라는 요구 | AI |
 | SIG_PERSONAL_INFO | 개인정보, 인증번호, 신분증, 비밀번호 요구 | 코드 + AI |
-| SIG_NEW_NUMBER | 폰 고장·분실로 새 번호를 쓴다는 말(AI), 또는 끝 4자리가 사칭된 가족의 등록 번호와 다름(코드) | 코드 + AI |
-| SIG_FAMILY_IMPERSONATION | 가족이라고 주장 | AI |
+| SIG_NEW_NUMBER | 새 번호나 빌린 폰으로 연락한다는 주장. 코드는 가족에게 직접 연락 수단 변경을 말한 경우 또는 입력한 끝 4자리와 등록한 가족 번호가 다를 때 표시한다. | 코드 + AI |
+| SIG_FAMILY_IMPERSONATION | 가족이라고 주장. 코드는 가족 호칭으로 말을 걸고 휴대폰 고장이나 연락 수단 변경을 설명하는 경우를 찾는다. | 코드 + AI |
 | SIG_AGENCY_IMPERSONATION | 기관, 금융사, 택배사라고 주장 | AI |
 | SIG_URGENCY | 재촉하거나 협박 | AI |
 | SIG_SECRECY | 다른 사람에게 말하지 말라는 요구 | AI |
