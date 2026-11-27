@@ -13,7 +13,7 @@ import { useEffect } from 'react'
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { MAX_ANALYSIS_CHARS, canAnalyzeText } from '../data/analyze.js'
+import { ANALYSIS_TOO_LONG_MESSAGE, MAX_ANALYSIS_CHARS, canAnalyzeText } from '../data/analyze.js'
 import useAnalyzeSubmission from './useAnalyzeSubmission.js'
 
 export default function InputScreen() {
@@ -31,6 +31,7 @@ export default function InputScreen() {
   }, [navigate, setText, sharedText])
 
   const length = [...text].length
+  const overLimit = length > MAX_ANALYSIS_CHARS
 
   return (
     <main id="main" className="mode-parent">
@@ -56,9 +57,9 @@ export default function InputScreen() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="확인할 문자 내용을 붙여 넣어 주세요."
-        maxLength={MAX_ANALYSIS_CHARS}
         rows={6}
-        aria-describedby="fs-input-count"
+        aria-invalid={overLimit}
+        aria-describedby={overLimit ? 'fs-input-count fs-input-limit' : 'fs-input-count'}
         autoComplete="off"
         spellCheck={false}
         disabled={loading}
@@ -67,6 +68,7 @@ export default function InputScreen() {
         {length} / {MAX_ANALYSIS_CHARS}자
       </p>
 
+      {overLimit && <p id="fs-input-limit" className="screen-body" role="alert">{ANALYSIS_TOO_LONG_MESSAGE}</p>}
       {loading && <p className="screen-body" role="status">판별 중이에요.</p>}
       {error && <p className="screen-body" role="alert">{error}</p>}
       <div className="screen-actions">
