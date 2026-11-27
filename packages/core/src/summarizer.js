@@ -10,6 +10,7 @@ const SIGNAL_PHRASE = {
   SIG_CREDENTIAL_DISCLOSURE: "남에게 인증값을 전달하거나 문자 속 주소에 금융 비밀을 입력하라는 요구",
   SIG_DOCUMENT_BUNDLE: "지원금이나 일자리를 내세워 문자 속 주소로 신분증과 통장 자료를 함께 보내라는 요구",
   SIG_LOAN_CASH_PICKUP: "대출 상환금을 직원이 찾아와 현금으로 받겠다는 안내",
+  SIG_FOREIGN_PAYMENT_CALLBACK: "해외 발신 결제 알림에서 본인이 쓴 게 아니면 문자 속 번호로 취소하라는 안내",
   SIG_CASH_HANDOVER:         "수사기관이라며 현금을 직접 건네라는 요구",
   SIG_NEW_NUMBER:           "새 번호로 연락",
   SIG_LINK:                 "링크 포함",

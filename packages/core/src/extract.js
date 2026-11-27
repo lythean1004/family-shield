@@ -21,7 +21,7 @@ import {
   SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
   SIG_FAMILY_IMPERSONATION, SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT, SIG_OFFICIAL_LINK,
   SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL, SIG_CASH_HANDOVER, SIG_PREPAYMENT,
-  SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE, SIG_LOAN_CASH_PICKUP,
+  SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE, SIG_LOAN_CASH_PICKUP, SIG_FOREIGN_PAYMENT_CALLBACK,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
 import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
@@ -262,6 +262,7 @@ export function extractCodeSignals(text, options = {}) {
   if (payments.thirdPartyAccount) signals.add(SIG_THIRD_PARTY_ACCOUNT);
   if (hasInvestigativeCashHandover(input)) signals.add(SIG_CASH_HANDOVER);
   if (hasLoanCashPickup(input)) signals.add(SIG_LOAN_CASH_PICKUP);
+  if (callback.foreignPayment) signals.add(SIG_FOREIGN_PAYMENT_CALLBACK);
   if (callback.signal) signals.add(SIG_CALL_THIS_NUMBER);
   const disclosure = personalDisclosure(input);
   if (disclosure.requested) signals.add(SIG_PERSONAL_INFO);

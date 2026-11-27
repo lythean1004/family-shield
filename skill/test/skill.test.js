@@ -149,6 +149,16 @@ describe("핸들러 - 기본", () => {
     assert.match(r.body.template.outputs[0].simpleText.text, /위험 이유: .*현금/);
   });
 
+  it("해외 발신 결제 취소 회신이 위험 이유이면 번호를 노출하지 않고 설명한다", async () => {
+    const cfgWithFakeAi = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway([]) } };
+    const number = "010-0000-XXXX".replace("XXXX", "0".repeat(4));
+    const utterance = "[국제발신] 분류 서식 / 결제 완료. 본인 결제가 아닌 경우 취소 접수처 " + number;
+    const response = await handleRequest({ utterance }, cfgWithFakeAi);
+    const reply = response.body.template.outputs[0].simpleText.text;
+    assert.match(reply, /위험 이유: .*해외 발신 결제.*취소/);
+    assert.ok(!reply.includes(number));
+  });
+
   it("인증값 전달 요구를 규칙이 찾으면 AI 설명과 함께 안내한다", async () => {
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway([]) } };
     const r = await handleRequest({ utterance: "문법 연습 / 원격지원 코드를 담당자에게 알려 주세요." }, c);

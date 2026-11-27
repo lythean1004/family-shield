@@ -19,7 +19,7 @@ import {
   SIG_PERSONAL_INFO, SIG_CALL_THIS_NUMBER, SIG_URGENCY, SIG_SECRECY,
   SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT, SIG_DELETE_APP,
   SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_LOOKALIKE_DOMAIN, SIG_NEW_DOMAIN, SIG_OFFICIAL_LINK,
-  SIG_DECEPTIVE_URL, SIG_CASH_HANDOVER, SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE, SIG_LOAN_CASH_PICKUP,
+  SIG_DECEPTIVE_URL, SIG_CASH_HANDOVER, SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE, SIG_LOAN_CASH_PICKUP, SIG_FOREIGN_PAYMENT_CALLBACK,
 } from "./signals.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
@@ -73,6 +73,7 @@ export function decide(context) {
   if (codeSignals.has(SIG_CREDENTIAL_DISCLOSURE)) fire("R16", "위험");
   if (codeSignals.has(SIG_DOCUMENT_BUNDLE)) fire("R17", "위험");
   if (codeSignals.has(SIG_LOAN_CASH_PICKUP)) fire("R18", "위험");
+  if (codeSignals.has(SIG_FOREIGN_PAYMENT_CALLBACK)) fire("R19", "위험");
 
   // R13: 가족 사칭 + (상품권 요구, 또는 돈 요구 + 압박[재촉·통화 회피·비밀·고립]).
   // 카카오는 보낸 번호를 받지 않아 R3의 '새 번호'가 없을 수 있다(D45). 압박 조건은 “용돈 보냈어” 같은

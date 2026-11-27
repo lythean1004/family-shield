@@ -2,10 +2,62 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { OFFICIAL_DOMAIN_CARDS } from "../src/lookalike.js";
 import { extractCodeSignals } from "../src/extract.js";
-import { SIG_CALL_THIS_NUMBER, SIG_AGENCY_IMPERSONATION } from "../src/signals.js";
+import { analyze } from "../src/pipeline.js";
+import { decide } from "../src/rule-engine.js";
+import { SIG_CALL_THIS_NUMBER, SIG_AGENCY_IMPERSONATION, AI_ALLOWED_SIGNALS, codeOnlyFrom } from "../src/signals.js";
 
 const number = "010-0000-XXXX".replace("XXXX", "0".repeat(4));
 const hasCall = text => extractCodeSignals(text).signals.includes(SIG_CALL_THIS_NUMBER);
+
+describe("D56 해외 발신 결제 알림의 미승인 취소 창구", () => {
+  const signal = "SIG_FOREIGN_PAYMENT_CALLBACK";
+  const official = OFFICIAL_DOMAIN_CARDS.find(c => c.id === "EV-DOM-EPOST").callback_contact.numbers[0];
+  const notice = (status, route, header = "[국외발신]") => [header, "분류 서식 / " + status, route].join("\n");
+  const desk = "본인 결제가 아닌 경우 취소 접수처 ";
+  for (const [header, status, route] of [
+    ["[국외발신]", "결제 완료", desk + number],
+    ["[국제발신]", "카드 승인 완료", "본인이 승인하지 않았다면 거래 취소 문의: " + number],
+    ["[Web발신] [해외 발신]", "결제가 완료되었습니다.", "본인 거래가 아니면 결제 취소 고객센터 " + number],
+    ["국제발신:", "결제 완료 USD 0.00", "본인이 한 결제가 아니라면 아래 번호로 취소를 접수하세요: " + number],
+    ["[국제발신]", "결제 완료", "본인 결제가 아닐 시 " + number + "로 거래 취소를 신청하십시오."],
+  ]) it(status + " / 지정 취소 번호", async () => {
+    const r = await analyze({ text: notice(status, route, header) });
+    assert.equal(r.level, "위험");
+    assert.ok(r.fired_rules.includes("R19") && r.signals_code.includes(signal));
+    assert.match(r.summary, /결제.*취소/);
+  });
+  for (const [name, text] of [
+    ["정상 영수증", notice("결제 완료", "영수증을 발급했습니다. 주문 문의 " + number)],
+    ["확인된 대표번호", notice("결제 완료", desk + official)],
+    ["다른 곳에 미확인 번호가 적힌 공식 취소 창구", notice("결제 완료", desk + official + ". 배송 문의 " + number)],
+    ["국내 발신", notice("결제 완료", desk + number, "[Web발신]")],
+    ["취소 영수증", notice("결제 취소 완료", desk + number)],
+    ["미처리 통지", notice("결제가 완료되지 않았습니다.", desk + number)],
+    ["미래 결제", notice("결제 완료 예정", desk + number)],
+    ["결제 방법 안내", notice("결제 완료 후 영수증을 출력하는 방법", desk + number)],
+    ["단순 결제 취소 연락처", notice("결제 완료", "단순 변심에 따른 취소 문의 " + number)],
+    ["별도 행사 연락처", notice("결제 완료. 별도 행사 안내입니다.", desk + number)],
+    ["예방 자료", notice("사칭 피해 예방 안내 / 결제 완료", desk + number)],
+    ["인용된 옛 창구", notice("카드 승인 완료", "‘" + desk + number + "’라는 문구가 쓰였습니다.")],
+    ["취소는 앱에서, 번호는 배송처", notice("결제 완료", "본인 결제가 아닐 시 앱에서 취소하세요. 배송 문의 " + number)],
+  ]) it(name, async () => {
+    const r = await analyze({ text });
+    assert.notEqual(r.level, "위험");
+    assert.ok(!r.signals_code.includes(signal));
+  });
+  it("저장 결과에 남는 코드 전용 근거이며 AI 추출값만으로는 발동하지 않는다", () => {
+    assert.deepEqual(codeOnlyFrom([signal]), [signal]);
+    assert.ok(!AI_ALLOWED_SIGNALS.has(signal));
+    assert.ok(!decide({ signals_code: [], signals_final: [signal] }).fired_rules.includes("R19"));
+  });
+  it("기존에 로컬에서 처리하던 건강 관련 알림은 새 결제 신호만으로 AI에 보내지 않는다", async () => {
+    let calls = 0;
+    const r = await analyze({ text: notice("안과 진료 영수증 / 결제 완료", desk + number), ai: {
+      model: "fixture", apiKey: "fixture", fetchImpl: async () => { calls++; throw Error("fixture"); },
+    } });
+    assert.deepEqual([r.level, r.ai_skipped, calls], ["위험", "health", 0]);
+  });
+});
 
 describe("전담 창구에 결제·본인확인을 하도록 지정한 회신 번호", () => {
   for (const [issuer, text] of [
