@@ -94,6 +94,47 @@ function routedToOtherParty(text) {
     CONTRACT_PARTY.test(clause) && MISMATCH.test(clause) && hasDirectedOtherRoute(clause));
 }
 
+const basicOfferInformation = /(?:물품|상품|물건|매물)(?:의)?\s*(?:상태|진위|실물)|실물|(?:약정|계약|이용|거래)(?:의)?\s*(?:세부|기본|구체적)?\s*(?:조건|정보|약관)|(?:예약|가입|참가|대여|거래)\s*(?:가능\s*여부|가능한지|유무)/u;
+const withholding = /(?:비로소|그제야|서야|이후에만|한\s*뒤에만|전에는|보기\s*전|전에)\s*/u;
+const showsOrDiscloses = /(?:보여\s*(?:주|준|줄)|확인할\s*수|알려\s*주|알\s*수|설명(?:해\s*주|을\s*들|을\s*받|한다|해준다)|공개(?:하|되)|열람(?:하|할))/u;
+const obligationBefore = /(?:내야|부쳐야|보내야|납부해야|지불해야|결제해야|입금해야|송금해야|이체해야|(?:보내|입금하|납부하|지불하|송금하|이체하|치르)고\s*(?:나서야|나야)|(?:입금|납부|지불|송금|이체|결제)\s*(?:이후에만|한\s*뒤에만))/u;
+const establishedPrice = /(?:이미\s*(?:정해진|공개된|확정된|확인한|계약한)|확정(?:된|한))\s*(?:예약|거래|계약|견적|조건|물건)|(?:영수증|결제\s*내역|세금\s*계산서)(?:만|을|를)?\s*(?:확인|조회|열람)/u;
+
+function paymentBeforeBasicInformation(clause, context) {
+  if (!currentlyReported(context) || NO_PAYMENT.test(clause) || CONFIRMATION_FIRST.test(clause) ||
+      establishedPrice.test(context) || !basicOfferInformation.test(clause)) return false;
+  const payment = obligationBefore.exec(clause);
+  if (!payment || !MONEY_OBJECT.test(clause.slice(Math.max(0, payment.index - 32), payment.index + payment[0].length))) return false;
+  const after = clause.slice(payment.index + payment[0].length);
+  return (withholding.test(after) || /(?:서야|나야|에만)$/u.test(payment[0])) &&
+    showsOrDiscloses.test(after);
+}
+
+const currentPaymentDirective = /(?:비용|돈|금액|대금|요금|수수료)(?:을|를)?\s*(?:입금|납부|송금|이체|지불|결제)(?:하라는|하라고|하도록|할\s*것을|해\s*달라는|해야\s*한다는)[^.!?\n]{0,16}(?:요구|요청|안내|통보|설명|내용)|(?:입금|납부|송금|이체|지불|결제)(?:하라는|하라고|하도록|해\s*달라는)[^.!?\n]{0,12}(?:요구|요청|통보)|(?:비용|금액|대금|요금|수수료)(?:의)?\s*(?:입금|납부|송금|이체|지불|결제)(?:를|을|의)?\s*(?:요구|요청|지시)/u;
+const namedPaymentAccount = /(?:입금|납부|송금|이체|지불|수납)할\s*(?:계좌|통장|곳)|(?:비용|돈|대금|요금|금액)(?:을|를)?\s*(?:받을|받는)\s*(?:계좌|통장)|(?:입금처|수납처|납부처|수취\s*계좌)|(?:그|해당)\s*(?:계좌|예금주)/u;
+const displayedDifferentHolder = /(?:업체|회사|사업자|판매자)(?:로|가|의)?[^.!?\n]{0,18}(?:표시|기재|적힌)[^.!?\n]{0,16}(?:다른\s*사람|다른\s*개인)(?:의)?\s*(?:명의|이름)(?:의|로)?\s*(?:계좌|통장)/u;
+const adjoiningAccountField = /(?:^|[\s,，])(?:해당\s*|그\s*)?(?:계좌|통장|예금주)(?:의|는|이|가|에는|에|란|\s*[:：])\s*[^.!?\n]{0,48}(?:명의|이름|사람|개인)/u;
+const accountDocument = /(?:명의|예금주|계좌\s*주인|계좌주)(?:는|은|이|가|로|의)?|(?:명의|예금주|계좌주)\s*(?:표시|기재|적힌)/u;
+const outsider = /(?:거래|계약)(?:의)?\s*(?:상대|업체|당사자)(?:와|과)(?:는)?\s*(?:무관한|관계(?:가)?\s*없는|다른)\s*(?:사람|이|개인)|(?:업체|회사|판매자|사업자)(?:의)?\s*(?:이름|명의)?(?:과는?|와는?)\s*(?:무관한|관계(?:가)?\s*없는|다른)\s*(?:사람|개인)|(?:계약|거래)(?:\s*(?:상대|업체|당사자))?(?:와는?|과는?)\s*(?:무관하|관계가\s*없|관계\s*없)|(?:업체|회사|사업자|계약\s*상대|거래\s*상대)(?:의)?\s*(?:(?:명의|이름)(?:이|가)?\s*)?(?:아니라|아닌|대신|와\s*다른|과\s*다른)\s*(?:다른\s*)?(?:사람|개인)/u;
+
+function mismatchInContinuation(prior, clause, context) {
+  if (!prior || CLOSED_REQUEST.test(context) || SWITCH.test(clause) || NO_PAYMENT.test(context) ||
+      EXAMPLE.test(context) || REVERSE_OR_AUTHORIZED.test(context)) return false;
+  if (!currentPaymentDirective.test(prior) && !(MONEY_OBJECT.test(prior) && accountDirective.test(prior))) return false;
+  if (displayedDifferentHolder.test(clause)) return true;
+  return (namedPaymentAccount.test(clause) || adjoiningAccountField.test(clause)) && accountDocument.test(clause) && outsider.test(clause) &&
+    !CONTRACTOR_OWN_ACCOUNT.test(clause);
+}
+const assignedPersonalAccount = /(?:입금|납부|송금|이체)(?:할|하라고|하라는|을|의|은|는|처|대상)?[^.!?\n]{0,26}(?:제\s*[삼3]자|거래(?:와|과)\s*무관한\s*사람)(?:의)?\s*(?:개인\s*)?(?:(?:명의|이름)(?:의|인|자(?:의)?|로)?\s*)?(?:계좌|통장)|(?:제\s*[삼3]자|거래(?:와|과)\s*무관한\s*사람)(?:의)?\s*(?:개인\s*)?(?:(?:명의|이름)(?:의|인|자(?:의)?|로)?\s*)?(?:계좌|통장)(?:를|로|으로|에)?[^.!?\n]{0,22}(?:입금|납부|송금|이체)/u;
+const accountDirective = /(?:요구|요청|지시)(?:사항|항목|대상|조건|내용|은|는|이|가|로)?[^.!?\n]{0,40}(?:계좌|통장)(?:로|으로|에)?[^.!?\n]{0,11}(?:입금|납부|이체|송금)|(?:입금|납부|송금|이체)(?:을|를)?\s*(?:요구|요청|지시|하라고|하라는)|(?:계좌|통장)(?:를|을|로|으로|에)?[^.!?\n]{0,20}(?:요구|요청|지시)/u;
+const inconsistentTradeHolder = /(?:거래|계약)[^.!?\n]{0,12}(?:무관|관계가\s*없|관련이\s*없)[^.!?\n]{0,10}(?:명의|예금주)|(?:거래|계약)(?:와|과|(?:\s*(?:상대|당사자))?(?:와|과))\s*(?:무관한|무관하다고|관계(?:가)?\s*없는|관련(?:이)?\s*없는)\s*(?:사람(?:의)?\s*)?(?:명의|예금주)|(?:계약|거래)(?:[가-힣\s]{0,14})(?:명의|계약자|당사자|예금주)(?:과|와|가|는|이|은)?\s*(?:서로\s*)?(?:다르|별개|일치하지\s*않|같지\s*않|아닌|아니라)|(?:명의|예금주)(?:가|는|은|이)?[^.!?\n]{0,18}(?:계약|거래)[^.!?\n]{0,12}(?:다르|별개|일치하지\s*않|관련\s*없|무관)|(?:계약|거래)[^.!?\n]{0,28}(?:명의|예금주)[^.!?\n]{0,14}(?:는|은|이|가)?\s*(?:없|상이|무관)/u;
+
+function explicitlyReassignedAccount(clause, next, context) {
+  if (!currentlyReported(context) || NO_PAYMENT.test(context) || REVERSE_OR_AUTHORIZED.test(context + " " + next) ||
+      !assignedPersonalAccount.test(clause) || !accountDirective.test(clause)) return false;
+  return !SWITCH.test(next) && !EXAMPLE.test(next) && !CLOSED_REQUEST.test(next) &&
+    !NO_PAYMENT.test(next) && inconsistentTradeHolder.test(next);
+}
 export function addReportedTransactionConditions(text, signals) {
   const clauses = text.split(SENTENCES).map(value => value.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
@@ -103,8 +144,10 @@ export function addReportedTransactionConditions(text, signals) {
     const context = !SWITCH.test(clause) && !CLOSED_REQUEST.test(prior) ? prior + " " + clause : clause;
     if (EXAMPLE.test(context) || EXAMPLE.test(next) && !SWITCH.test(next)) continue;
     if (paymentBeforeOutcome(clause) || paymentBeforeOutcome(context)) signals.add(SIG_PREPAYMENT);
-    if (reportedUpfrontGate(context) || demandsPaymentBeforeVerification(clause)) signals.add(SIG_PREPAYMENT);
-    if (routedToOtherParty(clause) || currentlyReported(context) && !NO_PAYMENT.test(context) && !REVERSE_OR_AUTHORIZED.test(context) &&
+    if (reportedUpfrontGate(context) || demandsPaymentBeforeVerification(clause) || paymentBeforeBasicInformation(clause, context)) {
+      signals.add(SIG_PREPAYMENT);
+    }
+    if (routedToOtherParty(clause) || mismatchInContinuation(prior, clause, context) || explicitlyReassignedAccount(clause, next, context) || currentlyReported(context) && !NO_PAYMENT.test(context) && !REVERSE_OR_AUTHORIZED.test(context) &&
         ORIGINAL_RECIPIENT.test(prior) && MISMATCH.test(prior) && INDIVIDUAL_DESTINATION.test(clause)) {
       signals.add(SIG_THIRD_PARTY_ACCOUNT);
     }

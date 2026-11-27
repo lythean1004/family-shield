@@ -47,8 +47,31 @@ function related(text, noun, verb, action, parts) {
   }));
 }
 
+const supportAtSide = /(?:곁|옆|자리|주변)\s*(?:에|에서)?\s*(?:있(?:던|는)|가까이\s*있던)\s*(?:사람|이들|인원)(?:을|를)?/gu;
+const separateSupport = /(?:떨어(?:져|진|질|지|뜨리)|떼어|물리|내보내|(?:자리|곁|옆)(?:에서|를)\s*(?:보내|비우게|떠나게)|보내고)/u;
+const soleContact = /(?:혼자(?:서)?(?:만)?|단독(?:으로)?)\s*(?:(?:남아|계속|따로)\s*)?(?:통화|상담|접촉|연락|시작|응대|절차)|(?:통화|상담|접촉|연락|응대|절차)(?:는|가|를|은|이|을)?\s*(?:(?:꼭|오직|반드시|계속)\s*)?(?:혼자(?:서)?(?:만)?|단독(?:으로)?)/u;
+const deferHelp = /(?:연락|상의|의논|조언|도움)(?:을|를|는|은|도)?\s*(?:(?:아예|일단|나중으로|뒤로)\s*)?(?:미루|보류하|건너뛰|생략하|넘기)(?:라(?:고|는|며)|래|고\s*있)/u;
+const throughAction = /(?:거래|절차|상담|연락|통화|처리|송금|결제|심사)(?:가|이|을|를)?\s*(?:끝날\s*때까지|끝나기\s*전(?:까지)?|진행되는\s*동안|진행할\s*동안|하는\s*동안|마칠\s*때까지|마무리될\s*때까지)/u;
+const staysAlone = /(?:혼자(?:서)?(?:만)?|단독(?:으로)?)\s*(?:있(?:으|어|는)|남(?:아|으|는))/u;
+const barsSeekingAdvice = /(?:가족|친구|친척|지인|이웃|아는\s*사람)(?:들)?(?:과|와|에게|한테|이랑|이나|이나는|도)?[^.!?\n]{0,32}(?:상의|의논|조언)(?:(?:를|을|는|은)\s*)?(?:하는\s*(?:건|일은|것은)\s*|하면\s*|해서는\s*|하는\s*것도\s*)?안\s*된(?:다는|다고|다며|다는\s*내용)|(?:가족|친구|친척|지인|이웃|아는\s*사람)(?:들)?(?:과|와|에게|한테|이랑|이나|도)?[^.!?\n]{0,32}(?:상의|의논|조언)(?:를|을)?\s*(?:하(?:지\s*말라|면\s*안\s*된다)|하지\s*않도록)\s*(?:고|는|며)/u;
+const allowedSupport = /(?:같이|함께)\s*(?:할|참여할)\s*수|(?:상의|연락|통화)(?:를|을)?\s*(?:해도|해\s*봐도)\s*(?:돼|된)|(?:원하면|선택하면)\s*가족/u;
+
+function requiredSeparation(text) {
+  if (allowedSupport.test(text)) return false;
+  if (barsSeekingAdvice.test(text)) return true;
+  const parties = [...text.matchAll(supportAtSide), ...text.matchAll(person)];
+  return parties.some(party => {
+    const tail = text.slice(party.index + party[0].length, party.index + party[0].length + 72);
+    const apart = separateSupport.exec(tail);
+    if (apart && (soleContact.test(tail.slice(apart.index)) || throughAction.test(text) && (soleContact.test(text) || staysAlone.test(tail.slice(apart.index)))) &&
+        (DIRECTIVE.test(tail) || /(?:으라고|하도록)\s*(?:한|안내|적|요구|요청)/u.test(tail))) return true;
+    const before = text.slice(Math.max(0, party.index - 38), party.index);
+    return throughAction.test(before + tail) && deferHelp.test(tail);
+  });
+}
 function mandatesIsolation(text) {
   if (SELF_REQUEST.test(text) || NARROW_CONTEXT.test(text)) return false;
+  if (requiredSeparation(text)) return true;
   return related(text, person, communication, ({after, between, object}) => {
     if (/^(?:다른|제[삼3]자)/u.test(object[0]) ||
         /(?:녹음|영상|촬영|내용을\s*공개|번호를\s*차단|단지|일시적으로|잠깐|잠시)/u.test(between + after) ||
