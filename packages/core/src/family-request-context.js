@@ -403,9 +403,30 @@ const recipientPrivateNeed = new RegExp(
 );
 const documentForOwnUse = /(?:직접|각자|본인(?:이|은|만)?)\s*(?:지참|보관|사용|확인)|(?:지참|보관|확인)할\s*(?:서류|자료|목록)|(?:사본|번호|사진)(?:을|를)?\s*(?:보내|넘기|알리|제출하|공유하)지\s*(?:않|말)|(?:말|뜻|요구)(?:이|은|는)?\s*아니/u;
 
+const issuedContact = "(?:(?:처음\\s*보는|낯선|모르는|다른|새(?:로운)?|바뀐)\\s*" +
+  contact + "(?:로|에서)\\s*)";
+const issuedFamilyName = new RegExp(
+  "^(?<precedingContact>" + issuedContact + ")?" + relation + "(?:의)?\\s*(?:명의|이름)(?:로|으로)\\s*" +
+  "(?<followingContact>" + issuedContact + ")?(?:온|도착한|받은|수신한)\\s*" + message +
+  "(?:에는|에서는|에|에서)(?=\\s|$)\\s*", "u",
+);
+const continuingReceipt = new RegExp("^(?:같은|그|해당)\\s*" + message + "(?:에는|에서는|에|에서|은|는|이|가)\\s*", "u");
+const receivedPaymentObject = new RegExp("^" + money + "(?=$|[\\s을를이가은는])", "u");
+const pairedMoneyPressure = /(?:요구|요청|부탁)(?:와|과|도)\s*(?:재촉|독촉)(?:이|도|과|까지)?\s*(?:함께|같이|동시에)\s*(?:담|적|실|왔|들어)/u;
+const reportedImmediateDeadline = /^(?:(?:이어|그리고|또)\s*)?(?:지금\s*)?(?:당장|즉시|곧바로)이?라(?:고|며|면서)/u;
+const repeatsPreviousDemand = /(?:이|그|같은|해당)\s*(?:요구|요청|부탁|얘기|말)(?:를|을|도|에|은|는)/u;
+const reportsSpeaker = /(?:말|덧붙|재촉|요구|요청|반복)(?:했|였|하|해)|(?:라고|라는\s*말도)\s*했/u;
+const historicHeading = /^(?:지난(?:번|주|달|해)|예전|이전|과거)(?:에|의|에는)?\s/u;
+
 function attributedSpeaker(clause) {
   const actor = senderThenRole.exec(clause) ?? roleThenSender.exec(clause);
-  return actor && !conditionalOrQuotedRole.test(clause.slice(actor[0].length)) ? actor : null;
+  if (actor && !conditionalOrQuotedRole.test(clause.slice(actor[0].length))) return { head: actor[0] };
+  const receipt = issuedFamilyName.exec(clause);
+  if (!receipt) return null;
+  return {
+    head: receipt[0], namedReceipt: true,
+    changedContact: Boolean(receipt.groups.precedingContact || receipt.groups.followingContact),
+  };
 }
 
 function mentionsChangedContact(clause) {
@@ -414,19 +435,32 @@ function mentionsChangedContact(clause) {
   return (newContact.test(contactText) || announcedChatRoute.test(contactText)) && !incidentalChannel.test(contactText);
 }
 
-function addAttributedFamilySignals(parts, signals) {
-  const requested = requestsIn(parts, false, false);
-  const changed = parts.some(mentionsChangedContact) &&
-    !parts.some(part => sameContact.test(part) || unchangedContactField.test(part));
-  const payment = requested.has(SIG_MONEY) || parts.some(part =>
+function addAttributedFamilySignals(parts, signals, actor) {
+  const [opening, next] = parts;
+  // 명의는 발신 출처만 가리킨다. 같은 연락에 실제 적혔다고 보고한 목적물과 재촉만 잇는다.
+  const contents = actor.namedReceipt
+    ? [opening, ...parts.slice(1).filter(part => continuingReceipt.test(part))
+      .map(part => part.replace(continuingReceipt, ""))]
+    : parts;
+  const active = contents.filter(part => !askerIsReporter.test(part));
+  const requestParts = actor.namedReceipt ? active.filter(part => receivedPaymentObject.test(part)) : active;
+  const requested = requestsIn(requestParts, false, false);
+  const changed = (actor.changedContact || active.some(mentionsChangedContact)) &&
+    !active.some(part => sameContact.test(part) || unchangedContactField.test(part));
+  const payment = requested.has(SIG_MONEY) || !actor.namedReceipt && active.some(part =>
     !actionNegation.test(part) && askedToPay.test(part));
-  const privateRequest = requested.has(SIG_PERSONAL_INFO) || parts.some(part =>
-    !documentForOwnUse.test(part) && recipientPrivateNeed.test(part));
-  const giftRequest = requested.has(SIG_GIFTCARD);
-  const appRequest = requested.has(SIG_APP_INSTALL);
-  const pressure = payment && parts.some(part => urgency.test(part) && urgentRequirement.test(part));
-  const secret = payment && parts.some(part => secrecy.test(part) && secrecyRequirement.test(part));
-  const voice = parts.some(reportedFamilyVoiceResponse);
+  const privateRequest = !actor.namedReceipt && (requested.has(SIG_PERSONAL_INFO) || active.some(part =>
+    !documentForOwnUse.test(part) && recipientPrivateNeed.test(part)));
+  const giftRequest = !actor.namedReceipt && requested.has(SIG_GIFTCARD);
+  const appRequest = !actor.namedReceipt && requested.has(SIG_APP_INSTALL);
+  const pressure = payment && (actor.namedReceipt
+    ? requestParts.some(part => pairedMoneyPressure.test(part)) || Boolean(next &&
+      reportedImmediateDeadline.test(next) && repeatsPreviousDemand.test(next) &&
+      reportsSpeaker.test(next) && !askerIsReporter.test(next))
+    : active.some(part => urgency.test(part) && urgentRequirement.test(part)));
+  const secret = !actor.namedReceipt && payment &&
+    active.some(part => secrecy.test(part) && secrecyRequirement.test(part));
+  const voice = !actor.namedReceipt && active.some(reportedFamilyVoiceResponse);
   if (!(giftRequest || voice || pressure || secret || changed && (payment || privateRequest || appRequest))) return;
 
   signals.add(SIG_FAMILY_IMPERSONATION);
@@ -450,8 +484,9 @@ export function addFamilyRequestContextSignals(text, signals, { numberMismatch =
     const previous = clauses[index - 1] ?? "";
     if (identifiesReportedThirdPerson(start) || illustrative.test(previous) || exampleReceiptHeading.test(previous)) continue;
     const actor = attributedSpeaker(start);
-    if (actor && !segments[index].endsWith("?") && !documentaryPast.test(previous)) {
-      const parts = [start.slice(actor[0].length).trimStart()];
+    if (actor && !segments[index].endsWith("?") && !documentaryPast.test(previous) &&
+        !(actor.namedReceipt && historicHeading.test(previous))) {
+      const parts = [start.slice(actor.head.length).trimStart()];
       for (let offset = 1; offset <= 3 && index + offset < clauses.length; offset++) {
         const clause = clauses[index + offset];
         if (segments[index + offset].endsWith("?") || shiftedReport.test(clause) || isOtherSource(clause) || isSource(clause) || attributedSpeaker(clause)) break;
@@ -459,7 +494,7 @@ export function addFamilyRequestContextSignals(text, signals, { numberMismatch =
       }
       if (!parts.some(part => closed.test(part) || documentaryPast.test(part) || verified.test(part) ||
           illustrative.test(part) || shiftedReport.test(part) || isOtherSource(part))) {
-        addAttributedFamilySignals(parts.filter(part => !askerIsReporter.test(part)), signals);
+        addAttributedFamilySignals(parts, signals, actor);
       }
     }
     const framed = hasFramedFamilySource(start, previous);
