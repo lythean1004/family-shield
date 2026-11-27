@@ -157,6 +157,8 @@ const claimantWrittenResponse = /(?:문자|메시지|채팅|글)(?:로|으로)�
 
 const offersIdentityCheckLater = /(?:오늘\s*(?:저녁|오후)|내일|모레|다음\s*(?:날|번)|이따가?|나중에)[^,，.!?\n]{0,12}(?:다시\s*)?(?:전화|통화)(?:를)?\s*(?:하겠|하자|드리겠|하겠습니다)/u;
 const completedIdentityCall = /(?:전화|통화|목소리)(?:로|를\s*통해)?\s*(?:직접\s*)?(?:본인|신원|맞는지)\s*(?:여부를?\s*)?확인(?:했|을\s*마쳤)/u;
+const nonClaimantVoiceResponse = /^[,，\s]*(?:제가|내가|저는|나는|수신자(?:는|가)|받은\s*사람(?:은|이)|보호자(?:는|가)|제\s*[삼3]자(?:는|가))\s/u;
+const declinesCall = /(?:전화|통화)(?:는|가|를|도)?\s*(?:(?:할\s*수\s*없|못\s*(?:하겠|한)|하지\s*않겠|하지\s*않는다고))/u;
 export function reportedFamilyVoiceResponse(clause) {
   if (SPURIOUS_REPORT.test(clause) || DENIAL.test(clause) || HYPOTHETICAL.test(clause) ||
       CLOSED_REQUEST.test(clause) || clause.endsWith("?")) return false;
@@ -164,11 +166,12 @@ export function reportedFamilyVoiceResponse(clause) {
   const challenge = verifiedChallenge ?? receivedVoiceChallenge.exec(clause);
   if (!challenge) return false;
   const response = clause.slice(challenge[0].length).trimStart();
-  if (hasOtherSource(response) || RECIPIENT_REFUSAL.test(response) || temporaryVoiceLimit.test(response) ||
+  if (hasOtherSource(response) || nonClaimantVoiceResponse.test(response) || RECIPIENT_REFUSAL.test(response) ||
+      temporaryVoiceLimit.test(response) ||
       laterVoiceOffer.test(response) || closedVoiceRecord.test(response)) return false;
   return (VOICE_REFUSAL.test(response) && hasVoiceRefusal(clause)) ||
-    Boolean(verifiedChallenge && claimantWrittenResponse.test(response) && !offersIdentityCheckLater.test(response) &&
-      !completedIdentityCall.test(response));
+    Boolean((verifiedChallenge || declinesCall.test(response)) && claimantWrittenResponse.test(response) &&
+      !offersIdentityCheckLater.test(response) && !completedIdentityCall.test(response));
 }
 
 function hasWrittenOnlyResponse(context) {
