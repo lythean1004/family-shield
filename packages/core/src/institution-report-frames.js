@@ -423,9 +423,32 @@ function* currentCashReports(text, extraRequest = () => false, extraIssuer = () 
   }
 }
 
+const statedInvestigationDuty = /^(?<role>수사(?:를|\s*업무(?:를)?)?\s*)(?:(?:담당(?:자)?이?라고)|(?:담당한다고|맡았다고|맡고\s*있다고))\s*(?:한|말한|밝힌|소개한|주장한)\s*(?:발신(?:자|인)|보낸\s*(?:사람|이)|상대(?:방)?|사람|쪽)(?:이|가|은|는)(?=\s|$)/u;
+const heldByAddressee = /^(?:(?:제|내|수신자의)\s*|(?:(?:제가|내가|수신자가)\s*)?(?:(?:집|자택|댁)(?:에|에서)\s*)?(?:가진|가지고\s*있던|보관(?:한|하던|\s*중이던)|준비한|소지(?:한|하던))\s*)(?:현찰|현금)(?:을|를|만)(?=\s|$)/u;
+const dutyPayee = /^(?:수사|조사)\s*(?:업무\s*)?담당\s*(?:직원|수사관|요원)(?:에게|한테)(?=\s|$)/u;
+const physicalHandoff = /^(?:직접|대면(?:으로|해서)?)(?=\s|$)/u;
+const issuedCashOrder = /^\s*(?:(?:요구|요청|지시)(?:를|을)?\s*(?:했|하였|한|받았)|(?:했|하였)(?:다|습니다|어요|고))/u;
+
+function hasInvestigationDutyHandoff(action) {
+  const order = directedHandover.exec(action);
+  if (!order || !issuedCashOrder.test(action.slice(order.index + order[0].length))) return false;
+  const argumentsNeeded = new Set([heldByAddressee, dutyPayee, physicalHandoff]);
+  let argumentsText = action.slice(0, order.index).trim();
+  while (argumentsText) {
+    const first = [...argumentsNeeded].find(pattern => pattern.test(argumentsText));
+    if (!first) return false;
+    argumentsText = argumentsText.replace(first, "").trimStart();
+    argumentsNeeded.delete(first);
+  }
+  return !argumentsNeeded.size &&
+    cashEventEvidence(action, { investigative: true, sourceInClause: true, structuredReceiver: true }) === "investigative_handover";
+}
+
 function* reportedCashTransfers(text) {
-  for (const { role, unit, action, source, speakerHere, next } of currentCashReports(text)) {
-    if (investigator.test(role) && requiresCashAtMeeting(action)) yield SIG_CASH_HANDOVER;
+  for (const { role, unit, action, source, speakerHere, next } of
+    currentCashReports(text, undefined, clause => statedInvestigationDuty.exec(clause))) {
+    if (investigator.test(role) && requiresCashAtMeeting(action) ||
+        speakerHere && statedInvestigationDuty.test(source) && hasInvestigationDutyHandoff(action)) yield SIG_CASH_HANDOVER;
     if ((financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "") &&
         requiresLoanPickup(action, source, speakerHere && !closedCashPickupPlan.test(next))) yield SIG_LOAN_CASH_PICKUP;
   }
