@@ -73,6 +73,9 @@ const REPORTED_SPEECH = /[?‘“"'「]|(?:그때|지난번|예전에)|(?:다는
 const DIRECT_RELATION = /^(?:[나저](?:는)?\s*)?(?:(?:큰|작은|맏|막내|첫째|둘째|친|외)\s*)?(?:아들|딸|손자|손녀|손주|동생|형|형님|누나|언니|오빠|아내|남편|배우자|조카|막내)(?:인데(?:요)?|이야|야|이에요|예요|입니다)(?=[\s,.!~ㅋㅎㅠㅜ]|$)/u;
 const SELF_RELATION = /^(?:(?:나|저)(?:는)?\s*)?(?:(?:큰|작은|막내)?(?:아들|딸)|손자|손녀|손주|동생)(?:인데|이야|야|이에요|예요|입니다)/;
 const FIRST_PERSON = /^(?:나야|저예요|저에요|나|저)(?=[\s.,!~]|$)/;
+// 카카오 확인(2026-11-28): “엄마 나 폰 액정 깨져서 임시폰이야”. 자기 폰이 임시폰·임시 번호라고 밝히는 진술.
+// 질문(“임시폰이야?”), 인용(“‘임시폰이야’라는 문자”)은 제외한다
+const TEMP_PHONE_SELF = /(?:^|[\s.,!~])(?:지금\s*|이거\s*|이\s*번호(?:는|가)?\s*)?임시\s*(?:폰|휴대폰|핸드폰|번호)(?:이?야|이?에요|이?예요|입니다|이?라서|이?라)(?![?？’'"”]|\s*(?:라는|란|라고))/;
 const REPLACED_DEVICE = /(?:휴대폰|핸드폰|폰)(?:을)?\s*바꿨어/;
 const OWN_OPENING = /^(?:(?:이거|이게|이건)\s*)?(?:나야|내다|나는|내가|제가|저는|저예요|저에요|접니다|나|저|내|제)(?=[\s,.!~ㅠㅜ]|$)/;
 const OTHER_SUBJECT = /(?:친구|동생|언니|형|기사님|아이|직원)(?:는|은|가|이)\s+/;
@@ -152,7 +155,11 @@ function addFamilySignals(input, signals) {
   }
   if (!/번호(?:는|가)?\s*(?:그대로|같아)/.test(opening) &&
       (NEW_CONTACT.test(statement) || USING_BORROWED.test(statement) || ACTIVATING_ELSEWHERE.test(statement) ||
-       SENDING_FROM_LOANED_PHONE.test(statement) || (ownDamage && USING_OTHERS_DEVICE.test(statement)) || CLOSED_NUMBER_ROUTE.test(opening) ||
+       SENDING_FROM_LOANED_PHONE.test(statement) || (ownDamage && USING_OTHERS_DEVICE.test(statement)) ||
+       TEMP_PHONE_SELF.test(statement) ||
+       // 주어를 생략한 “폰 떨어뜨려서 … 이거 임시 번호야”: 첫 두 마디가 인용·질문·다른 사람 이야기가 아닐 때만
+       (opening.match(/[^.!?\n]+[.!?]?/g) ?? []).slice(0, 2).some(clause =>
+         !REPORTED_SPEECH.test(clause) && !OTHER_SUBJECT.test(clause) && TEMP_PHONE_SELF.test(clause)) || CLOSED_NUMBER_ROUTE.test(opening) ||
        (REPLACED_DEVICE.test(statement) && SAVE_CONTACT.test(statement)))) {
     signals.add(SIG_FAMILY_IMPERSONATION);
     signals.add(SIG_NEW_NUMBER);
@@ -210,7 +217,7 @@ const PATTERNS = {
   ],
   [SIG_PERSONAL_INFO]: [
     new RegExp(
-      `(?:인증\\s*번호|비밀\\s*번호|비번|주민\\s*(?:등록\\s*)?번호|신분증|보안\\s*카드|OTP|카드\\s*번호|계좌\\s*번호)` +
+      `(?:인증\\s*번호|비밀\\s*번호|비번|주민\\s*(?:등록\\s*)?(?:번호|증)|운전\\s*면허증|신분증|보안\\s*카드|OTP|카드\\s*번호|계좌\\s*번호)` +
       `${gap(15)}(?:알려|보내|입력\\s*(?:해|하세요|부탁)|찍어|불러|말해)${NOT_PROHIBITION}`,
       "i",
     ),
