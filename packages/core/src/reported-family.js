@@ -51,7 +51,10 @@ const VOICE = /(?:통화|전화|음성|목소리)/u;
 const VERIFY = /(?:확인|본인|신원|진짜|목소리)/u;
 const voiceChallenge = /(?:(?:통화|전화)(?:로|해서)\s*(?:본인|신원)\s*확인|목소리(?:만|를)?\s*확인)(?:을|를)?\s*(?:제안|요청|하자|해\s*보자|하고\s*싶)/u;
 const writtenOnlyReply = /(?:상대(?:방)?|발신자|보낸\s*사람|그\s*사람)(?:는|은|이|가)\s*[^.!?]{0,56}(?:문자|채팅|메시지|글)(?:로|으로)만\s*(?:답|대화|얘기|이야기|연락)(?:을\s*)?하겠다/u;
-const temporaryVoiceLimit = /(?:운전|진료|회의|근무|수술|수업)\s*중|(?:청각|언어)\s*장애|목소리(?:가)?\s*나오지\s*않/u;
+const temporaryVoiceLimit = /(?:운전|진료|회의|근무|수술|수업)\s*중|(?:청각|언어)\s*장애|목소리(?:가)?\s*나오지\s*않|(?:보청기|인공와우)(?:가|는)?\s*(?:점검|고장|수리)/u;
+const laterVoiceOffer = /(?:나중에|이따가?|잠시\s*후|밖에서|퇴근\s*(?:뒤|후)|끝나(?:면|고))\s*(?:다시\s*)?(?:직접\s*)?(?:통화|전화)(?:를)?\s*(?:하겠|드리겠|하자)/u;
+const closedVoiceRecord = /(?:당시|그때)[^,，.!?\n]{0,48}(?:그|해당)\s*(?:연락|확인\s*절차|통화)(?:은|는|이|가)?\s*(?:이미\s*)?(?:끝났|종료됐|완료됐|마쳤)/u;
+const independentVoiceChallenge = /^(?!(?:그|해당|같은|내가|저는|제가|발신자가|상대가)\s)(?:[\p{L}\p{N}·-]{1,16}\s+)?(?:안내\s*데스크|안내\s*창구|접수\s*창구|고객\s*센터)(?:에서|가|는)\s/u;
 const VOICE_REFUSAL = /거절(?:해|하|했)|(?:회피|피하|피했|피해)|(?:응하지|답하지)\s*않|(?:확인|전화|통화|답변)(?:을|를)?\s*(?:하지|해\s*주지)\s*않|(?:문자|채팅|메시지)(?:로|만|로만)\s*(?:하자고\s*)?(?:고집|강요)|(?:통화|전화|음성)(?:로|으로)?\s*(?:(?:신원|본인)\s*)?확인(?:은|을|하는\s*(?:것|건|일))?\s*(?:안\s*(?:하겠|돼|된)|하지\s*않겠다)/u;
 const SECRET = /(?:비밀로\s*(?:해|하|남겨|두)|(?:알리지|말하지|얘기하지|전하지|공유하지)\s*(?:말|마)|(?:알리면|말하면|전하면)\s*안\s*된)(?:라는|다고|라고|달라|리라|\s*(?:요구|요청|부탁))|(?:알리|말하|전하|공유하)지\s*(?:않는|않을|말라는)\s*(?:것|걸)(?:을)?\s*(?:조건|전제)|숨기(?:라고|라는|래(?:요|서)|는\s*(?:(?:것|걸)(?:을)?\s*)?(?:조건|전제))/u;
 const PRESSURE = /재촉(?:해|하|했|하며|한다|도)|(?:반복|거듭)\s*(?:독촉|재촉)|기다(?:려|릴)\s*(?:주지\s*않|수\s*없)/u;
@@ -124,6 +127,16 @@ function hasVoiceRefusal(clause) {
     !RECIPIENT_REFUSAL.test(clause);
 }
 
+function hasWrittenOnlyResponse(context) {
+  return context.some((clause, index) => {
+    const reply = context[index + 1];
+    if (!reply || DENIAL.test(clause) || DENIAL.test(reply) || clause.endsWith("?") || reply.endsWith("?")) return false;
+    return voiceChallenge.test(clause) && !independentVoiceChallenge.test(clause) &&
+      writtenOnlyReply.test(reply) && !temporaryVoiceLimit.test(reply) &&
+      !laterVoiceOffer.test(reply) && !closedVoiceRecord.test(reply);
+  });
+}
+
 /** 같은 연락에 묶인 가족 발신 주장과 현재 요구를 기존 판정 규칙에 전달한다. */
 export function addReportedFamilySignals(text, signals) {
   if (typeof text !== "string" || SPURIOUS_REPORT.test(text)) return;
@@ -149,10 +162,7 @@ export function addReportedFamilySignals(text, signals) {
     const requested = new Set(REQUESTS.filter(([signal, pattern]) =>
       active.some(clause => hasCurrentRequest(clause, signal, pattern))).map(([signal]) => signal));
     if (active.some(clause => PAYMENT_DEADLINE.test(clause))) requested.add(SIG_MONEY);
-    const voice = active.some(hasVoiceRefusal) || active.some((clause, index) => {
-      const reply = active[index + 1];
-      return voiceChallenge.test(clause) && reply && writtenOnlyReply.test(reply) && !temporaryVoiceLimit.test(reply);
-    });
+    const voice = active.some(hasVoiceRefusal) || hasWrittenOnlyResponse(context);
     const secret = requested.has(SIG_MONEY) && active.some(clause => SECRET.test(clause));
     const pressured = requested.has(SIG_MONEY) && active.some(clause => PRESSURE.test(clause));
 
