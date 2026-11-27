@@ -10,3 +10,6 @@ Resource/
 # 개인정보가 든 문서 (커밋 금지)
 private/
 ~$*
+
+# 최종 측정용 평가 세트(개선 작업 중에는 커밋하지 않음, docs/codex-request-improve-loop.md)
+eval/holdout-private/
