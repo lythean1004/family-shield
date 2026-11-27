@@ -11,6 +11,26 @@ const install = "SIG_APP_INSTALL";
 const handover = "SIG_CASH_HANDOVER";
 const level = signals => decide({ signals_final: signals, signals_code: signals });
 
+describe("수사·감독 관계자를 자처한 사람이 수신자의 현금을 방문 인수하는 경우", () => {
+  for (const text of [
+    "수사 담당자라고 적힌 쪽지에 제 현금을 방문 직원에게 건네는 게 필수라고 써 있어요.",
+    "감독기관 소속이라고 소개한 발신자가 집에 온대요. 저한테서 현금을 받아 간다는 절차예요.",
+    "수사관이 보냈다는 답장에 현찰을 방문자에게 직접 인계하는 것이 제 역할이라고 적혀 있어요.",
+  ]) it(text, async () => {
+    const result = await analyze({ text, ai: null });
+    assert.ok(result.signals_code.includes(handover));
+    assert.ok(result.fired_rules.includes("R15"));
+  });
+  for (const text of [
+    "수사관이 보냈다는 안내였는데, 분실한 현금을 주인에게 돌려주는 절차였어요.",
+    "수사 담당자라고 적힌 쪽지를 설명한 예방 교육이에요. 현금을 방문 직원에게 건네는 게 필수라는 사례예요.",
+    "감독기관 소속이라며 방문했지만 제게서 현금을 받아 가는 일이 아니었어요.",
+    "수사관이 보낸 설문지를 받았어요. 따로 상점 직원이 물건값을 집에 받으러 왔어요.",
+    "수사관이 보냈다는 안내는 민원인이 창구에서 보관하던 현금을 돌려받는 절차예요.",
+    "여론 조사기관 소속이라고 소개한 방문자예요. 저한테서 현금을 받아 갈 절차라고 적은 연극 대본을 읽었어요.",
+  ]) it(text, async () => assert.ok(!(await analyze({ text, ai: null })).fired_rules.includes("R15")));
+});
+
 describe("D55 대출 상환금을 회사 직원이 방문해 현금으로 수거한다는 통지", () => {
   const pickup = "SIG_LOAN_CASH_PICKUP";
   for (const text of [

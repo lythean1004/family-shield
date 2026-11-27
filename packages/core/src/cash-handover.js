@@ -14,12 +14,32 @@ const collection = new RegExp(cash + person + "(?:이|가)\\s*(?:(?:댁|집|현�
   "(?:받으러|가지러|수거하러)\\s*(?:갑니다|갈\\s*겁니다|방문합니다)(?=[\\s.!?]|$)");
 const prevention = /[‘’“”"'「」]|(?:분실물|습득물|유실물|예방|예시|사칭\s*주의)|(?:라고|라는)\s*(?:말|문자|요구)/;
 
+const reportedOfficer = new RegExp("(?:" + role + "|(?:수사|감독|형사\\s*조사)\\s*(?:기관|담당자))(?:\\s*소속)?" +
+  "(?:(?:이|가)\\s*(?:썼|보냈|작성했)다는|이?라(?:고|는|며)\\s*(?:적힌|소개|밝힌|발신|쓴|한))");
+const visit = /방문|댁으로|집(?:에|으로)\s*온/;
+const giveToVisitor = /(?:현금|현찰)(?:을|은|만)?\s*(?:방문(?:한)?\s*(?:직원|담당자)|방문자|수사관|대리인)(?:에게|한테)\s*(?:직접\s*)?(?:건네|넘기|인계하|전달하)(?:는\s*(?:게|것|일)|야)[^.!?\n]{0,16}(?:필수|조건|제\s*(?:몫|역할)|한다고)/;
+const collectFromRecipient = /(?:제게서|저한테서|나에게서|내게서|저에게서)\s*(?:현금|현찰)(?:을|만)?\s*(?:직접\s*)?(?:받아|가져)\s*(?:갈\s*(?:절차|예정)|간다는\s*(?:절차|내용|예정))/;
+const noCollection = /(?:사례|교육|분실|습득|반환|돌려[받주]|거절했|철회했)|(?:연극|드라마|영화)\s*(?:대본|배역|장면)|(?:뜻|일|절차)(?:이|은|가)?\s*아니|(?:받|건네|넘기|수거하)지\s*(?:말|마|않)/;
+
+function reportsHandover(text) {
+  if (!reportedOfficer.test(text) || noCollection.test(text)) return false;
+  const sentences = text.split(/[.!?\n]+/u).map(sentence => sentence.trim()).filter(Boolean);
+  return sentences.some((sentence, i) => {
+    const sender = reportedOfficer.exec(sentence);
+    if (!sender || prevention.test(sentence)) return false;
+    const action = sentence.slice(sender.index + sender[0].length);
+    if (giveToVisitor.test(action)) return true;
+    return visit.test(action) && (collectFromRecipient.test(action) ||
+      collectFromRecipient.exec(sentences[i + 1] ?? "")?.index === 0);
+  });
+}
+
 // 금융위의 대면편취 유형. 실제 수령인·현금·인계 요구가 한 문장에 있어야 한다.
 // https://www.fsc.go.kr/po010106/78643
 export function hasInvestigativeCashHandover(text) {
-  if (!claim.test(text)) return false;
-  return text.split(/[.!?\n]/).some(clause =>
-    !prevention.test(clause) && (delivery.test(clause) || collection.test(clause)));
+  if (claim.test(text) && text.split(/[.!?\n]/).some(clause =>
+    !prevention.test(clause) && (delivery.test(clause) || collection.test(clause)))) return true;
+  return reportsHandover(text);
 }
 
 const repayment = /(?:대출(?:금)?|융자금)(?:의|을)?\s*상환/;
