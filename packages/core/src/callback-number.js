@@ -119,19 +119,29 @@ const requiredCancellationCall = /^\s*(?:으로|로|에)(?:만)?\s*(?:(?:직접|
 const revokedContactRequest = /(?:발신자|상대(?:방)?)(?:가|이|는)\s*(?:(?:그|해당|같은)\s*)?(?:(?:취소|회신)\s*)?(?:요구|요청|지시)(?:을|를)?\s*(?:이미\s*)?(?:철회|취소)/u;
 const unrelatedReceipt = /(?:별개|별건|별도(?:의)?\s*(?:문자|메시지|거래)|다른\s*(?:곳|사람|거래|문자|메시지)|승인\s*(?:대기|예정|취소)|취소(?:됐|되었)다)/u;
 
+const callThenCancel = /^\s*(?:으로|로|에)(?:만)?\s*(?:전화|연락)(?:를|을)?\s*(?:해서|하여|한\s*(?:뒤|다음))\s*(?:(?:거래|결제|승인)\s*)?취소(?:를)?\s*(?:접수|신청)(?:을|를)?\s*(?:하라(?:는|고)|하도록|해야\s*한다(?:는|고))/u;
+const deniesCallPurpose = /(?:하라는|하라고|하도록|해야\s*한다는)\s*(?:(?:뜻|말|의미|요구|지시|사실)(?:은|는|이|가)?\s*(?:아니|없)|한\s*적(?:은|이)?\s*없)/u;
+const markedAbroad = /(?:알림|안내|문자|통지|메시지)(?:이|가|은|는)\s*(?:국외|해외|국제)\s*발신(?:이었(?:고|으며|습니다|어요|다)|으로\s*표시(?:됐|되었)(?:고|으며|습니다|어요|다))/u;
+const completedCharge = /(?:결제|거래)(?:가|이)?\s*(?:이미\s*)?(?:(?:승인|완료)(?:됐|되었)|끝났)다는\s*(?:내용|통지|안내|내역)(?:이었|였)(?:습니다|어요|다|음)/u;
+
 function reportsDirectedCancellation(prefix, afterNumber) {
-  if (!requiredCancellationCall.test(afterNumber) || revokedContactRequest.test(afterNumber)) return false;
+  if (revokedContactRequest.test(afterNumber) || deniesCallPurpose.test(afterNumber)) return false;
+  const byPhone = callThenCancel.test(afterNumber);
+  if (!byPhone && !requiredCancellationCall.test(afterNumber)) return false;
   const route = prefix.at(-1) ?? "";
   const condition = disownedPayment.exec(route);
   if (!condition) return false;
   const contact = route.slice(condition.index + condition[0].length).replace(/^[\s,，]+/u, "");
   const sender = sourceAssignedContact.exec(contact);
-  if (!sender || !summaryCancelRole.test(contact.slice(sender[0].length))) return false;
+  const description = contact.slice(sender?.[0].length ?? 0).trim();
+  if (!(byPhone && !description) && !(sender && summaryCancelRole.test(description))) return false;
 
   // 번호 바로 앞의 조건과 취소 창구를 결속하고, 같은 연락의 발신 표시와 승인 사실을 대조한다.
   const context = [...prefix.slice(-3, -1), route.slice(0, condition.index)].join(" ");
-  const origin = receivedForeignMark.exec(context);
-  return origin !== null && !unrelatedReceipt.test(context) && reportedPayment.test(context.slice(origin.index + origin[0].length));
+  const origin = receivedForeignMark.exec(context) ?? markedAbroad.exec(context);
+  if (!origin || unrelatedReceipt.test(context)) return false;
+  const charge = context.slice(origin.index + origin[0].length);
+  return reportedPayment.test(charge) || completedCharge.test(charge);
 }
 
 const compactReceiptHeader = /^(?:수신\s*(?:경위|기록|내역|문자|알림)|받은\s*(?:문자|알림|안내|연락))(?:에서)?\s*(?:발췌|요약|메모|기록)(?:\s*[:：]\s*|$)/u;
