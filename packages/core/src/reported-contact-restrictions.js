@@ -199,11 +199,31 @@ function mustContinueWithoutSupport(clauses) {
   });
 }
 
+const asksToMoveForTwo = /^(?:(?:소개(?:로|\s*받아)\s*연결된|연락한|연락을\s*보낸)\s*(?:사람|상대(?:방)?)|(?:같은\s*)?(?:발신자|발신인|보낸\s*사람|상대(?:방)?))(?:가|이|은|는)\s*(?:(?:자기|자신)(?:와|과)\s*)?(?:단둘이|둘이서만|둘만)\s*(?:있는|앉는|남는|머무는|이야기하는)\s*(?:자리|공간|방|곳)(?:으로|로)\s*(?:옮기|이동하|가)라(?:고|는)\s*(?:했|말했|요청했|요구했|지시했)/u;
+const barsCompanionBeforeReply = /^(?:(?:같은|그)\s*(?:발신자|상대(?:방)?)(?:가|이|는|은)\s*)?(?:동행인|동행자|함께\s*온\s*사람)(?:과|와|하고)\s*(?:따로\s*)?떨어져\s*있어야(?:만)?\s*(?:그때야\s*|비로소\s*)?(?:다음|나머지|이어지는)\s*(?:이야기|말|설명|상담)(?:를|을)?\s*(?:해\s*준다|한다|진행한다)(?:고|는)\s*(?:했|해서|말했|설명했|요구했|밝혔)/u;
+const chosePrivateSession = /(?:제가|내가|수신자가)\s*(?:먼저|직접|자발적으로|스스로)\s*(?:(?:단독|비공개)\s*(?:상담|면담|시험)|(?:동행인|동행자)\s*없이\s*(?:상담|면담))(?:을|를)?\s*(?:요청|선택|신청|예약)/u;
+const senderWithdrewCompanionCondition = /^(?:(?:같은|그|해당)\s*)?(?:발신자|상대(?:방)?|보낸\s*사람)(?:가|이|는|은)\s*(?:(?:같은|그|해당)\s*)?(?:조건|요구|요청|지시)(?:을|를)\s*(?:이미\s*)?(?:철회|취소)(?:했|하였|함|한다)/u;
+
+function requiresSeparationBeforeReply(text) {
+  return text.split(/\r?\n[ \t]*\r?\n/u).some(record => {
+    const clauses = record.split(CLAUSE).map(clause => clause.trim()).filter(Boolean);
+    return clauses.some((clause, index) => {
+      const previous = clauses[index - 1] ?? "";
+      if (!asksToMoveForTwo.test(previous) || !barsCompanionBeforeReply.test(clause)) return false;
+      const following = clauses[index + 1] ?? "";
+      const context = [clauses[index - 2] ?? "", previous, clause, BREAK.test(following) ? "" : following].join(" ");
+      return !PAST_OR_REJECTED.test(previous + " " + clause) && !NARROW_CONTEXT.test(context) &&
+        !chosePrivateSession.test(context) && !allowedSupport.test(context) &&
+        !sameIsolationDemandEnded.test(following) && !senderWithdrewCompanionCondition.test(following);
+    });
+  });
+}
+
 /** 현재 받은 연락에서 대상과 명령, 말한 사람을 연결해 기존 R9 신호를 보강한다. */
 export function addReportedContactRestrictions(text, signals) {
   const clauses = text.split(CLAUSE).map(value => value.trim()).filter(Boolean);
   if (clauses.some(clause => TEACHING.test(clause))) return;
-  if (mustContinueWithoutSupport(clauses)) signals.add(SIG_ISOLATION);
+  if (mustContinueWithoutSupport(clauses) || requiresSeparationBeforeReply(text)) signals.add(SIG_ISOLATION);
   if (marketplaceResponderDemandsRemoval(text)) signals.add(SIG_DELETE_APP);
 
   for (const [index, clause] of clauses.entries()) {

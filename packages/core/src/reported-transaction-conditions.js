@@ -334,7 +334,7 @@ const advanceAmount = new RegExp("^(?:(?<before>먼저|미리|우선)\\s*)?" + M
   "한다(?:는|고)\\s*(?:(?:답변|답|회신|연락|안내|설명)(?:을|를|이|가)\\s*(?:받았|왔|있었)|(?:했|답했|설명했))", "u");
 const organizerPersonalDestination = /^(?:단체|기관|협회|회사|주최\s*측|운영\s*측)(?:의)?\s*(?:(?:명의|계좌|통장)(?:가|이)?\s*)?(?:아니라|대신|말고)\s*(?:(?:행사|모임|체험)\s*)?(?:진행자|담당자|운영자|주최자)(?:의)?\s*개인\s*(?:명의(?:의)?\s*)?(?:계좌|통장)(?:로|으로|에)\s*/u;
 const asksPaymentToDestination = /^(?:입금|송금|납부|이체)(?:을|를)?\s*(?:요구|요청|하라(?:고|는)|해야)/u;
-const withdrewReservationPayment = /^(?:발신자|상대(?:방)?|담당자|진행자)(?:가|이)\s*(?:(?:그|해당|같은)\s*)?(?:(?:참가비|납부|입금|송금)\s*)?(?:요구|요청|지시)(?:을|를)?\s*(?:취소|철회)/u;
+const withdrewReservationPayment = /^(?:(?:같은|그|해당)\s*)?(?:발신자|상대(?:방)?|담당자|진행자)(?:가|이)\s*(?:(?:그|해당|같은)\s*)?(?:(?:참가비|선입금|선납|납부|입금|송금)\s*)?(?:요구|요청|지시)(?:을|를)?\s*(?:취소|철회)(?:했|하였|함|한다)/u;
 const regularRemittance = /(?:회비\s*정산|각자\s*부담|실비\s*정산|반환하는\s*보증금|환불되는\s*예치금|유료로\s*전환하기로)/u;
 
 function requiresOrganizerPaymentForFreeBooking(text) {
@@ -359,13 +359,17 @@ function requiresOrganizerPaymentForFreeBooking(text) {
   return false;
 }
 
+const pendingBooking = /예약(?:을|이|를|가)?\s*(?:처리|확정|접수)(?:(?:하|되)?기)?/u;
+const bookingDemandSource = /(?:판매자|매도인|거래\s*상대|(?:연락|통화|채팅|대화)한\s*상대)(?:가|이|는|은)\s*$/u;
+const separateFee = /^(?:별도(?:로)?|추가(?:로)?|따로)\s*/u;
+const activeAdvanceDemand = /^(?:금)?(?:을|를|부터)?\s*(?:(?:먼저|미리|우선)\s*)?(?:요구|요청|지시)(?:했(?:다|다고|고|습니다|어요)|해(?:서|\s*왔)|하였(?:다|습니다|어요))/u;
 const pendingContract = /(?:거래|계약|구매)(?:가|이|를|을)?\s*(?:성립|성사|체결|확정)(?:(?:하|되)?기|\s*이루어지기)/u;
 const receivedDemand = /(?:요구|요청|지시)(?:를|을)\s*(?:받(?:았|은)|전달받(?:았|은)|접수했|접수한)/u;
 const confirmsDemand = /(?:요구|요청|지시)(?:가|이)\s*(?:있었(?:다|다고|음|습니다|어요)|들어\s*왔(?:다|다고|음|습니다|어요))/u;
 const transactionReport = /(?:거래|계약|구매|판매)[^,.!?\n]{0,26}(?:상담|신고|접수|보고|기록)/u;
 const reportedAdvanceFee = /^(?:선입금|선납|사전\s*(?:납부|지급|송금|입금|결제))\s*/u;
 const inspectedBeforeDemand = /(?:확인|열람|검토|살펴보)(?:를|을)?\s*(?:이미\s*)?(?:마쳤|끝냈|완료했)|(?:이미|사전에)\s*(?:확정|승인|계약)/u;
-const currentDemandWithdrawn = /^(?:(?:그|이|같은|해당)\s*)?(?:납부\s*|입금\s*|송금\s*)?(?:요구|요청|지시)(?:은|는|이|가|을|를)?\s*(?:(?:이미|뒤에|이후에?|나중에)\s*)?(?:없어졌|취소|철회)/u;
+const currentDemandWithdrawn = /^(?:(?:그|이|같은|해당)\s*)?(?:납부\s*|입금\s*|송금\s*)?(?:요구|요청|지시)(?:은|는|이|가|을|를)?\s*(?:(?:이미|뒤에|이후에?|나중에)\s*)?(?:없어졌|(?:취소|철회)(?:됐|되었|했|하였|함|한다))/u;
 
 function recordedAdvanceBeforeCommitment(text) {
   for (const block of text.split(/\r?\n[ \t]*\r?\n/u)) {
@@ -381,11 +385,20 @@ function recordedAdvanceBeforeCommitment(text) {
           withdrewReservationPayment.test(following) || currentDemandWithdrawn.test(following)) continue;
 
       // 확인할 대상과 선결 의무가 있는 절에서만 실제 요구를 읽는다.
-      const phase = transactionInspection.exec(clause) ?? pendingContract.exec(clause);
+      const booking = pendingBooking.exec(clause);
+      const phase = transactionInspection.exec(clause) ?? pendingContract.exec(clause) ?? booking;
       if (!phase) continue;
       const before = inspectionFirst.exec(clause.slice(phase.index + phase[0].length));
       if (!before) continue;
       const requirement = clause.slice(phase.index + phase[0].length + before[0].length);
+      if (phase === booking) {
+        if (establishedPrice.test(context) || regularRemittance.test(context)) continue;
+        const separate = separateFee.exec(requirement);
+        const fee = separate && reportedAdvanceFee.exec(requirement.slice(separate[0].length));
+        if (bookingDemandSource.test(clause.slice(0, phase.index)) && fee &&
+            activeAdvanceDemand.test(requirement.slice(separate[0].length + fee[0].length))) return true;
+        continue;
+      }
       if (!receivedDemand.test(requirement) && !(confirmsDemand.test(requirement) && transactionReport.test(context))) continue;
       if (sellerImposesPayment.test(requirement) || reportedAdvanceFee.test(requirement)) return true;
     }
