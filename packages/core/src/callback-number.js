@@ -110,6 +110,30 @@ const summaryCancelRole = /^(?:(?:결제|거래|승인)\s*)?취소(?:할|용|(?:
 const summaryNumberAssignment = /^(?:이|가|은|는)?\s*(?:(?:(?:그|같은|해당)\s*(?:문자|알림|통지|메시지)(?:의\s*본문)?|(?:같은|해당)\s*본문|본문)(?:에|에서))\s*(?:지정|기재|표시|명시)(?:됨|됐음|되었음|되었습니다|돼\s*있었음)$/u;
 const summaryStepClosed = /^(?:(?:그|이|해당|같은)\s*)?(?:취소|접수)\s*(?:요청|안내|절차|접수|지시)(?:을|를|은|는|이|가)?\s*(?:(?:발신자(?:가|는)|이미)\s*){0,2}(?:거절|철회|종료|완료|중단|취소)/u;
 
+const receivedForeignMark = /(?:국외|해외|국제)(?:에서)?\s*(?:발신|발송|전송)(?:으로|이?라고|(?:됐|되었)다고)\s*(?:표시된|적힌|기재된|표기된)\s*(?:알림|안내|글|문자|메시지|통지)(?:를|을|가|이)?\s*(?:받았|확인했|도착했|왔|수신했)/u;
+const reportedPayment = /(?:결제|거래)(?:가|이)?\s*(?:승인|완료)(?:됐|되었)(?:고|으며|다고\s*(?:(?:적혀|기재돼|표시돼)\s*있(?:었|음)|안내(?:됐|되었)))/u;
+const disownedPayment = new RegExp("(?:" + notMine + "|(?:(?:제|내|본인(?:의)?|수신자(?:의)?)\\s*|" +
+  "(?:제가|내가|본인이|수신자가)\\s*한\\s*)(?:결제|거래|승인)(?:가|이)?\\s*(?:아니라면|아니면|아닐\\s*(?:때|경우|시)|아닌\\s*경우))", "u");
+const sourceAssignedContact = /^(?:(?:(?:평소|기존)\s*)?(?:고객\s*센터|상담\s*창구|대표\s*번호)\s*(?:대신|말고)\s*)?(?:(?:상대(?:방)?|발신자|보낸\s*(?:사람|쪽))(?:가|이)\s*(?:따로\s*)?(?:적은|지정한|알려\s*준|정한)|(?:문자|메시지|본문|알림)(?:에|에서)\s*(?:적힌|실린|지정된|표시된))\s*/u;
+const requiredCancellationCall = /^\s*(?:으로|로|에)(?:만)?\s*(?:(?:직접|따로|다시)\s*)?(?:전화|연락|회신|통화)(?:를|을)?\s*(?:해야(?:만)?\s*한다(?:고|는)|하라(?:고|는)|하도록)\s*(?:(?:내용|설명|안내)(?:이었|였|이\s*있었|가\s*있었)|(?:했|말했|알렸))/u;
+const revokedContactRequest = /(?:발신자|상대(?:방)?)(?:가|이|는)\s*(?:(?:그|해당|같은)\s*)?(?:(?:취소|회신)\s*)?(?:요구|요청|지시)(?:을|를)?\s*(?:이미\s*)?(?:철회|취소)/u;
+const unrelatedReceipt = /(?:별개|별건|별도(?:의)?\s*(?:문자|메시지|거래)|다른\s*(?:곳|사람|거래|문자|메시지)|승인\s*(?:대기|예정|취소)|취소(?:됐|되었)다)/u;
+
+function reportsDirectedCancellation(prefix, afterNumber) {
+  if (!requiredCancellationCall.test(afterNumber) || revokedContactRequest.test(afterNumber)) return false;
+  const route = prefix.at(-1) ?? "";
+  const condition = disownedPayment.exec(route);
+  if (!condition) return false;
+  const contact = route.slice(condition.index + condition[0].length).replace(/^[\s,，]+/u, "");
+  const sender = sourceAssignedContact.exec(contact);
+  if (!sender || !summaryCancelRole.test(contact.slice(sender[0].length))) return false;
+
+  // 번호 바로 앞의 조건과 취소 창구를 결속하고, 같은 연락의 발신 표시와 승인 사실을 대조한다.
+  const context = [...prefix.slice(-3, -1), route.slice(0, condition.index)].join(" ");
+  const origin = receivedForeignMark.exec(context);
+  return origin !== null && !unrelatedReceipt.test(context) && reportedPayment.test(context.slice(origin.index + origin[0].length));
+}
+
 function hasForeignReceiptSummary(text, targets) {
   if (teaching.test(text) || memoExample.test(text)) return false;
   return targets.some(({ start, end, known, long }) => {
@@ -117,6 +141,10 @@ function hasForeignReceiptSummary(text, targets) {
     const before = text.slice(0, start).split(reportBlockBreak).at(-1);
     const after = text.slice(end).split(reportBlockBreak, 1)[0];
     const prefix = before.split(reportClauseBreak).map(clause => clause.trim()).filter(Boolean);
+    const [assignment, following = ""] = after.split(reportClauseBreak, 2);
+    const next = following.trimStart();
+    if (memoWithdrawn.test(next) || summaryStepClosed.test(next) || revokedContactRequest.test(next) || memoExample.test(next)) return false;
+    if (reportsDirectedCancellation(prefix, assignment)) return true;
     if (prefix.length < 3 || prefix.length > 4) return false;
 
     // 요약의 발신 표시, 승인 사실, 취소 연락처를 같은 수신 항목에서만 연결한다.
@@ -132,10 +160,7 @@ function hasForeignReceiptSummary(text, targets) {
 
     const condition = summaryNotMine.exec(route);
     if (!condition || !summaryCancelRole.test(route.slice(condition[0].length))) return false;
-    const [assignment, following = ""] = after.split(reportClauseBreak, 2);
-    const next = following.trimStart();
-    return summaryNumberAssignment.test(assignment.trimEnd()) &&
-      !memoWithdrawn.test(next) && !summaryStepClosed.test(next) && !memoExample.test(next);
+    return summaryNumberAssignment.test(assignment.trimEnd());
   });
 }
 
