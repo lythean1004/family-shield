@@ -72,10 +72,40 @@ const formEntryReport = /(?:발신처|상대|담당자|직원)(?:가|이)\s*(?:�
 const statedFormAddress = /(?:양식|서식|접수창|입력창|폼)\s*(?:의\s*)?(?:주소|링크)(?:는|가|이|[:：])?\s+(?<token>\S+)/u;
 const continuedFormAddress = /^(?:(?:그|해당|이|같은)\s*)?(?:확인\s*)?(?:양식|서식|접수창|입력창|폼)\s*(?:의\s*)?(?:주소|링크)/u;
 
+
+const oneTimeConfirmationValue = "(?:일회용\\s*(?:(?:본인\\s*확인|인증|확인)\\s*)?(?:값|코드|숫자|번호)|OTP)";
+const deliveredToRecipient = /(?<![\p{L}\p{N}])(?:내|제|수신자(?:의)?|저에게|저한테|제게|나에게|나한테)(?:\s*(?:휴대전화|휴대폰|핸드폰|전화기|기기|단말(?:기)?|화면|번호|연락처|수신함|알림(?:창)?|메일|채팅(?:방)?|계정|쪽|앞|문자|앱)(?:에|로|으로|에서)?|에게|한테)?\s*(?:온|오는|오면|도착한|도착하는|받은|받게\s*된|뜬|표시된|나타난|발급된|생긴)/u;
+const deliveredToPhone = /(?:휴대전화|휴대폰|핸드폰|전화기|전화|단말기?|기기|폰)(?:에|로|으로)\s*(?:온|오는|오면|도착한|뜬|표시된|발급된)\s*$/u;
+const anotherHolder = /(?:상대(?:방)?|발신자|직원|담당자|상담원|다른\s*사람|친구|동료|타인|그|제삼자|제3자)(?:의|가|이|는|은)?\s*(?:본인(?:의)?|자기(?:의)?|자신(?:의)?)?\s*$|(?:그의|타인의|남의|다른\s*사람의)\s*$/u;
+const assignedRecipient = "(?:(?:지정(?:된|한)|정한|지목한|별도(?:의)?|다른|전담|상담|접수|지원)\\s*)*(?:직원|접수원|상담원|담당자|관리자)";
+const handoverDuty = "\\s*(?:게|것(?:이|을)?|일(?:이|을)?)\\s*(?:(?:제|수신자의|다음|정해진)\\s*)?(?:몫|역할|조건|절차|순서|의무|요건)";
+const relayAct = "(?:전달|인계|전송)(?:하(?:라(?:고|는|며)?|도록|여야)|해야|해\\s*달라|하기로\\s*(?:했|돼|되어|정해졌))" +
+  "|(?:넘기|건네)(?:라(?:고|는|며)?|도록|어야)|(?:넘겨|건네|전해|알려|불러)\\s*(?:달라|주어야)" +
+  "|(?:(?:전달|인계|전송)하|넘기|건네|전하|알리|읽어\\s*주)는" + handoverDuty;
+const assignedValueRelay = new RegExp(oneTimeConfirmationValue + "(?:을|를|만)?\\s*" +
+  "[^.!?\\n]{0,26}" + assignedRecipient + "(?:에게|한테|쪽으로)\\s*(?:구두로\\s*)?(?:" + relayAct + ")", "iu");
+const assignedHandoverRole = new RegExp(oneTimeConfirmationValue + "(?:의|을|를)?\\s*(?:인계|전달|전송)\\s*(?:대상|수령인|받는\\s*사람)(?:은|는|이|가)\\s*" +
+  "(?:(?:그쪽|발신자|상대|담당자|상담원)(?:이|가)?\\s*(?:지정한|정한|지목한)\\s*)?" + assignedRecipient +
+  "(?:이?라고|이?라는|입니다|였다고|였다는)", "iu");
+const valueDescriptorOnly = /(?:유형|종류|형식|길이|자리\s*수|사용\s*여부|발급\s*여부|예시(?:값)?|접수\s*번호|예약\s*번호|택배\s*코드|운송장)/u;
+const otherRelayTopic = /(?:그와|이와)(?:는)?\s*별개|별도로|한편|다른\s*(?:문자|연락|답신|안내|업무)|(?:과거|지난번|이전에?|당시)\s*[^.!?\n]{0,12}(?:예|사례|문서|절차)/u;
+
+function requiresHandoffToAssignedStaff(clause) {
+  if (inactiveReport.test(clause) || localEntry.test(clause) || otherRelayTopic.test(clause)) return false;
+  const relay = assignedValueRelay.exec(clause) ?? assignedHandoverRole.exec(clause);
+  if (!relay || valueDescriptorOnly.test(relay[0])) return false;
+  const origin = clause.slice(Math.max(0, relay.index - 32), relay.index).trimEnd();
+  if (/(?:다른|별도의?)\s*(?:수신자|학생|사용자|사람)(?:의|에게|한테)/u.test(origin)) return false;
+  if (deliveredToRecipient.test(origin)) return true;
+  const phone = deliveredToPhone.exec(origin);
+  // 받은 연락 안의 휴대전화가 다른 사람의 것으로 표시된 경우에는 수신자의 값과 연결하지 않는다.
+  return Boolean(phone && !anotherHolder.test(origin.slice(0, phone.index).trimEnd()));
+}
+
 function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
   for (const { body, next } of currentReceivedRequests(text)) {
     if (localEntry.test(body)) continue;
-    if (senderRelay.test(body)) return true;
+    if (senderRelay.test(body) || requiresHandoffToAssignedStaff(body) || requiresHandoffToAssignedStaff(next)) return true;
     if (!hasUnverifiedLink) continue;
     const form = remoteEntry.exec(body);
     const afterForm = form && body.slice(form.index + form[0].length);

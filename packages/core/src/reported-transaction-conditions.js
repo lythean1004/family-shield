@@ -156,6 +156,22 @@ function workerPaysBeforeAssignment(clause, context) {
     fromAssigningParty.test(context) && /(?:문자|안내|연락|답장|답신|통보|메시지)/u.test(context) &&
       evidenceOfWorkerPayment.test(following);
 }
+
+const designatedPayee = /(?:요청|지정|통지|고지|안내|제시)(?:된|한|하는|받은)?\s*(?:실제\s*)?(?:입금|납부|지불|송금|이체)\s*(?:대상|수취인|받는\s*계좌|받을\s*계좌|처)|(?:입금|납부|지불|송금|이체)(?:하라고\s*지정한|하도록\s*지정한|하라고\s*한|해야\s*할)\s*(?:수취\s*)?(?:대상|계좌|통장|수취인|납부처|곳)|(?:입금|납부|송금|이체)\s*(?:대상|수취인|납부처|받을\s*계좌)(?:으로|로|에)\s*(?:지정(?:된|한)|기재(?:된|한)|요청(?:된|한))/u;
+const otherOwnedAccount = /(?:거래(?:와|과)?\s*)?(?:무관한|관련(?:이)?\s*없는|참여하지\s*않은)?\s*(?:제\s*[삼3]자|다른\s*사람|타인)(?:의)?\s*(?:(?:개인\s*)?(?:명의|이름)(?:의|인|의\s*)?(?:\s*(?:계좌|통장))?|(?:개인\s*)?(?:계좌|통장))|(?:제\s*[삼3]자|다른\s*사람|타인)(?:이|가|이며|이고)\s*(?:그|해당|그\s*사람)(?:의)?\s*(?:개인\s*)?명의(?:의)?\s*(?:계좌|통장)/u;
+const excludesContractParty = /(?:판매자|공급자|계약(?:의)?\s*(?:상대|당사자|업체)|거래(?:의)?\s*(?:상대|당사자|업체)|업체|회사)(?:는|가|이|의|와|과)?\s*(?:(?:등록된|실제|기존의?)\s*)?(?:아닌|아니라|아니고|대신|무관|관련(?:이)?\s*없|관계(?:가)?\s*없|관계(?:가)?\s*없(?:는|어))|(?:계약|거래)(?:에|와|과)?\s*(?:참여하지\s*않은|무관한|관계(?:가)?\s*없는|관련(?:이)?\s*없는)/u;
+const examplePayee = /(?:이름|명의|번호|유형|형식|표기)\s*(?:만|의\s*예)|(?:계좌|통장|수취인)(?:의)?\s*(?:예시|견본|시험\s*값|자료용)|(?:받을|받는|수령할)\s*(?:환급|환불|반환|돌려받을)/u;
+
+function namedPaymentToOutsider(clause, context) {
+  if (NO_PAYMENT.test(context) || CLOSED_REQUEST.test(context) || REVERSE_OR_AUTHORIZED.test(context) ||
+      examplePayee.test(clause)) return false;
+  const target = designatedPayee.exec(clause);
+  if (!target) return false;
+  // 돈을 받을 사람이나 계좌를 지정한 같은 절에서만 계약 상대와 실제 명의를 비교한다.
+  const recipient = clause.slice(target.index + target[0].length);
+  return otherOwnedAccount.test(recipient) && excludesContractParty.test(recipient);
+}
+
 export function addReportedTransactionConditions(text, signals) {
   const clauses = text.split(SENTENCES).map(value => value.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
@@ -169,7 +185,7 @@ export function addReportedTransactionConditions(text, signals) {
         workerPaysBeforeAssignment(clause, context)) {
       signals.add(SIG_PREPAYMENT);
     }
-    if (routedToOtherParty(clause) || mismatchInContinuation(prior, clause, context) || explicitlyReassignedAccount(clause, next, context) || currentlyReported(context) && !NO_PAYMENT.test(context) && !REVERSE_OR_AUTHORIZED.test(context) &&
+    if (routedToOtherParty(clause) || namedPaymentToOutsider(clause, context) || mismatchInContinuation(prior, clause, context) || explicitlyReassignedAccount(clause, next, context) || currentlyReported(context) && !NO_PAYMENT.test(context) && !REVERSE_OR_AUTHORIZED.test(context) &&
         ORIGINAL_RECIPIENT.test(prior) && MISMATCH.test(prior) && INDIVIDUAL_DESTINATION.test(clause)) {
       signals.add(SIG_THIRD_PARTY_ACCOUNT);
     }
