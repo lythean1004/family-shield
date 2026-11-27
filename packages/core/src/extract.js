@@ -20,7 +20,7 @@ import {
   SIG_LINK, SIG_SHORT_URL, SIG_LOOKALIKE_DOMAIN, SIG_APP_INSTALL, SIG_MONEY,
   SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
   SIG_FAMILY_IMPERSONATION, SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT, SIG_OFFICIAL_LINK,
-  SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL, SIG_CASH_HANDOVER,
+  SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL, SIG_CASH_HANDOVER, SIG_PREPAYMENT,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
 import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
@@ -29,7 +29,7 @@ import { hasCardServiceRequest } from "./card-sender.js";
 import { classifyCallback } from "./callback-number.js";
 import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover } from "./cash-handover.js";
-import { requestedPayments } from "./payment-request.js";
+import { requestedPayments, requiresAdvancePayment } from "./payment-request.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
 /** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
@@ -234,6 +234,7 @@ export function extractCodeSignals(text, options = {}) {
 
   const callback = classifyCallback(input, PATTERNS[SIG_CALL_THIS_NUMBER]);
   const payments = requestedPayments(input);
+  if (requiresAdvancePayment(input)) signals.add(SIG_PREPAYMENT);
   if (payments.money) signals.add(SIG_MONEY);
   if (payments.gift) signals.add(SIG_GIFTCARD);
   if (hasInvestigativeCashHandover(input)) signals.add(SIG_CASH_HANDOVER);

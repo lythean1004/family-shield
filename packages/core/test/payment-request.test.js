@@ -1,9 +1,24 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { extractCodeSignals } from "../src/extract.js";
-import { SIG_MONEY, SIG_GIFTCARD } from "../src/signals.js";
+import { SIG_MONEY, SIG_GIFTCARD, SIG_PREPAYMENT } from "../src/signals.js";
 
 const has = (text, id) => extractCodeSignals(text).signals.includes(id);
+describe("금융 혜택의 선입금 조건", () => {
+  for (const text of [
+    "모의 분류표 / 대출 심사 / 수수료 선입금 후 승인",
+    "모의 분류표 / 환급 서류 / 보증료 먼저 납부해야 환급 가능",
+    "모의 분류표 / 입금하면 확정 수익을 보장합니다.",
+  ]) it(text, () => assert.ok(has(text, SIG_PREPAYMENT)));
+  for (const text of [
+    "숙소 예약표 / 예약금 선입금 후 객실 배정",
+    "대출 심사 수수료는 선입금할 필요가 없습니다.",
+    "피해 예방 안내. 대출 수수료 선입금 후 승인이라는 말은 사기입니다.",
+    "투자설명서. 계좌에 입금하셔도 수익을 보장하지 않습니다.",
+    "보증료 정산이 끝나 계좌에 대출금이 입금되었습니다.",
+  ]) it(text, () => assert.ok(!has(text, SIG_PREPAYMENT)));
+});
+
 describe("송금의 목적지·금액과 실제 요청", () => {
   for (const text of [
     "견본 항목 / 연습 계좌로 좀 보내 줘.",

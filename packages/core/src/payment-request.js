@@ -10,6 +10,24 @@ const voucher = /(?:상품권|기프트\s*카드|기프티콘|플레이\s*카드
 const buyCount = new RegExp("(?:[1-9]\\d?|한|두|세|네|몇)\\s*장(?:만|을)?\\s*(?:사(?:다)?\\s*" + polite +
   "|구매\\s*(?:부탁|요청)|사서\\s*.{0,28}?(?:사진|번호|코드).{0,12}?(?:보내|알려)\\s*" + polite + ")" + end);
 const reported = /[‘’“”"'「」]|(?:다는|라는)\s*(?:요구|문자|말)|(?:예방|피싱)\s*(?:교육|안내)|부탁(?:해)?\s*(?:주)?지\s*(?:마|말|않)/;
+const lending = /(?:대출|융자|환급)/;
+const release = /(?:선입금|선납|먼저\s*(?:납부|입금|송금))\s*(?:을|를)?\s*(?:후|한\s*뒤|해야|하셔야|하시면)\s*(?:즉시\s*)?(?:지급|승인|대출|환급)/;
+const guaranteedReturn = /(?:입금|송금|예치)(?:하시?면|하면|해야)\s*(?:(?:고정|확정|약정)\s*)?수익(?:을)?\s*보장(?:합니다|됩니다|해\s*드(?:립니다|려요))/;
+
+// 금융위·금감원 피해예방 10계명의 대출 전 보증금 요구 유형. https://www.fsc.go.kr/no010101/86250
+export function requiresAdvancePayment(text) {
+  for (const match of text.matchAll(/[^.!?\n]+/g)) {
+    const clause = match[0];
+    if (reported.test(clause) || /사기(?:입니다|예방)|(?:라는|이라는)\s*(?:말|문구)|(?:피해|예방)\s*사례/.test(clause)) continue;
+    if (guaranteedReturn.test(clause)) return true;
+    if (release.test(clause)) {
+      // 알림 제목과 조건표는 줄이 달라도 한 문서다. 지난 문장의 조건은 이어받지 않는다.
+      const notice = text.slice(Math.max(0, match.index - 160), match.index + clause.length).split(/[.!?]/).at(-1);
+      if (lending.test(notice)) return true;
+    }
+  }
+  return false;
+}
 
 export function requestedPayments(text) {
   let money = false;
