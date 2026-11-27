@@ -422,9 +422,39 @@ const repeatsPreviousDemand = /(?:이|그|같은|해당)\s*(?:요구|요청|부�
 const reportsSpeaker = /(?:말|덧붙|재촉|요구|요청|반복)(?:했|였|하|해)|(?:라고|라는\s*말도)\s*했/u;
 const historicHeading = /^(?:지난(?:번|주|달|해)|예전|이전|과거)(?:에|의|에는)?\s/u;
 
+// A relative clause can bind an in-law claim to the person who contacted us
+// via the reported account. A recipient label or a bystander's name cannot.
+const relationshipInReceipt = "(?:" + relation + "|사위|며느리)";
+const changedAccountFamilySource = new RegExp(
+  "^(?:이전과\\s*다른|처음\\s*보는|낯선|새(?:로운)?|새로\\s*쓰는)\\s*(?:[가-힣]+\\s*)?(?:대화\\s*|연락\\s*|채팅\\s*|메신저\\s*)?계정(?:으로|에서)\\s*" +
+  "(?:(?:제|내|우리)\\s*)?" + relationshipInReceipt +
+  "이?라(?:는|고\\s*(?:소개한|말한))\\s*(?:사람|상대(?:방)?|발신자)(?:이|가|은|는)\\s*" +
+  "(?:말(?:을)?\\s*걸(?:었|어왔)|연락(?:해\\s*왔|했)|(?:문자|메시지|쪽지)(?:를)?\\s*보냈)", "u",
+);
+const unchangedAccount = /(?:계정|아이디|대화방)(?:이|가|은|는)?\s*(?:그대로|같|바뀌지\s*않|변경되지\s*않)/u;
+const deviceChangeByAnother = /(?:^|[,，;\s])(?:제가|내가|수신자(?:가|는)|받은\s*사람(?:은|이)|보호자(?:가|는)|(?:옆|다른)\s*사람(?:이|은))\s*[^,，.!?\n]{0,24}(?:휴대전화|휴대폰|핸드폰|전화기|폰|기기)(?:를|가|는|은)?\s*(?:교체|변경|바꾸|바꿨|바뀌)/u;
+const recipientDocumentOwner = /(?:^|[\s,，])(?:제|내|수신자의|받은\s*사람의)\s*$/u;
+
+function sameAccountDisclosure(parts, signals) {
+  if (parts.some(part => unchangedAccount.test(part) || deviceChangeByAnother.test(part))) return;
+  const transfersOwnRecord = parts.some(part => {
+    if (askerIsReporter.test(part) || recipientAsks.test(part) || actionNegation.test(part) || documentForOwnUse.test(part)) return false;
+    const disclosure = tablePersonalRequest.exec(part);
+    return Boolean(disclosure && recipientDocumentOwner.test(part.slice(0, disclosure.index)) &&
+      !privateDocumentStatus.test(disclosure.groups.modifiers));
+  });
+  if (!transfersOwnRecord) return;
+
+  signals.add(SIG_FAMILY_IMPERSONATION);
+  signals.add(SIG_NEW_NUMBER);
+  signals.add(SIG_PERSONAL_INFO);
+}
+
 function attributedSpeaker(clause) {
   const actor = senderThenRole.exec(clause) ?? roleThenSender.exec(clause);
   if (actor && !conditionalOrQuotedRole.test(clause.slice(actor[0].length))) return { head: actor[0] };
+  const account = changedAccountFamilySource.exec(clause);
+  if (account) return { head: account[0], accountReceipt: true };
   const receipt = issuedFamilyName.exec(clause);
   if (!receipt) return null;
   return {
@@ -440,6 +470,10 @@ function mentionsChangedContact(clause) {
 }
 
 function addAttributedFamilySignals(parts, signals, actor) {
+  if (actor.accountReceipt) {
+    sameAccountDisclosure(parts, signals);
+    return;
+  }
   const [opening, next] = parts;
   // 명의는 발신 출처만 가리킨다. 같은 연락에 실제 적혔다고 보고한 목적물과 재촉만 잇는다.
   const contents = actor.namedReceipt
