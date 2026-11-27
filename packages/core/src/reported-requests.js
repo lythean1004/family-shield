@@ -16,6 +16,13 @@ const advance = /(?:보증금|수수료|선납금|예치금|비용)(?:(?:을|를
 const completedAdvance = /^\s*(?:했던|하였던|됐던|되었던|하던|(?:조건|요건|전제)(?:이었던|이던|였던))[^,，.!?\n]{0,48}(?:완료(?:했|됐|되었)|끝냈|끝났|마쳤|처리했)(?:습니다|어요|다|고|으며|는데|지만|$)/u;
 const unrelatedHolder = /(?:제\s*(?:3|삼)자|(?:과|와|하고)(?:는)?\s*(?:아무\s*)?(?:무관한|관계\s*없는)|아무\s*관계\s*없는)[^.!?\n]{0,20}(?:계좌|통장)(?:로|으로|에)/;
 const instructionToPay = /(?:보내|내|입금하|송금하|이체하|납부하)(?:라(?:고|는)|달라(?:고|는)|야(?:만|\s*한)|는\s*(?:게|것이)\s*조건)/;
+const charge = "(?:수강료|참가비|신청비|접수비|보증금|수수료|(?:처리\\s*)?비용|예치금)";
+const payFirst = new RegExp(charge + "(?:(?:을|를)?\\s*(?:먼저|미리)|부터)\\s*(?:선입금|입금|납부|지불)?(?:해야|내야|하래|하라|해\\s*달라)");
+const availabilityBefore = /(?:자리|매물|물건|좌석|예약|양도)(?:가\s*있는지|(?:의|\s*가능)?\s*(?:여부|유무))?(?:을|를)?\s*(?:보려면|알려면|확인하려면)\s*$/;
+const availabilityAfter = /^\s*(?:만\s*)?(?:자리|좌석|대여|예약|양도|신청|거래)(?:가\s*되는지|\s*(?:가능\s*)?(?:여부|유무))(?:를)?\s*(?:알려|확인)/;
+const institutionPayee = /(?:업체|회사|가게|매장|사업자|법인)(?:의)?\s*(?:계좌|통장|이름|명의|장부)(?:가\s*아니라|\s*대신)\s*/g;
+const alternateAccount = /^(?!(?:제|내|저의|나의)\s)(?:[가-힣]{1,8}(?:의)?\s+)?개인\s*(?:명의\s*)?(?:통장|계좌)(?:로|으로|에)\s*(?:(?:대금|[가-힣]{1,6}비)(?:을|를)?\s*)?(?:보내|넣으|부치|입금하|송금하|이체하)(?:라|래)/;
+const illustrativeTransaction = /(?:가상|가정한|예시)\s*(?:거래|상황|사례)|(?:제가|내가)\s*[^.!?\n]{0,16}(?:에게|한테)\s*(?:요청|안내)/;
 
 const socialSupport = /(?:가족|친구|이웃|지인|주위|주변|다른\s*사람|평소\s*(?:연락|상의|상담)하던\s*(?:사람|이들)|누구(?:와|하고|에게)도)/;
 const avoidSupport = /(?:연락|이야기|대화|의논|상의)(?:까지|을|를|도)?\s*끊(?:어야|는\s*(?:게|것|일))|(?:연락|의논|상의)(?:하거나\s*(?:의논|상의))?하지\s*않(?:는\s*데|기로)/;
@@ -28,7 +35,13 @@ const installMessage = /(?:앱|어플|프로그램)(?:을|를)?\s*설치하라�
 const notReceived = /받은\s*(?:적|기억)(?:이|은)?\s*없|(?:이미|바로)\s*거절|거절했|보낸\s*적(?:이)?\s*없/;
 
 function hasCurrentAdvance(topic) {
-  if (!proceeds.test(topic) || negatedFee.test(topic)) return false;
+  if (negatedFee.test(topic) || noObligation.test(topic)) return false;
+  const fee = payFirst.exec(topic);
+  if (fee && !completedAdvance.test(topic.slice(fee.index + fee[0].length)) && !/(?:취소|철회|거절)/.test(topic.slice(fee.index))) {
+    const prefix = topic.slice(0, fee.index);
+    if (proceeds.test(prefix) || availabilityBefore.test(prefix) || availabilityAfter.test(topic.slice(fee.index + fee[0].length))) return true;
+  }
+  if (!proceeds.test(topic)) return false;
   for (const match of topic.matchAll(advance)) {
     if (!completedAdvance.test(topic.slice(match.index + match[0].length))) return true;
   }
@@ -46,6 +59,10 @@ function addConditions(passage, signals) {
 
     const holder = unrelatedHolder.exec(clause);
     if (holder && instructionToPay.test(clause.slice(holder.index + holder[0].length, holder.index + holder[0].length + 32))) {
+      signals.add(SIG_THIRD_PARTY_ACCOUNT);
+    }
+    if (topics.some(topic => !illustrativeTransaction.test(topic) && !/(?:거절했|취소했|철회했)/.test(topic) &&
+        [...topic.matchAll(institutionPayee)].some(payee => alternateAccount.test(topic.slice(payee.index + payee[0].length))))) {
       signals.add(SIG_THIRD_PARTY_ACCOUNT);
     }
 
