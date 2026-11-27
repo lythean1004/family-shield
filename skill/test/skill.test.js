@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { handleRequest, handleResultLookup, handleAnalyze, makeHandler } from "../src/handler.js";
-import { createMemoryResultStore } from "../../packages/core/src/result-token.js";
+import { createMemoryResultStore, RESULT_TOKEN_TTL_MS } from "../../packages/core/src/result-token.js";
 import { readRequest, simpleText, quickReply, anonymousCode } from "../src/kakao.js";
 import { loadConfig, tokenMatches } from "../src/config.js";
 import { CHECK_LEVEL_TEXT, OFFICIAL_LINK_TEXT } from "../../packages/core/src/fixed-text.js";
@@ -114,6 +114,14 @@ function fakeGateway(signals, impersonation_type = "none", explanation = undefin
 
 const cfg = { ai: { model: "fake", apiKey: "k", timeoutMs: 1000, promptVersion: "v1", fetchImpl: fakeGateway([]) }, hmacKey: null, cards: [], webBaseUrl: null };
 
+function textCardButtons(body) {
+  return body.template.outputs.find((output) => output.textCard)?.textCard.buttons ?? [];
+}
+
+function detailUrl(body) {
+  return textCardButtons(body).find((button) => button.label === "자세히 보기")?.webLinkUrl;
+}
+
 it("AI 설명이 모두 걸러지면 판정 신호를 살리고 정해진 이유 문구를 보낸다", async () => {
   const fetchImpl = fakeGateway(["SIG_PERSONAL_INFO"], "none", ["이상 없어요."]);
   const r = await handleRequest({ utterance: "교육용 사례를 살펴봅니다." }, { ...cfg, ai: { ...cfg.ai, fetchImpl } });
@@ -203,15 +211,21 @@ describe("핸들러 - 기본", () => {
     assert.ok(!text.includes("특이 내용을 찾지 못했어요."), "AI 설명은 쓰지 않는다");
   });
 
-  it("Google 목록으로 위험이면 단정하지 않는 이유 문구, 'Advisory provided by Google', Google 안내 버튼", async () => {
+  it("Google 목록으로 위험이면 경고 이미지, 안내 글, 링크 카드가 순서대로 나온다", async () => {
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK"]) },
-      urlReputation: async () => ({ ok: true, malicious: ["evil.invalid"], sources: { safe_browsing: ["evil.invalid"] } }) };
-    const r = await handleRequest({ utterance: "택배 확인 http://evil.invalid/a" }, c);
-    const text = r.body.template.outputs[0].simpleText.text;
+      webBaseUrl: "https://fs.example", resultStore: createMemoryResultStore(),
+      urlReputation: async () => ({ ok: true, malicious: ["schedule.example.invalid"], sources: { safe_browsing: ["schedule.example.invalid"] } }) };
+    const r = await handleRequest({ utterance: "도서관 모임 일정표 https://schedule.example.invalid/calendar" }, c);
+    const { outputs, quickReplies } = r.body.template;
+    assert.deepEqual(outputs.map(Object.keys), [["simpleImage"], ["simpleText"], ["textCard"]]);
+    assert.ok(outputs[2].textCard.title);
+    const text = outputs[1].simpleText.text;
     assert.ok(text.includes("위험 이유: Google이 위험할 수 있다고 표시한 링크"), text);
     assert.ok(text.includes("Advisory provided by Google"));
-    const qr = r.body.template.quickReplies ?? [];
-    assert.ok(qr.some((q) => q.action === "webLink" && q.webLinkUrl === "https://developers.google.com/safe-browsing/v4/advisory"));
+    assert.deepEqual(quickReplies, [quickReply.message("이미 당했어요", "이미 당했어요"), quickReply.message("처음으로", "처음으로")]);
+    const buttons = textCardButtons(r.body);
+    assert.deepEqual(buttons.map(({ action, label }) => [action, label]), [["webLink", "자세히 보기"], ["webLink", "Google 안내"]]);
+    assert.equal(buttons[1].webLinkUrl, "https://developers.google.com/safe-browsing/v4/advisory");
   });
 
   it("KISA 목록으로만 위험이면 Google 표시를 붙이지 않는다", async () => {
@@ -292,16 +306,15 @@ describe("핸들러 - R1과 한계 문구", () => {
 describe("자세히 보기 1회용 토큰 (D34, PRD 13-4)", () => {
   const dangerAi = { ...cfg.ai, fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") };
 
-  function detailUrl(body) {
-    return body.template.quickReplies.find((q) => q.label === "자세히 보기")?.webLinkUrl;
-  }
-
-  it("WEB_BASE_URL과 저장소가 있으면 버튼 주소가 /check/result?t=토큰", async () => {
+  it("일상 안내는 글과 1회용 결과 링크 카드를 보내고 처음으로만 바로연결에 둔다", async () => {
     const store = createMemoryResultStore();
     const r = await handleRequest(
-      { utterance: "[검찰청] 링크: http://x.invalid/a" },
-      { ...cfg, ai: dangerAi, webBaseUrl: "https://fs.example", resultStore: store },
+      { utterance: "도서관 독서 모임은 오후에 만납니다." },
+      { ...cfg, webBaseUrl: "https://fs.example", resultStore: store },
     );
+    assert.deepEqual(r.body.template.outputs.map(Object.keys), [["simpleText"], ["textCard"]]);
+    assert.deepEqual(r.body.template.quickReplies, [quickReply.message("처음으로", "처음으로")]);
+    assert.equal(textCardButtons(r.body)[0].action, "webLink");
     assert.match(detailUrl(r.body), /^https:\/\/fs\.example\/check\/result\?t=[A-Za-z0-9_-]{22}$/);
     assert.equal(store.size(), 1);
   });
@@ -332,6 +345,31 @@ describe("자세히 보기 1회용 토큰 (D34, PRD 13-4)", () => {
     assert.equal(handleResultLookup("x".repeat(22), null).status, 410);
     assert.equal(handleResultLookup("x".repeat(22), createMemoryResultStore()).body.reason, "missing");
   });
+
+  it("카드에서 꺼낸 결과 토큰도 수명이 지나면 410", async () => {
+    let now = 0;
+    const store = createMemoryResultStore({ clock: () => now });
+    const r = await handleRequest({ utterance: "도서관 책 반납일을 확인했습니다." },
+      { ...cfg, webBaseUrl: "https://fs.example", resultStore: store });
+    const token = new URL(detailUrl(r.body)).searchParams.get("t");
+    now += RESULT_TOKEN_TTL_MS;
+    assert.deepEqual(handleResultLookup(token, store), { status: 410, body: { ok: false, reason: "expired" } });
+  });
+
+  it("결과 저장 실패 시 글 판정과 Google 링크만 남는다", async () => {
+    const r = await handleRequest({ utterance: "도서관 모임 일정표 https://schedule.example.invalid/calendar" }, {
+      ...cfg, webBaseUrl: "https://fs.example",
+      resultStore: { put: async () => { throw new Error("store unavailable"); } },
+      urlReputation: async () => ({ ok: true, malicious: ["schedule.example.invalid"], sources: { safe_browsing: ["schedule.example.invalid"] } }),
+    });
+    assert.equal(r.status, 200);
+    assert.ok(r.body.template.outputs[0].simpleImage);
+    assert.match(r.body.template.outputs[1].simpleText.text, /Advisory provided by Google/);
+    assert.deepEqual(textCardButtons(r.body), [{
+      action: "webLink", label: "Google 안내", webLinkUrl: "https://developers.google.com/safe-browsing/v4/advisory",
+    }]);
+    assert.equal(detailUrl(r.body), undefined);
+  });
 });
 
 describe("HTTP 서버 - 결과 조회 경로", () => {
@@ -341,7 +379,7 @@ describe("HTTP 서버 - 결과 조회 경로", () => {
       ai: { model: "fake", apiKey: "k", timeoutMs: 1000, promptVersion: "v1",
             fetchImpl: fakeGateway(["SIG_AGENCY_IMPERSONATION", "SIG_LINK"], "agency") },
     };
-    const server = createServer(makeHandler({...config,resultStore:createMemoryResultStore()}));
+    const server = createServer(makeHandler({ ...config, phishingList: null, domainAge: null, resultStore: createMemoryResultStore() }));
     await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
     const base = `http://127.0.0.1:${server.address().port}`;
     const logs = [];
@@ -353,7 +391,7 @@ describe("HTTP 서버 - 결과 조회 경로", () => {
         headers: { "content-type": "application/json", "x-skill-token": "h" },
         body: JSON.stringify({ userRequest: { utterance: "[검찰청] 링크: http://x.invalid/a" } }),
       }).then((r) => r.json());
-      const url = skill.template.quickReplies.find((q) => q.label === "자세히 보기").webLinkUrl;
+      const url = detailUrl(skill);
       const token = new URL(url).searchParams.get("t");
 
       const a = await fetch(`${base}/api/result?t=${token}`);

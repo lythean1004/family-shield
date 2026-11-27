@@ -4,7 +4,7 @@
  * 요청: { userRequest: { utterance, user: { properties: { botUserKey } } } }
  * 응답: { version: "2.0", template: { outputs: [{ simpleText: { text } }], quickReplies: [...] } }
  *
- * 규칙: 말풍선 최대 3개, 글 1,000자, 버튼 최대 3개. 넘으면 잘라서 보낸다.
+ * 규칙: 말풍선 최대 3개, 글 1,000자, 바로연결 최대 3개. URL은 카드 버튼으로 보낸다.
  */
 
 import { isAffirmativeParentAnswer } from "../../packages/core/src/rule-engine.js";
@@ -49,20 +49,27 @@ export function simpleText(text, quickReplies = []) {
   return { version: "2.0", template };
 }
 
+/** 링크는 선택할 수 있는 텍스트 카드의 버튼으로 보낸다(D25). */
+export function withLinkCard(body, links) {
+  if (!links.length) return body;
+  const buttons = links.map(({ label, url }) => ({ action: "webLink", label, webLinkUrl: url }));
+  const card = { textCard: { title: "웹에서 보기", buttons } };
+  const outputs = [...body.template.outputs, card].slice(0, MAX_OUTPUTS);
+  return { ...body, template: { ...body.template, outputs } };
+}
+
 /**
  * 말풍선 맨 앞에 이미지 하나를 넣는다(멘토링 2026-11-26: 주의·위험은 이미지로 확실하게 경고).
  * 이미지는 우리 웹 서버의 고정 파일만 쓴다. altText는 화면 읽기·이미지 안 뜰 때 대신 보인다.
  */
 export function withImage(body, imageUrl, altText) {
-  const template = { ...body.template, outputs: [{ simpleImage: { imageUrl, altText } }, ...body.template.outputs] };
-  return { ...body, template };
+  const outputs = [{ simpleImage: { imageUrl, altText } }, ...body.template.outputs].slice(0, MAX_OUTPUTS);
+  return { ...body, template: { ...body.template, outputs } };
 }
 
-/** 버튼 만들기 도우미 (D25: 우리가 먼저 링크를 보내지 않는다 → webLink는 사용자가 누를 때만) */
+/** 버튼에 적힌 문장을 사용자 발화로 보낸다. */
 export const quickReply = {
   message: (label, messageText) => ({ label, action: "message", messageText }),
-  phone: (label, phoneNumber) => ({ label, action: "phone", phoneNumber }),
-  webLink: (label, webLinkUrl) => ({ label, action: "webLink", webLinkUrl }),
 };
 
 /**

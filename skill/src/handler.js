@@ -21,7 +21,7 @@ import { createMemoryResultStore, redactToken, toResultView } from "../../packag
 import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
 import { loadPhishingListChecker, combineCheckers } from "../../packages/core/src/phishing-list.js";
 import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
-import { readRequest, simpleText, quickReply, withImage } from "./kakao.js";
+import { readRequest, simpleText, quickReply, withImage, withLinkCard } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
 import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT } from "../../packages/core/src/fixed-text.js";
 import { tokenMatches } from "./config.js";
@@ -109,25 +109,19 @@ function buildReplyText(result) {
 }
 
 /**
- * 판정에 맞는 빠른 버튼을 만든다.
- * D25: 가족방패는 먼저 링크를 보내지 않으므로 webLink는 사용자 요청 버튼만 허용.
+ * 판정 결과에서 사용자가 직접 누를 웹 링크를 준비한다(D25).
  * D34: [자세히 보기]는 1회용 토큰 주소(/check/result?t=…). 저장소가 없으면 버튼을 만들지 않는다.
  */
-async function buildQuickReplies(result, webBaseUrl, resultStore) {
-  const replies = [];
-  if (result.level === "위험" || result.level === "주의") {
-    replies.push(quickReply.message("이미 당했어요", "이미 당했어요"));
-  }
+async function buildResultLinks(result, webBaseUrl, resultStore) {
+  const links = [];
   if (webBaseUrl && resultStore) {
     try {
       const token = await resultStore.put(result);
-      replies.push(quickReply.webLink("자세히 보기", `${webBaseUrl}/check/result?t=${token}`));
+      links.push({ label: "자세히 보기", url: `${webBaseUrl}/check/result?t=${token}` });
     } catch { /* The already computed verdict remains available if DB storage fails. */ }
   }
-  // Google 출처 표시의 안내 링크(부모님이 누를 때만 열림, D25 답변 버튼)
-  if (hasGoogleWarning(result)) replies.push(quickReply.webLink("Google 안내", GOOGLE_ADVISORY_URL));
-  replies.push(quickReply.message("처음으로", "처음으로"));
-  return replies;
+  if (hasGoogleWarning(result)) links.push({ label: "Google 안내", url: GOOGLE_ADVISORY_URL });
+  return links;
 }
 
 /**
@@ -190,8 +184,13 @@ export async function handleRequest(params, cfg) {
   }
 
   const text = buildReplyText(result);
-  const replies = await buildQuickReplies(result, cfg.webBaseUrl, cfg.resultStore ?? null);
-  const body = simpleText(text, replies);
+  const replies = [];
+  if (result.level === "위험" || result.level === "주의") {
+    replies.push(quickReply.message("이미 당했어요", "이미 당했어요"));
+  }
+  replies.push(quickReply.message("처음으로", "처음으로"));
+  const links = await buildResultLinks(result, cfg.webBaseUrl, cfg.resultStore);
+  const body = withLinkCard(simpleText(text, replies), links);
   const image = LEVEL_IMAGE[result.level];
   return { status: 200, body: image && cfg.webBaseUrl ? withImage(body, `${cfg.webBaseUrl}${image.path}`, image.alt) : body };
 }

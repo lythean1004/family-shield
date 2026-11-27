@@ -75,7 +75,7 @@ powershell -ExecutionPolicy Bypass -File deploy\copy-skill-token.ps1
 엄마 나 폰 고장났어. 이 번호로 문자해. 급하게 50만원만 보내줘
 ```
 
-기대: `[⚡ 주의]` 또는 `[⚠️ 위험]`, 한계 문구, 버튼 3개(이미 당했어요 · 자세히 보기 · 처음으로).
+주의 또는 위험 결과에서는 경고 이미지와 판정, 한계 문구가 보인다. ‘이미 당했어요’와 ‘처음으로’는 채팅 바로연결에 있고, 결과 저장소와 웹 주소가 설정돼 있으면 ‘웹에서 보기’ 카드에 ‘자세히 보기’ 버튼이 있다. Google 목록에 따른 경고에는 같은 카드에 ‘Google 안내’ 버튼도 나온다. [카카오 응답 명세](https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide/answer_json_format)
 
 서버 확인: `ssh fs-ncp "sudo journalctl -u family-shield-skill -n 20 --no-pager"` 에 `POST /api/kakao-skill 200` 줄이 있으면 카카오가 우리 서버를 부른 것이다.
 
