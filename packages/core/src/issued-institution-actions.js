@@ -1,7 +1,8 @@
 
 import { isCardCallbackNumber } from "./card-sender.js";
+import { inspectLinkCandidates } from "./link-candidates.js";
 import { currentReceivedRequests } from "./received-message.js";
-import { SIG_CALL_THIS_NUMBER, SIG_PERSONAL_INFO } from "./signals.js";
+import { SIG_CALL_THIS_NUMBER, SIG_LINK, SIG_PERSONAL_INFO } from "./signals.js";
 
 const artifact = "(?:문자|메시지|연락|안내(?:문)?|통지(?:문)?|쪽지|알림)";
 const postalRole = "(?:우편(?:물)?|택배|배송)\\s*(?:보관|수령|접수|문의|배송|배달)\\s*(?:창구|센터|담당\\s*부서)";
@@ -61,6 +62,50 @@ export function* recognizedIssuedNoticeActions(text) {
       if (route && !nonCurrentRoute.test(route + " " + next) && assignsCallback(route) && sameNoticeCallback.test(next)) {
         yield SIG_CALL_THIS_NUMBER;
       }
+    }
+  }
+}
+
+const publicNoticeIssuer = new RegExp(
+  String.raw`(?:^|[—:：]\s*)(?:(?:부모|수신자|수신인|받는\s*사람)(?:가|는)\s*)?(?:받은|수신한|전달받은)\s*` +
+  artifact + String.raw`(?:이|가|은|는)\s*(?:공공|행정|복지)\s*기관\s*명의(?:(?:였|이었)(?:습니다|어요|다|음)|입니다|이다|임)[.!。]?$`, "u",
+);
+const sameReceivedNotice = new RegExp(
+  String.raw`^(?:그|같은|이|해당)\s*` + artifact + String.raw`(?:\s*(?:안|본문))?(?:에|에는|에서)\s*`, "u",
+);
+const unknownAddressProvenance = /(?:발신\s*근거|발신처|출처|운영처|관리\s*주체)(?:를|을|가|이)?\s*확인(?:을)?\s*(?:할\s*수\s*없|하지\s*못|되지\s*않)/u;
+const addressPresentInNotice = /(?:주소|링크)(?:가|이)\s*(?:적혀\s*있|들어\s*있|포함(?:되어|돼)\s*있|기재(?:되어|돼)\s*있|실려\s*있)/u;
+const substituteAddress = /(?:대체|치환|삭제|제외|대신|별건|가상|예시|견본|참고\s*(?:용|주소|링크))/u;
+const recordedAddressValue = /^(?:(?:(?:시험|신고|상담|수신|접수)\s*)?기록(?:의|에\s*남긴)\s*)?(?:주소|링크)(?:\s*표기)?(?:는|가|이|\s*[:：])\s*https?:\/\//iu;
+const sameNoticePrivateReply = new RegExp(
+  String.raw`^(?:(?:본인|신원|가입|접수)\s*확인(?:을)?\s*(?:이유로|명분으로|위해|목적으로)\s*)?` + protectedMaterial +
+  String.raw`(?:을|를)?\s*(?:그|같은|이|해당)\s*(?:(?:대화|문자|메시지|채팅)(?:에|으로|로)\s*)?(?:답장|회신)(?:으로|로)?\s*(?:(?:첨부|제출|전송|전달)\s*)?(?:하라(?:고|는)|해\s*달라(?:고|는))(?=[\s.!?。]|$)`, "u",
+);
+const inactiveRoleReport = /(?:예방|교육|훈련|설문|연습)\s*(?:을\s*위해|자료|목적|사례)|(?:할지|해야\s*하는지|달라는지|있는지)\s*(?:물|문의|확인)|(?:한|말한)\s*적(?:이|은|도)?\s*(?:없|아니)|(?:다른\s*(?:직원|사람|수신자|업체)|제\s*3\s*자)(?:에게|한테)(?:만)?|(?:하면|인\s*경우|때에만)\s*(?:요구|요청|지시)/u;
+
+const sameRequestedReplyWithdrawn = /^(?:그|같은|해당)?\s*(?:발신자|보낸\s*쪽|담당자|상대)(?:가|이)\s*(?:그|해당|같은)\s*(?:회신\s*)?(?:요구|요청)(?:를|을)\s*(?:이미\s*)?(?:철회|취소)/u;
+
+function addressAssignedToNotice(body, next, outsideCandidates) {
+  if (!sameReceivedNotice.test(body) || !unknownAddressProvenance.test(body) || !addressPresentInNotice.test(body)) return false;
+  if (substituteAddress.test(body + " " + next) || !recordedAddressValue.test(next)) return false;
+  const inline = inspectLinkCandidates(body);
+  const recorded = inspectLinkCandidates(next);
+  if (!inline.complete || inline.candidates.length || !recorded.complete || recorded.candidates.length !== 1) return false;
+  const [address] = recorded.candidates;
+  return outsideCandidates.some(candidate =>
+    candidate.raw === address.raw && candidate.host === address.host &&
+    candidate.protocol === address.protocol && candidate.port === address.port && candidate.rest === address.rest);
+}
+
+export function* recognizedRecipientActions(text, { outsideCandidates, telecomSender }) {
+  const isIssuer = clause => publicNoticeIssuer.test(clause) || Boolean(telecomSender(clause));
+  for (const report of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    for (const { body, previous, next } of currentReceivedRequests(report, isIssuer, clause => addressPresentInNotice.test(clause))) {
+      if (inactiveDemand.test(body + " " + next) || inactiveRoleReport.test(body) ||
+          actorWithdrawal.test(next) || sameRequestedReplyWithdrawn.test(next)) continue;
+      if (publicNoticeIssuer.test(previous) && addressAssignedToNotice(body, next, outsideCandidates)) yield SIG_LINK;
+      const claimant = telecomSender(body);
+      if (claimant && sameNoticePrivateReply.test(body.slice(claimant.index + claimant[0].length))) yield SIG_PERSONAL_INFO;
     }
   }
 }

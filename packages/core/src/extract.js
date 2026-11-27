@@ -360,6 +360,7 @@ function extractRawCodeSignals(text, options) {
   addInstitutionRequestContext(input, signals);
   addInstitutionReportFrames(input, signals, {
     unverifiedLinks,
+    outsideCandidates: outside,
     installFromDirectPatterns: clause => hasSensitiveRequest(clause, PATTERNS[SIG_APP_INSTALL], acceptsDirectInstallation),
   });
   return {

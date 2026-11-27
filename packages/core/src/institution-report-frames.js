@@ -2,7 +2,7 @@ import { classifyCallback } from "./callback-number.js";
 import { personalDisclosure } from "./personal-disclosure.js";
 import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
 import { INVESTIGATIVE, readInvestigativeCashDocument } from "./cash-handover.js";
-import { recognizedIssuedNoticeActions } from "./issued-institution-actions.js";
+import { recognizedIssuedNoticeActions, recognizedRecipientActions } from "./issued-institution-actions.js";
 import { readInstitutionIssuer } from "./institution-request-context.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { isOfficialLink, readUnregisteredAddressDirection } from "./official-links.js";
@@ -154,11 +154,17 @@ function reportsLoanCollection(fields, sender, heading) {
     staffVisit.test(value) && collects.test(value) && (cash || fieldCash.test(value)));
 }
 
-const reportedRole = "(?:" + authority + "|공공\\s*(?:고지|통지|민원)|통신\\s*(?:사|회사|업체)|보험사|건강\\s*보험(?:공단)?|카드사|택배\\s*(?:사|회사)|공단)";
+const telecomRole = String.raw`통신\s*(?:사|회사|업체)`;
+const reportedRole = "(?:" + authority + "|공공\\s*(?:고지|통지|민원)|" + telecomRole + "|보험사|건강\\s*보험(?:공단)?|카드사|택배\\s*(?:사|회사)|공단)";
 const roleTitle = "(?<role>" + reportedRole + ")(?<unit>(?:\\s+(?:가입|관리|고객|민원|업무|전산|수사|조사|사건|통지|지원|상담|대출|상환|금융|담당(?:자|부서)?|부서|직원|팀|소속|창구)){0,5})";
 const reportingSender = "(?:발신(?:자|인|처)|보낸\\s*(?:사람|이|쪽)|상대(?:방)?)";
 const roleMarker = "(?:이?라고\\s*(?:소개한|밝힌|말한|주장한)|(?:[을를]\\s*)?(?:자처하(?:는|던)|자처한|자칭하(?:는|던)|자칭한))";
 const introducedSender = new RegExp("(?<![\\p{L}\\p{N}])" + roleTitle + "\\s*" + roleMarker + "\\s*" + reportingSender + "(?:이|가|은|는)?(?=[\\s,，]|$)", "u");
+const introducedTelecomSender = new RegExp(
+  String.raw`^(?:[가-힣]+\s*(?:기록|메모)\s*[—:：]\s*)?` + telecomRole +
+  String.raw`(?:\s+(?:접수|고객(?:\s*관리)?|가입|관리|상담|지원)){0,2}\s*(?:(?:팀|부서|창구)\s*)?` +
+  roleMarker + "\\s*(?:" + reportingSender + "|직원|담당자|사람)(?:이|가|은|는)\\s*", "u",
+);
 const selfDescription = new RegExp("^(?:(?:문자|메시지|연락)(?:를|을)?\\s*)?" + reportingSender + "(?:이|가|은|는)\\s*" + roleTitle +
   "\\s*(?:이?라고\\s*(?:했|하였|말했|소개했|밝혔|주장했)|(?:[을를]\\s*)?(?:자처했|자칭했))", "u");
 const describedRole = new RegExp("^" + roleTitle + "이?라는\\s*(?:사람|쪽|상대(?:방)?)(?:이|가|은|는)?(?=[\\s,，]|$)", "u");
@@ -892,7 +898,7 @@ function* sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPa
   }
 }
 
-export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [], installFromDirectPatterns } = {}) {
+export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [], outsideCandidates = [], installFromDirectPatterns } = {}) {
   const addAgencyAction = signal => {
     signals.add(SIG_AGENCY_IMPERSONATION);
     signals.add(signal);
@@ -913,6 +919,11 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
   }
   for (const signal of reportedRouteChanges(text, unverifiedLinks)) addAgencyAction(signal);
   for (const signal of recognizedIssuedNoticeActions(text)) addAgencyAction(signal);
+  const recipientActions = recognizedRecipientActions(text, {
+    outsideCandidates,
+    telecomSender: clause => roleBelongsToReportedSource(clause) ? introducedTelecomSender.exec(clause) : null,
+  });
+  for (const signal of recipientActions) addAgencyAction(signal);
   if (installFromDirectPatterns) {
     for (const signal of sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPatterns)) addAgencyAction(signal);
   }
