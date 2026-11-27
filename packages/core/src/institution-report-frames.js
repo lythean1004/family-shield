@@ -908,11 +908,94 @@ function* sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPa
   }
 }
 
+const sameNoticeContact = /(?:(?:이|그|같은|해당)\s*)?(?:문자(?:\s*본문)?|메시지|통지|안내|발신\s*내용|본문)(?:에(?:서)?|\s*속)\s*/u;
+const assignedSymbolicCallback = /^(?:(?<separate>별도(?:로|의)?|따로)\s*)?(?:지정(?:한|된)|정해\s*둔|적힌|실린)\s*(?:(?<separateTarget>별도(?:의)?|따로)\s*)?(?:(?<unverified>미확인|확인되지\s*않은)\s*)?(?:(?<phone>전화)(?:\s*(?:번호|연락처))?|(?:회신|통화|상담|문의)\s*(?:번호|연락처)|(?:번호|연락처))/u;
+const establishedCallbackBypass = /(?:(?:공식|대표|평소|기존)\s*(?:고객\s*센터|상담\s*창구|전화|번호|연락처))(?:를|은|는)?\s*(?:이용하는\s*)?(?:대신|말고)\s*$/u;
+const callbackPurpose = /^(?:(?:그|해당|같은)\s*(?:기관|발신자)(?:은|는|이|가)\s*)?(?:(?:(?:접수\s*상태|수령지|수령\s*정보|처리\s*상태)(?:을|를)?\s*)?확인(?:하려면|은)|처리\s*(?:요건|조건)으로)?\s*$/u;
+const symbolicCallInstruction = /^\s*(?:으로|로|에)(?<exclusive>만)?\s*(?:(?:직접|다시|따로)\s*)?(?:(?<verb>전화|통화)(?:을|를)?\s*)?(?:하라(?:고|는)|하도록|해야)(?!\s*(?:하는지|할지|하는\s*건지|할\s*필요))/u;
+const symbolicCallbackAssignment = /(?:회신|전화|통화)\s*(?:번호|연락처)(?:를|을)\s*(?:별도로|따로)\s*(?:지정했|정했)(?:고|으며)\s*(?:수신자(?:가|는)\s*)?(?:그|해당)\s*(?:연락처|번호)/u;
+const independentOfficialCallback = /(?:직접|스스로)\s*(?:찾|확인한)\s*(?:기관의\s*)?(?:공식|대표)|(?:공식|대표)\s*(?:고객\s*센터|상담\s*창구|전화|번호|연락처)(?:으로|로|에)(?:만)?\s*(?:다시\s*)?(?:전화|통화|연락|문의)/u;
+const substitutedCallbackDestination = /(?:대체(?:한|된|용)\s*(?:주소|번호|연락처)|원래\s*(?:번호|연락처|주소)\s*대신|(?:원번호|원래\s*번호|실제\s*연락처)[^.!?\n]{0,24}(?:다른\s*(?:번호|연락처|주소)|바꿨|바꿔|대체했)|(?:가린|가려진)\s*(?:번호|연락처)\s*대신)/u;
+const numericCallbackCandidate = /(?<!\d)(?:1\d{2,3}|0\d{1,2}[- ]?\d{3,4}[- ]?\d{4}|1\d{3}[- ]?\d{4})(?!\d)/u;
+
+const affirmedReportedEnding = String.raw`(?:다(?:고\s*(?:알렸|기록했|적었|말했|설명했|확인했|정리했)(?:다|습니다|어요|음))?|습니다|어요|음)[.!。]?\s*$`;
+const completedSymbolicDemand = new RegExp(
+  String.raw`^\s*(?:한다(?:고|는)\s*)?(?:(?:적었|기록했|알렸|설명했|말했|했)|(?:요구|요청|지시|안내)(?:했|하였|(?:이었|였)|(?:이|가)\s*(?:같이\s*)?있었|(?:을|를)\s*받았)|(?:내용|말|설명)(?:이었|였))` +
+    affirmedReportedEnding, "u",
+);
+
+function readCompletedSymbolicCall(text) {
+  const directive = symbolicCallInstruction.exec(text);
+  return directive && completedSymbolicDemand.test(text.slice(directive[0].length)) ? directive.groups : null;
+}
+
+const callbackRecordNote = /^(?:수신자|부모|저)(?:는|가|님은)\s*(?:(?:다음날|나중에|직접)\s*)?(?:그|이|해당)\s*(?:문자|메시지|안내|통지)(?:를|을)\s*(?:(?:회의|상담)에서\s*)?(?:검토|보관|기록)했(?:다|다고\s*(?:기록|설명)했다|습니다|어요|음)[.!。]?$/u;
+const separateFollowingRecord = /^(?:별개(?:의)?\s+(?:수업|사건|기록)|별건으로\s+다른\s)/u;
+
+function symbolicNoticeCallback(action) {
+  if (!openDirectedReport(action) || optionalRoute.test(action) || asksIfRequired.test(action) ||
+      questionedDemand.test(action) || independentOfficialCallback.test(action)) return false;
+  const marker = sameNoticeContact.exec(action);
+  if (!marker) return false;
+  const lead = action.slice(0, marker.index);
+  const bypass = establishedCallbackBypass.exec(lead);
+  if (!callbackPurpose.test(bypass ? lead.slice(0, bypass.index) : lead)) return false;
+  const tail = action.slice(marker.index + marker[0].length);
+  const assigned = assignedSymbolicCallback.exec(tail);
+  const assignment = symbolicCallbackAssignment.exec(tail);
+  if (assignment) return Boolean(readCompletedSymbolicCall(tail.slice(assignment.index + assignment[0].length))?.verb);
+  if (!assigned) return false;
+  const order = readCompletedSymbolicCall(tail.slice(assigned[0].length));
+  return Boolean(order && (order.verb || assigned.groups.phone) &&
+    (bypass || (assigned.groups.separate || assigned.groups.separateTarget) && (order.exclusive || assigned.groups.unverified)));
+}
+
+const callbackHeading = /^(?:(?:피해|상담|수신)\s*(?:경위|기록|일지)(?:\s*(?:발췌|요약))?\s*[—:：]\s*|(?:수신|상담)\s*기록(?:에서|에는|에)\s+)/u;
+const callbackIssuerRole = String.raw`(?:민원\s*접수\s*기관|${reportedRole})(?:\s+(?:업무|담당(?:자|\s*부서)?|직원|부서)){0,3}`;
+const callbackNotice = "(?:문자|메시지|연락|통지|안내)";
+const callbackClaim = new RegExp(
+  String.raw`^(?:(?:(?:[가-힣]+\s+){0,4}[가-힣]+(?:다는|라는)\s+)?${callbackNotice}의\s+)?(?:${reportingSender}|발신\s*쪽)(?:은|는|이|가)\s*` +
+    callbackIssuerRole + String.raw`\s*(?:(?:을|를)?\s*(?:자처했|자칭했)|이?라고\s*(?:밝혔|소개했|말했))` + affirmedReportedEnding, "u",
+);
+const callbackReceipt = new RegExp(
+  "^" + callbackIssuerRole + "\\s*" + roleMarker +
+    String.raw`\s*(?:(?:쪽|사람|발신자)(?:에서|에게서|한테서)\s*)?${callbackNotice}(?:이|가|를|을)?\s*(?:있었|왔|받았|도착했|수신했)` +
+    String.raw`(?:고$|으며$|${affirmedReportedEnding})`, "u",
+);
+function affirmedCallbackIssuer(clause) {
+  const source = clause.trim().replace(callbackHeading, "").replace(/배송\s*(?:사|회사)/u, "택배사");
+  return openDirectedReport(source) && roleBelongsToReportedSource(source) &&
+    (callbackClaim.test(source) || callbackReceipt.test(source));
+}
+
+// An omitted number can support R6 only as a directed, separate route in the same institution's notice.
+function hasBoundSymbolicCallback(text) {
+  if (!sameNoticeContact.test(text) || !/(?:번호|연락처|전화)/u.test(text)) return false;
+  const reports = text.split(/\r?\n[ \t]*\r?\n/u);
+  if (reports.length > 2 || reports[1] && !separateFollowingRecord.test(reports[1].trim())) return false;
+  const report = reports[0].trim();
+  if (numericCallbackCandidate.test(report) || substitutedCallbackDestination.test(report)) return false;
+  const parsed = inspectLinkCandidates(report);
+  if (!parsed.complete || parsed.candidates.length) return false;
+
+  const clauses = report.split(/(?<=[.!?。])\s+|[\r\n]+/u).map(s => s.trim()).filter(Boolean);
+  if (callbackRecordNote.test(clauses.at(-1) ?? "")) clauses.pop();
+  if (clauses.length === 1) {
+    const parts = clauses[0].split(/[,，]\s*/u);
+    return parts.length === 2 && affirmedCallbackIssuer(parts[0]) && symbolicNoticeCallback(parts[1]);
+  }
+  if (clauses.length !== 2) return false;
+  for (const { body, previous } of currentReceivedRequests(clauses.join(" "), affirmedCallbackIssuer, symbolicNoticeCallback)) {
+    if (clauses.at(-1).endsWith(body) && affirmedCallbackIssuer(previous) && symbolicNoticeCallback(body)) return true;
+  }
+  return false;
+}
 export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [], outsideCandidates = [], inputComplete = true, installFromDirectPatterns } = {}) {
   const addAgencyAction = signal => {
     signals.add(SIG_AGENCY_IMPERSONATION);
     signals.add(signal);
   };
+  if (inputComplete && hasBoundSymbolicCallback(text)) addAgencyAction(SIG_CALL_THIS_NUMBER);
   for (const { issuer, action, next, continuedCall } of narrativeFrames(text, unverifiedLinks)) {
     if (directsToUnverifiedAddress(action, unverifiedLinks)) addAgencyAction(SIG_LINK);
     if (directsToNoticeNumber(action)) addAgencyAction(SIG_CALL_THIS_NUMBER);
