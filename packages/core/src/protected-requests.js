@@ -183,6 +183,24 @@ function relayArguments(text, argument) {
   return roles;
 }
 
+
+const conversationContext = /(?:대화|거래|채팅|문의|상담|메시지|연락|문자)[^,.!?\n]{0,50}(?:다가|면서|(?:하는|하던|나누던)\s*중(?:에)?|도중(?:에)?)[,，]?\s*$/u;
+const asksToReceiveCode = /\s*(?:전달해|전송해|보내|전해|알려|넘겨|건네|읽어|불러|말해)\s*달라고\s*(?:했|하였|말했|부탁했|요청했|요구했)(?:다|습니다|어요|음)(?:고\s*(?:기록했|적었)(?:다|습니다|어요))?[.。!]?$/u;
+
+function asksForReceiversCode(clause) {
+  if (inactiveReport.test(clause) || localEntry.test(clause) || otherRelayTopic.test(clause) ||
+      supportIllustration.test(clause) || valueDescriptorOnly.test(clause)) return false;
+  const issuer = currentRelayIssuer.exec(clause);
+  if (!issuer) return false;
+  const prefix = clause.slice(0, issuer.index);
+  if (prefix && !conversationContext.test(prefix)) return false;
+  const request = clause.slice(issuer.index + issuer[0].length).trimStart();
+  const predicate = asksToReceiveCode.exec(request);
+  if (!predicate) return false;
+  // 명시된 수취인이 없으면 ‘달라’는 이번 말을 한 사람이 값을 받겠다는 뜻이다.
+  return Boolean(relayArguments(request.slice(0, predicate.index), relayArgument)?.has("value"));
+}
+
 const speakerAsRecipient = "(?:자기|자신|발신자|발신인|상대(?:방)?)(?:에게|한테|쪽으로)";
 const receiverOwnedCode = deliveredToRecipient.source + "\\s*(?:" + oneTimeConfirmationValue + "|" + credential + ")(?:을|를)";
 const respondingParty = /^(?:발신(?:자|인)|상대(?:방)?|상담원|(?:(?:[\p{L}]{1,12}\s+){0,2}(?:문의|질문)(?:에|에는)\s*(?:(?:답(?:변)?|응답)(?:하던|한|하는|해\s*(?:준|주던|주는)))|답장(?:을)?\s*(?:쓴|쓰던|보낸|보내\s*(?:준|주던)))\s*(?:사람|담당자|쪽))(?:이|가|은|는)\s+/u;
@@ -272,17 +290,19 @@ function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
         owned: hasOwnedCode && (reportsRelayWithExplicitArguments(clause) || reportsIssuerContingentHandoff(clause)),
         claimed: hasOwnedCode && claimsRecipientsCode(clause),
         remote: hasAccessCode && reportsSupportCodeToIssuer(clause),
+        requested: hasOwnedCode && asksForReceiversCode(clause),
       });
       return observations.get(clause);
     }
     const identifiesHandoff = clause => {
       const handoff = readHandoff(clause);
-      return handoff.owned || handoff.claimed || handoff.remote;
+      return handoff.owned || handoff.claimed || handoff.remote || handoff.requested;
     };
     for (const { body, previous, next } of currentReceivedRequests(text, identifiesIssuer, identifiesHandoff)) {
       if (withdrewCodeRelay.test(next)) continue;
       const handoff = readHandoff(body);
       if (handoff.owned) return true;
+      if (handoff.requested && !supportIllustration.test(previous) && !supportIssuerWithdrawal.test(next)) return true;
       if (handoff.claimed && !supportIllustration.test(previous) && !supportIssuerWithdrawal.test(next)) return true;
       if (handoff.remote && !supportIssuerWithdrawal.test(next) && !supportIllustration.test(previous) &&
           ![previous, body, next].some(receiverInitiatedSupport)) return true;
@@ -559,6 +579,10 @@ function addRequirementsAtUnconfirmedAddress(text, signals, inspection) {
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
     const clauses = record.split(clauseBreak).map(clause => clause.trim()).filter(Boolean);
     for (const [index, clause] of clauses.entries()) {
+      if (linksApplicationReplyToSubmissionAddress(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "",
+        clauses[index + 2] ?? "", address)) {
+        signals.add(SIG_DOCUMENT_BUNDLE);
+      }
       const token = [...clause.matchAll(/\S+/gu)].find(match => match[0] === address.raw);
       if (!token) continue;
       const previous = clauses[index - 1] ?? "";
@@ -616,6 +640,41 @@ function bindsPairedDocumentsToRecordedAddress(clause, previous, next, inspectio
     const tail = part.slice(token.index + token[0].length);
     return (!tail.trim() || addressRecorded.test(tail)) && reportsPairedDocumentRequirement(parts[1 - index]);
   });
+}
+
+
+const asksAboutApplication = /(?:문의(?:를)?\s*했|질문(?:을)?\s*했|물어\s*봤|물었|문의하였)/u;
+const inquiryConnective = /(?:문의했더니|질문했더니|물어\s*봤더니|물었더니)\s*/u;
+const responseLead = /^(?:그\s*)?(?:답변|회신|답신|답)(?:에는|에서는|에서|에|은|는|이|가)\s+/u;
+const directsToSubmissionAddress = /^(?:(?:처음\s*보는|미확인|별도(?:의)?)\s*)?(?<role>접수|제출|신청)\s*(?<target>주소|링크)\s*(?:(?:한|같은)\s*곳)?(?:으로|에|로)\s+/u;
+const reportedUpload = /^(?:을|를)?\s*(?:(?:함께|같이|둘\s*다|모두|한꺼번에|동시에)\s*)?(?:올리|첨부하|제출하|보내|내)(?:라고|라는)\s*/u;
+const returnedDemand = /^(?:(?:답변|답|회신|답신|내용|요구|요청)(?:이|가|을|를)\s*(?:왔|있었|받았)|(?:했|하였|적혀\s*있었|써\s*있었|답했|요청했|요구했))(?:다|습니다|어요|음)[.。!]?$/u;
+const reportedAddressLabel = /^(?:(?:그|해당|같은|이)\s*)?(?<role>신청|접수|제출)\s*(?<target>주소|링크)(?:\s*(?:표기|기재)(?:는|가|은|이)?|(?:로는|으로는|가|는|은|이))?\s*[:：]?\s*$/u;
+const addressStatement = /^(?:\s+(?:이었(?:다|습니다|어요)|였(?:다|습니다|어요)|(?:이|가|이라고|라고|으로|로)\s*(?:기록돼|적혀|표시돼|기재돼)\s*있었(?:다|습니다|어요)))[.。!]?$/u;
+const addressDemandWithdrawn = /^(?:발신자|상대(?:방)?|보낸\s*사람)(?:가|이)\s*(?:(?:그|해당|같은)\s*)?(?:서류\s*|제출\s*)?(?:요구|요청|지시)(?:를|을)?\s*(?:취소|철회)/u;
+
+function linksApplicationReplyToSubmissionAddress(body, previous, record, next, address) {
+  const labelEnd = record.indexOf(address.raw);
+  if (labelEnd < 0 || !addressStatement.test(record.slice(labelEnd + address.raw.length))) return false;
+  const label = reportedAddressLabel.exec(record.slice(0, labelEnd));
+  if (!label || feedbackPurpose.test(body) || formNotInUse.test(body) || topicBoundary.test(body) ||
+      mereFormReference.test(body) || inactiveReport.test(previous + " " + body) ||
+      closedAddressRequirement.test(next) || addressDemandWithdrawn.test(next)) return false;
+
+  const reply = responseLead.exec(body);
+  const connective = !reply && inquiryConnective.exec(body);
+  if (!reply && !connective) return false;
+  const context = reply ? previous : body.slice(0, connective.index + connective[0].length);
+  if (!hasApplicationPurpose(context) || !applicationIntake.test(context) || !asksAboutApplication.test(context)) return false;
+  const demandStart = reply ? reply[0].length : connective.index + connective[0].length;
+  const demand = body.slice(demandStart).trimStart();
+  const place = directsToSubmissionAddress.exec(demand);
+  if (!place || place.groups.role !== label.groups.role || place.groups.target !== label.groups.target) return false;
+  const objects = demand.slice(place[0].length);
+  const pair = jointSubmissionPair.exec(objects);
+  if (pair?.index !== 0) return false;
+  const action = reportedUpload.exec(objects.slice(pair[0].length));
+  return Boolean(action && returnedDemand.test(objects.slice(pair[0].length + action[0].length)));
 }
 
 export function addReportedProtectedRequests(text, signals, hasUnverifiedLink, inspection) {
