@@ -20,6 +20,7 @@ import * as SIG from "../packages/core/src/signals.js";
 import { findLinks, toDomain, isShortener } from "../packages/core/src/links.js";
 import { inspectLinkCandidates } from "../packages/core/src/link-candidates.js";
 import { isOfficialLink, OFFICIAL_LINK_HOST_CARDS } from "../packages/core/src/official-links.js";
+import { shortUrlKey, SHORT_URL_KEYS } from "../packages/core/src/short-urls.js";
 import { OFFICIAL_DOMAIN_CARDS } from "../packages/core/src/lookalike.js";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -29,7 +30,9 @@ const LEVELS = new Set(["위험", "주의", "확인필요"]);
 const GROUPS = new Set(["A", "B", "C", "D1", "D2", "E"]);
 const TARGET = { A: 35, B: 45, C: 25, D1: 50, D2: 35, E: 10 };
 const MESSAGE_TARGET = { A: 16, B: 18, C: 16, D1: 50, E: 20 };
-const MESSAGE_DATASET = fileURLToPath(new URL("./messages-2026-11.jsonl", import.meta.url));
+// 문자형 세트: 1판(Codex, 가림 표시라 측정에 쓰지 않음·보관)과 2판(2026-11-27 Claude 독립 에이전트)
+const MESSAGE_DATASETS = new Set(["./messages-2026-11.jsonl", "./messages-2026-11-v2.jsonl"].map((p) => fileURLToPath(new URL(p, import.meta.url))));
+const isMessageDataset = (file) => MESSAGE_DATASETS.has(resolve(file));
 const homeHosts = new Set(OFFICIAL_LINK_HOST_CARDS.filter(c => c.status === "source_checked").flatMap(c => c.hosts));
 for (const card of OFFICIAL_DOMAIN_CARDS.filter(c => c.status === "source_checked")) {
   for (const domain of card.official_domains) {
@@ -80,7 +83,9 @@ export function checkCase(c, { messageDataset = false } = {}) {
   }
   if (messageDataset) {
     const { candidates, complete } = inspectLinkCandidates(text);
-    if (!complete || candidates.some(link => !link.host.endsWith(".invalid") && !fixtureHomepage(link, c.group))) {
+    // 지어낸 단축 주소는 KISA 목록에 없을 때만 허용한다(우연히 실제 피싱 주소와 같으면 안 됨, 링크는 열지 않음)
+    const syntheticShort = (link) => isShortener(link.host) && !SHORT_URL_KEYS.has(shortUrlKey(link.raw));
+    if (!complete || candidates.some(link => !link.host.endsWith(".invalid") && !syntheticShort(link) && !fixtureHomepage(link, c.group))) {
       errs.push("문자형 평가 주소는 합성 주소 또는 정상·경계 사례의 공식 대표 홈페이지만 허용");
     }
   } else {
@@ -135,7 +140,7 @@ function main(paths) {
   let bad = 0;
   const seen = new Map();
   for (const c of cases) {
-    const options = { messageDataset: resolve(c._file) === MESSAGE_DATASET };
+    const options = { messageDataset: isMessageDataset(c._file) };
     const errs = checkCase(c, options);
     if (seen.has(c.case_id)) errs.push(`case_id 중복(${seen.get(c.case_id)})`);
     seen.set(c.case_id, c._file);
@@ -158,8 +163,8 @@ function main(paths) {
   console.log("-".repeat(60));
   console.log(`전체 ${cases.length}건 (dev ${dev.length}, test ${test.length})  문제 ${bad}건`);
   for (const [label, target, rows] of [
-    ["평가용 묶음별", TARGET, test.filter(c => resolve(c._file) !== MESSAGE_DATASET)],
-    ["문자형 묶음별", MESSAGE_TARGET, test.filter(c => resolve(c._file) === MESSAGE_DATASET)],
+    ["평가용 묶음별", TARGET, test.filter(c => !isMessageDataset(c._file))],
+    ["문자형 묶음별", MESSAGE_TARGET, test.filter(c => isMessageDataset(c._file))],
   ]) {
     if (!rows.length) continue;
     const counts = Object.entries(target).map(([g, n]) => `${g} ${rows.filter(c => c.group === g).length}/${n}`);
