@@ -17,6 +17,23 @@ const financialSecret = /(?:복구\s*(?:문구|구문)|시드\s*(?:문구|구문
 const commentary = /[‘’“”"'「」]|(?:예방|보안)\s*교육|(?:라고|라는|다는)\s*(?:문구|요구|사례|말)|(?:요구|사기)\s*사례/;
 const clauseBreak = /(?<=[.!?。])\s+|[\r\n]+/;
 const aidOrWork = /(?:지원금|긴급\s*생계비|부업|재택\s*(?:근무|알바|일자리|채용)|체험단\s*모집)/;
+// 같은 문장 안에서 부정한 명목만 제외한다. 이어서 실제 신청한 다른 사업을 밝힐 수 있다.
+const program = aidOrWork.source;
+const combinedPrograms = program + "(?:\\s*(?:이나|나|과|와|또는|및|[·/])\\s*" + program + ")*";
+const deniedProgram = new RegExp(combinedPrograms + "(?:\\s*(?:신청|접수|모집|등록|참여))?" +
+  "(?:(?:[을를]\\s*위한)?\\s*(?:절차|목적|서류|양식))?\\s*(?:[은는이가]|[과와](?:는)?)?\\s*" +
+  "(?:아니|아닌|아닙|아님|무관|(?:관련|관계)(?:이|가)?\\s*없)", "gu");
+const applicationContext = new RegExp(program + "(?:[에을를의로]\\s*)?\\s*" +
+  "(?:신청|모집|등록|채용|접수|수급|수령|참여|대상자|서류|양식|서식|안내|알림|공고|문의|상담|제안|" +
+  "연습\\s*양식|필요한\\s*서류|이?라(?:는|고\\s*한)\\s*(?:문자|연락|안내)|" +
+  "(?:(?:[\\d,]+\\s*)?[천만억]?\\s*원\\s*)?지급\\s*(?:대상|신청|안내))" +
+  "|(?:재택\\s*채용|체험단\\s*모집)", "u");
+const programFieldValue = new RegExp(program + "(?:입니다|임)?[.。]?\\s*$", "u");
+
+function hasApplicationPurpose(text) {
+  const affirmed = text.replace(deniedProgram, " ");
+  return applicationContext.test(affirmed) || purposeHeading.test(affirmed) && programFieldValue.test(affirmed);
+}
 const identityCopy = "(?:신분증|주민등록증|운전면허증)\\s*(?:(?:앞면|뒷면|앞뒤)\\s*)?(?:사진|사본)";
 const bankCopy = "(?:(?:(?:급여|입금|지급)(?:을)?\\s*)?받(?:으실|을)\\s*(?:계좌(?:\\s*번호)?|통장\\s*사본)|통장\\s*사본)";
 const together = "\\s*(?:과|와|이랑|랑|및|[,·])\\s*";
@@ -377,7 +394,7 @@ function addFormFields(rows, signals) {
   const [address] = destinations;
   if (!/^https?:\/\/\S+$/iu.test(address) || !externalOnly(inspectLinkCandidates(address))) return;
 
-  const aidApplication = rows.some(row => (receivedFormHeader.test(row) || purposeHeading.test(row)) && aidOrWork.test(row));
+  const aidApplication = rows.some(row => (receivedFormHeader.test(row) || purposeHeading.test(row)) && hasApplicationPurpose(row));
   if (aidApplication && rows.some(requestsBothDocuments)) signals.add(SIG_DOCUMENT_BUNDLE);
   if (!rows.some(row => secretEntryForbidden.test(row)) && rows.some(row => {
     const heading = valueHeading.exec(row);
@@ -412,7 +429,7 @@ const mereFormReference = /(?:참고|예시|가상|견본|교육용|양식\s*미
 
 function reportsPairedSubmissionAtAddress(clause, previous, next) {
   const context = previous + " " + clause;
-  if (!aidOrWork.test(context) || formNotInUse.test(context) || inactiveReport.test(context) ||
+  if (!hasApplicationPurpose(context) || formNotInUse.test(context) || inactiveReport.test(context) ||
       mereFormReference.test(context + " " + next)) return false;
   const parsed = inspectLinkCandidates(clause);
   if (!externalOnly(parsed) || parsed.candidates.length !== 1) return false;
@@ -471,7 +488,7 @@ function submitsToTheSameForm(text) {
 
 function reportsJointSubmissionInApplication(clause, previous, next, afterNext) {
   const context = previous + " " + clause;
-  if (!aidOrWork.test(context) || formNotInUse.test(context) || inactiveReport.test(context) ||
+  if (!hasApplicationPurpose(context) || formNotInUse.test(context) || inactiveReport.test(context) ||
       mereFormReference.test(context) || closedSubmission.test(next)) return false;
   const parsed = inspectLinkCandidates(clause);
   if (!externalOnly(parsed) || parsed.candidates.length !== 1) return false;
@@ -510,7 +527,7 @@ export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
     const pair = documentPair.exec(clause);
     if (!pair || !requiredCopies.test(clause.slice(pair.index + pair[0].length))) continue;
     const previous = clauses[index - 1] ?? "";
-    if (!aidOrWork.test(clause) && (!aidOrWork.test(previous) || inactiveReport.test(previous) || topicBoundary.test(clause))) continue;
+    if (!hasApplicationPurpose(clause) && (!hasApplicationPurpose(previous) || inactiveReport.test(previous) || topicBoundary.test(clause))) continue;
     const afterPair = clause.slice(pair.index + pair[0].length);
     const next = clauses[index + 1] ?? "";
     if (hasNamedDestination(afterPair) || (!topicBoundary.test(next) && !inactiveReport.test(next) && hasNamedDestination(next))) {
@@ -551,6 +568,6 @@ export function hasDocumentBundle(text, unverifiedLink) {
   const clauses = text.split(clauseBreak).filter(Boolean);
   return clauses.some((clause, i) => {
     const request = clauses.slice(Math.max(0, i - 1), i + 1).join(" ");
-    return aidOrWork.test(request) && !commentary.test(request) && docs.test(clause) && externalForm(clause, clauses[i + 1]);
+    return hasApplicationPurpose(request) && !commentary.test(request) && docs.test(clause) && externalForm(clause, clauses[i + 1]);
   });
 }
