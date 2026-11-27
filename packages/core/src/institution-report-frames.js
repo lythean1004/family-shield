@@ -69,13 +69,14 @@ const appointmentProcedure = /(?:예약\s*내역|(?:면담|상담|접수|심사|
 const namedAddress = /^\s*(?:주소|링크|페이지)(?:에서|로|에)(?:만)?\s*(?:신청|입력|등록|접수|확인)\s*절차(?:을|를)?\s*(?:밟으라|진행하라|진행하도록|거치라|밟아야|거쳐야)/u;
 const bodyAddress = /(?:본문|문자|안내문?|메시지)(?:의|에\s*(?:적힌|실린|있는))\s*$/u;
 const useAddress = /^\s*(?:에서|으로|로|에)\s*(?:(?:신청|입력|등록|접수|확인)(?:을|를)?\s*(?:하라(?:고|는)?|해야|하도록)|(?:로그인|접속)(?:하라(?:고|는)?|해야|하도록))/u;
-function directsToUnverifiedAddress(action, unverifiedLinks) {
+function directsToUnverifiedAddress(action, unverifiedLinks, includesReading = false) {
   if (!unverifiedLinks.length || ORDINARY_LOOKUP.test(action)) return false;
   for (const token of action.matchAll(/\S+/gu)) {
     const after = action.slice(token.index + token[0].length);
     const before = action.slice(0, token.index);
     if (!(useAddress.test(after) && appointmentProcedure.test(before)) &&
-        !(namedAddress.test(after) && bodyAddress.test(before))) continue;
+        !(namedAddress.test(after) && bodyAddress.test(before)) &&
+        !(includesReading && reportDocument.test(before) && readAtAddress.test(after))) continue;
     const { complete, candidates } = inspectLinkCandidates(token[0]);
     if (complete && candidates.length === 1 && ["http:", "https:"].includes(candidates[0].protocol) &&
         unverifiedLinks.includes(candidates[0].raw)) return true;
@@ -141,6 +142,72 @@ function reportsLoanCollection(fields, sender, heading) {
   const cash = fields.some(field => /상환\s*수단/u.test(field.label) && cashOnly.test(field.value));
   return fields.some(({label, value}) => /(?:방식|방법)/u.test(label) && !noCashCollection.test(value) &&
     staffVisit.test(value) && collects.test(value) && (cash || fieldCash.test(value)));
+}
+
+const reportedRole = "(?:" + authority + "|공공\\s*(?:고지|통지|민원)|통신\\s*(?:사|회사|업체)|보험사|카드사|택배\\s*(?:사|회사)|공단)";
+const roleTitle = "(?<role>" + reportedRole + ")(?<unit>(?:\\s+(?:가입|관리|고객|민원|업무|수사|사건|통지|지원|상담|대출|상환|금융|담당(?:자|부서)?|부서|직원|팀|소속|창구)){0,5})";
+const reportingSender = "(?:발신(?:자|인|처)|보낸\\s*(?:사람|이|쪽)|상대(?:방)?)";
+const roleMarker = "(?:이?라고\\s*(?:소개한|밝힌|말한|주장한)|(?:[을를]\\s*)?(?:자처하(?:는|던)|자처한|자칭하(?:는|던)|자칭한))";
+const introducedSender = new RegExp("(?<![\\p{L}\\p{N}])" + roleTitle + "\\s*" + roleMarker + "\\s*" + reportingSender + "(?:이|가|은|는)?(?=[\\s,，]|$)", "u");
+const selfDescription = new RegExp("^(?:(?:문자|메시지|연락)(?:를|을)?\\s*)?" + reportingSender + "(?:이|가|은|는)\\s*" + roleTitle +
+  "\\s*(?:이?라고\\s*(?:했|하였|말했|소개했|밝혔|주장했)|(?:[을를]\\s*)?(?:자처했|자칭했))", "u");
+const describedRole = new RegExp("^" + roleTitle + "이?라는\\s*(?:사람|쪽|상대(?:방)?)(?:이|가|은|는)?(?=[\\s,，]|$)", "u");
+const institutionTitle = new RegExp("^" + roleTitle + "$", "u");
+const sameMessageSource = /(?:문자|메시지|쪽지|답장|회신)(?:을|를)?\s*보낸/u;
+const separateActionSource = /(?:^|[,，]\s*|\s+)(?:다른|별도(?:의)?|별개의?)\s*(?:발신(?:자|인|처)|사람|상대(?:방)?|단체|회사|기관|업체|담당자|직원|문자|서식|양식|쪽지)/u;
+const instructionalReport = /(?:예방|교육|훈련|모의|예시|참고)\s*(?:용|자료|사례|문구|설명|대본|상황)|(?:교육|훈련|수업|연극|역할극)(?:에서|의|을\s*위해)|(?:(?:신고|상담|교육)\s*이관용|기록용|참고용|예시용)\s*(?:더미|주소|링크|표기)|(?:절차|요청|통화|문자)(?:[이은가는을를])?\s*(?:취소|철회|종료|거절)|(?:자료|문서|주소|링크|현금)(?:[이은가는을를])?\s*(?:보내지|열지|봐서는|포함하지|전달하지|건네지|인계하지)\s*(?:말|마|않)/u;
+const reportDocument = /(?:서류|문서|고지|통지|접수|신청)(?:의|한)?\s*(?:내용|내역|위치|결과|확인)/u;
+const readAtAddress = /^\s*(?:에서|으로|로|에)(?:만)?\s*(?:직접\s*)?(?:보라는|보라고|봐야|읽으라는|읽으라고|읽어야|열람하라는|열람하라고|열람해야|확인하라는|확인하라고|확인해야)/u;
+const linkedPrivateReply = /(?:주민\s*등록\s*번호|여권\s*(?:번호|사본)|신분증\s*(?:사진|사본)|카드\s*비밀번호|계좌\s*비밀번호)(?:\s*(?:전부|전체|모두))?(?:을|를)?\s*(?:(?:그|해당|같은)\s*)?(?:(?:문자|메시지|쪽지)\s*)?(?:답장|회신)(?:란)?(?:으로|로|에)\s*(?:보내\s*(?:달라|달라는)|첨부하(?:라(?:고|는)?|도록)|알려\s*달라|남기(?:라(?:고|는)?|도록))/u;
+const deniedReportAction = /(?:요청|요구|지시|부탁|안내|말|뜻|내용)(?:[을를이가은는])?\s*(?:하지\s*않|없(?:었|다|다는|음)|아니(?:었|라|다)|취소|철회|거절)|(?:달라|하라|해야|보라)(?:고|는)?\s*(?:한|했던)?\s*(?:말|적|사실)(?:[이은가는])?\s*(?:없|아니)|이미\s*(?:종결됐|철회했|거절했|취소했)/u;
+const personCashDelivery = /(?:^|[\s,，])(?:수신자(?:가|는)?|받은\s*(?:사람|이)(?:가|이|은|는)?|제가|내가)\s*(?:(?:직접|먼저)\s*)?(?:사람|직원|담당자|수사관|대리인)(?:을|를)?\s*(?:직접\s*)?만나(?:서)?\s*(?:직접\s*)?(?:현금|현찰)(?:을|를|은)?\s*(?:건네|넘겨|인계해|전달해|교부해)(?:야|라(?:고|는)|\s*달라)/u;
+const requiredInPersonCash = /(?:대면\s*(?:으로)?\s*(?:현금|현찰)\s*(?:인계|전달|교부)|(?:현금|현찰)\s*대면\s*(?:인계|전달|교부))(?:를|을)?\s*(?:요구|지시)(?:하|한|했|함)/u;
+const inPersonLoanRepayment = /(?:대출(?:금)?|융자금)(?:의|을)?\s*상환(?:금|액)?(?:을|를|은)?\s*(?:현금|현찰)(?:으로|로|을|를)?\s*(?:직접\s*)?(?:(?:찾아\s*와서|와서|방문(?:해|하여|해서))\s*(?:수거|회수|받아\s*가|받아가|받)(?:하)?겠다고|(?:준비해(?:서)?\s*)?방문\s*(?:수거인|수령인|직원|담당자)(?:에게|한테)\s*(?:인계|전달|건네|넘겨)(?:하라는|하라고|해야|도록|라(?:고|는))?(?=\s*[.!。]?$))/u;
+const summarySplit = /\s*(?:\/|[|｜])\s*(?=(?:발신(?:인|자|처)|보낸\s*(?:사람|이)|(?:요구|요청)\s*(?:요약|내용|항목))[^.!?\n]{0,20}[:：])/u;
+const summaryHeading = /^(?:기록\s*(?:종류|유형)|(?:수신|받은\s*연락)\s*(?:기록|요약))(?:\s*[:：]\s*[^.!?\n]{0,20})?$/u;
+const summaryRole = /^(?:발신(?:인|자|처)|보낸\s*(?:사람|이))(?:의)?(?:\s*(?:자기\s*소개|소속|역할|표기|주장))?\s*[:：]\s*(?<value>[^\r\n]+)$/u;
+const summaryDemand = /^(?:요구|요청)\s*(?:요약|내용|항목)\s*[:：]\s*(?<value>[^\r\n]+)$/u;
+
+function issuerInReport(text) {
+  if (notCurrent.test(text) || anotherTopic.test(text) || instructionalReport.test(text)) return null;
+  return introducedSender.exec(text) ?? selfDescription.exec(text) ?? describedRole.exec(text);
+}
+
+function openDirectedReport(text) {
+  return !notCurrent.test(text) && !instructionalReport.test(text) && !deniedReportAction.test(text) &&
+    !separateActionSource.test(text) && !startsOtherOrganizer(text);
+}
+
+function* reportedDirectedInstitutionActions(text, unverifiedLinks) {
+  const hasRequest = clause => directsToUnverifiedAddress(clause, unverifiedLinks, true) ||
+    linkedPrivateReply.test(clause) || personCashDelivery.test(clause) || requiredInPersonCash.test(clause) || inPersonLoanRepayment.test(clause);
+  for (const { body, previous, next } of currentReceivedRequests(text, issuerInReport, hasRequest)) {
+    if (!openDirectedReport(body) || closedRemainder.test(next)) continue;
+    const sender = issuerInReport(body);
+    if (!sender) {
+      // 직전 절이 같은 문자의 발신자를 명시한 경우에만 현재 답장 요구와 연결한다.
+      if (sameMessageSource.test(previous) && issuerInReport(previous) && linkedPrivateReply.test(body)) yield SIG_PERSONAL_INFO;
+      continue;
+    }
+    const action = body.slice(sender.index + sender[0].length);
+    const { role, unit } = sender.groups;
+    if (!openDirectedReport(action)) continue;
+    if (directsToUnverifiedAddress(action, unverifiedLinks, true)) yield SIG_LINK;
+    if (linkedPrivateReply.test(action)) yield SIG_PERSONAL_INFO;
+    if (investigator.test(role) && !cashReturn.test(action) &&
+        (personCashDelivery.test(action) || requiredInPersonCash.test(action))) yield SIG_CASH_HANDOVER;
+    if (financialIssuer.test(role) && /직원|담당/u.test(unit) && inPersonLoanRepayment.test(action)) yield SIG_LOAN_CASH_PICKUP;
+  }
+  for (const line of text.split(/\r?\n/u)) {
+    if (!openDirectedReport(line)) continue;
+    const [heading, ...fields] = line.split(summarySplit).map(field => field.trim());
+    if (fields.length !== 2 || !summaryHeading.test(heading) || !receivingContext.test(heading)) continue;
+    const sender = fields.map(field => summaryRole.exec(field)?.groups.value).find(Boolean);
+    const role = institutionTitle.exec(sender ?? "")?.groups;
+    const request = fields.map(field => summaryDemand.exec(field)?.groups.value).find(Boolean);
+    if (role && financialIssuer.test(role.role) && /담당|직원/u.test(role.unit) &&
+        request && openDirectedReport(request) && inPersonLoanRepayment.test(request)) yield SIG_LOAN_CASH_PICKUP;
+  }
 }
 
 const formRow = /^\|\s*(?<label>[^|]*?)\s*\|\s*(?<value>[^|]*?)\s*\|$/u;
@@ -256,6 +323,10 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
       addAgencyAction(SIG_APP_INSTALL);
     }
     if (investigator.test(issuer) && reportsInvestigativeCash(action)) signals.add(SIG_CASH_HANDOVER);
+  }
+  for (const signal of reportedDirectedInstitutionActions(text, unverifiedLinks)) {
+    if (signal === SIG_LINK || signal === SIG_PERSONAL_INFO) addAgencyAction(signal);
+    else signals.add(signal);
   }
   if (hasStructuredInstallation(text)) addAgencyAction(SIG_APP_INSTALL);
   for (const { issuer, sender, heading, fields } of structuredFrames(text)) {
