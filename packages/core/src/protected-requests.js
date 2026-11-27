@@ -241,7 +241,10 @@ const helperOffer = /^(?:(?:[\p{L}]{1,12})(?:으로|로)\s+)?(?:도와\s*(?:준�
 const accessValueOrigin = "(?:" + ownedAccessDisplay.source + "|" + deliveredToRecipient.source + "|(?:(?:방금|막|오늘|지금|새로|직접|문자로|알림으로)\\s*)?(?:받은|수신한|온|도착한|표시된|뜬))";
 const hasReportedAccessCode = new RegExp(displayedSupportCode + "|" + directAccessCode, "iu");
 const reportedAccessIssuer = /^(?:[\p{L}\p{N}·-]{1,12}\s+){0,4}[\p{L}\p{N}]{0,12}(?:하겠다는|한다는|한다며|한다고\s*한|해\s*준다는|해\s*주겠다는)\s*(?:사람|이|직원|상대)(?:이|가|은|는)\s+/u;
-const deliveryToIssuer = "(?:자신|자기|본인|발신(?:자|인)|보낸\\s*사람|상대(?:방)?)(?:에게|한테|\\s*쪽(?:으로|에))";
+const relayRecipientParticle = "(?:에게|한테|\\s*쪽(?:으로|에))";
+const explicitIssuerRecipient = "(?:발신(?:자|인)|보낸\\s*사람|상대(?:방)?)" + relayRecipientParticle;
+const reflexiveRecipient = "(?:자신|자기|본인)" + relayRecipientParticle;
+const deliveryToIssuer = "(?:" + reflexiveRecipient + "|" + explicitIssuerRecipient + ")";
 const supportChatChannel = "(?:(?:이|같은|해당|상담|지원)\\s*)?(?:문자|메시지|채팅(?:방|창)?|대화방|메신저)(?:로|으로|에)";
 const remoteRelayArgument = new RegExp(
   "^\\s*(?:(?<agent>제가|내가|수신자가|받은\\s*사람이)|" +
@@ -268,6 +271,56 @@ function reportsSupportCodeToIssuer(clause) {
       !relayRequestEnding.test(ending) && !supportReportedEnding.test(ending)) return false;
   const roles = relayArguments(request.slice(0, predicate.index), remoteRelayArgument);
   return Boolean(roles?.has("value") && roles.has("destination"));
+}
+
+const remoteWorkOffer = "(?:원격\\s*(?:수리|지원|도움)(?:을|를)?\\s*(?:제안한|내세운|표방한|사칭한|한다고\\s*한|한다는|해\\s*준다는|해\\s*주겠다는)|" +
+  "원격으로\\s+(?:(?:기기|장비|컴퓨터)(?:를|을)\\s+)?(?:수리\\s*(?:한다는|하겠다는|해\\s*준다는)|고쳐\\s*(?:준다는|주겠다는)))";
+const remoteOffer = new RegExp("^" + remoteWorkOffer +
+  "\\s*(?:(?<notice>연락|안내|문자|메시지)(?:에서|에는)|(?:사람|상대(?:방)?|발신자)(?:가|이|은|는))\\s+", "u");
+const purposeMarkedCode = "(?:화면\\s*공유(?:\\s*용)?|원격\\s*(?:지원|접속)\\s*용)";
+const temporaryValue = "(?:임시|일회용|일회성|1\\s*회용|1\\s*회성)";
+const remoteCodePurpose = "(?:" + temporaryValue + "\\s*" + purposeMarkedCode + "|" +
+  purposeMarkedCode + "\\s*" + temporaryValue + ")\\s*(?:코드|번호|값)";
+const issuedSupportValue = "\\s*(?:(?:이미|방금)\\s*)?(?:발급된|생성된|표시된|뜬|도착한|받은|나타난)\\s*" +
+  remoteCodePurpose + "(?:을|를|만)";
+const reportedHolder = "(?:부모|받는\\s*사람)(?:\\s*본인)?(?:에게|한테)";
+const purposeMarkedRelayArgument = new RegExp(
+  "^\\s*(?:(?<agent>제가|내가|수신자가|받은\\s*사람이)|" +
+  "(?<value>" + recipientDeliveryOrigin.source + issuedSupportValue + ")|" +
+  "(?<holderValue>" + reportedHolder + issuedSupportValue + ")|" +
+  "(?<destination>" + explicitIssuerRecipient + ")|(?<reflexive>(?:자신|자기)" + relayRecipientParticle +
+  ")|(?<channel>" + supportChatChannel + "))(?=\\s|$)", "u",
+);
+const purposeRelayNoticeEnding = /^(?:요청|요구|지시)(?:이|가)\s*있었(?:다|습니다|어요|음)$/u;
+const purposeRelayRequestEnding = /^(?:요청|요구|지시)(?:를|을)?\s*(?:했|하였)(?:다|습니다|어요|음)$/u;
+const completedPurposeRelay = /^(?<request>[^.!?。！？\r\n]+)(?:(?:[.。][ \t]*(?:\r?\n[ \t]*)?|\r?\n[ \t]*)(?<outcome>[^.!?。！？\r\n]+))?[.。]?$/u;
+const recipientDidNotRelay = /^(?:저는|제가|나는|내가)\s*(?:(?:그|이|해당|같은)\s*)?(?:(?:코드|값|번호)(?:를|을)?\s*)?(?:전송하|전달하|보내|전하|넘기|건네)지\s*(?:않았|못했)(?:다|습니다|어요|음)$/u;
+
+function reportsPurposeMarkedRemoteRelay(text) {
+  // 새 문형은 보고 전체가 실제 요구 한 건으로 닫힐 때만 쓴다. 덧붙일 수 있는 것은 수신자 자신의 미전달 결과뿐이다.
+  const report = completedPurposeRelay.exec(text.trim());
+  if (!report || (report.groups.outcome && !recipientDidNotRelay.test(report.groups.outcome.trim()))) return false;
+  const clause = report.groups.request.trim();
+  if (inactiveReport.test(clause) || otherRelayTopic.test(clause)) return false;
+  const lead = remoteOffer.exec(clause);
+  if (!lead) return false;
+  const request = clause.slice(lead[0].length);
+  const predicate = supportRelayPredicate.exec(request) ??
+    /\s*(?:(?:돌려\s*)?보내|전해)(?:라(?:고|는|며)|도록)\s*(?<ending>[^.!?\n]*)[.!?]?$/u.exec(request);
+  if (!predicate) return false;
+  const ending = predicate.groups.ending.trim();
+  if (!purposeRelayRequestEnding.test(ending) && !supportReportedEnding.test(ending) &&
+      !(lead.groups.notice && purposeRelayNoticeEnding.test(ending))) return false;
+  const roles = relayArguments(request.slice(0, predicate.index), purposeMarkedRelayArgument);
+  // 화면에 보이는 다른 종류의 번호와 달리, 발급된 값 자체가 화면 공유나 원격 연결에 쓰인다.
+  if (!roles) return false;
+  const value = roles.has("value");
+  const holderValue = roles.has("holderValue");
+  // 별도 주어가 있는 인용절에서는 그 사람과 발급 대상이 같다고 가정하지 않는다.
+  if (value === holderValue || (holderValue && roles.has("agent"))) return false;
+  if (roles.has("destination")) return !roles.has("reflexive");
+  // ‘자기에게/자신에게’는 별도 주어가 없을 때만 발신 화자를 가리킨다.
+  return roles.has("reflexive") && !lead.groups.notice && !roles.has("agent");
 }
 
 const otherBookingActor = /(?:발신자|상담원|담당자|직원|상대(?:방)?|다른\s*사람)(?:이|가|은|는)\s/u;
@@ -716,8 +769,9 @@ function linksApplicationReplyToSubmissionAddress(body, previous, record, next, 
   return Boolean(action && returnedDemand.test(objects.slice(pair[0].length + action[0].length)));
 }
 
-export function addReportedProtectedRequests(text, signals, hasUnverifiedLink, inspection) {
-  if (hasReceivedCredentialRequest(text, hasUnverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
+export function addReportedProtectedRequests(text, signals, hasUnverifiedLink, inspection, { inputComplete = true } = {}) {
+  if (hasReceivedCredentialRequest(text, hasUnverifiedLink) ||
+      (inputComplete && reportsPurposeMarkedRemoteRelay(text))) signals.add(SIG_CREDENTIAL_DISCLOSURE);
   if (hasUnverifiedLink) {
     addReceivedFormFields(text, signals);
     addRequirementsAtUnconfirmedAddress(text, signals, inspection);

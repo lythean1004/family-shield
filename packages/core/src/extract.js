@@ -341,7 +341,7 @@ function extractRawCodeSignals(text, options) {
 
   const directSignals = [...signals];
   if (options.inputComplete !== false) addReportedContactRestrictions(input, signals);
-  addReportedProtectedRequests(input, signals, unverifiedLink, inspection);
+  addReportedProtectedRequests(input, signals, unverifiedLink, inspection, options);
   for (const signal of reportedRequestSignals(input, options)) signals.add(signal);
   if (reportsReceivedInstallation(input)) signals.add(SIG_APP_INSTALL);
   addReportedFamilySignals(input, signals);
