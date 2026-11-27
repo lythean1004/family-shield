@@ -182,6 +182,278 @@
       "terms_checked": false,
       "status": "source_checked",
       "check_note": "수협은행이 카드 이용 안내에서 인터넷뱅킹 주소로 명시한 호스트가 명부와 일치한다."
+    },
+    {
+      "id": "EV-LINK-IMBANK",
+      "name": "iM뱅크 대표 주소",
+      "hosts": [
+        "www.imbank.co.kr"
+      ],
+      "source_url": "https://www.imbank.co.kr/down/hlp/hlp_pre_20250812.pdf",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "iM뱅크 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "은행이 자기 홈페이지를 명시한 개인정보처리방침 개정 자료에서 현재 호스트를 확인했다. 금융연수원 명부의 옛 주소는 추가하지 않았다."
+    },
+    {
+      "id": "EV-LINK-JEJUBANK",
+      "name": "제주은행 대표 주소",
+      "hosts": [
+        "www.jejubank.co.kr"
+      ],
+      "source_url": "https://www.jejubank.co.kr/hmpg/csct/evnt.do?evntId=EVNT_26017391c9ed4d828438663b74894ac2&mode=detail",
+      "directory_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": "2026-02-02",
+      "checked_at": "2026-11-27",
+      "scope": "제주은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "제주은행 자체 상품 안내에서 현재 홈페이지를 명시했다. 명부의 이전 주소 및 별도 뱅킹 호스트는 범위에서 제외했다."
+    },
+    {
+      "id": "EV-LINK-KDB",
+      "name": "산업은행 대표 주소",
+      "hosts": [
+        "www.kdb.co.kr"
+      ],
+      "source_url": "https://www.kbi.or.kr/platformWeb/Introduction.do?cmd=openPage&pageName=introductionOrganization",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "산업은행 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "금융연수원 사원기관 명부에서 KDB산업은행과 연결된 대표 주소를 확인했다."
+    },
+    {
+      "id": "EV-LINK-KFCC",
+      "name": "새마을금고중앙회 대표 주소",
+      "hosts": [
+        "www.kfcc.co.kr"
+      ],
+      "source_url": "https://www.kfcc.co.kr/recruit/kfccRegularEmployment.do",
+      "directory_url": "https://www.bok.or.kr/portal/main/contents.do?menuNo=200577",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "새마을금고중앙회 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "중앙회 공개 채용 안내에서 명시한 홈페이지 주소다."
+    },
+    {
+      "id": "EV-LINK-CU",
+      "name": "신협중앙회 대표 주소",
+      "hosts": [
+        "www.cu.co.kr"
+      ],
+      "source_url": "https://www.cu.co.kr/cu/main.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "신협중앙회 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "신협중앙회 대표 누리집에서 기관 명칭과 중앙회 안내를 확인했다."
+    },
+    {
+      "id": "EV-LINK-MIRAEASSET-SEC",
+      "name": "미래에셋증권 대표 주소",
+      "hosts": [
+        "securities.miraeasset.com"
+      ],
+      "source_url": "https://www.kofia.or.kr/brd/m_215/list.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "미래에셋증권 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "금융투자협회 소수단위 거래 서비스 명부가 명시한 증권사 공지 호스트다. 그룹 전체 도메인은 제외했다."
+    },
+    {
+      "id": "EV-LINK-SAMSUNGPOP",
+      "name": "삼성증권 대표 주소",
+      "hosts": [
+        "www.samsungpop.com"
+      ],
+      "source_url": "https://www.kofia.or.kr/brd/m_215/list.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "삼성증권 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "금융투자협회가 삼성증권 홈페이지로 안내한 정확한 호스트다."
+    },
+    {
+      "id": "EV-LINK-SAMSUNGFIRE",
+      "name": "삼성화재 대표 주소",
+      "hosts": [
+        "www.samsungfire.com"
+      ],
+      "source_url": "https://knia.or.kr/eng/member/member01",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "삼성화재 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "손해보험협회 정회원 명부가 연결한 본사 홈페이지다. 별도의 모집인 호스트는 포함하지 않는다."
+    },
+    {
+      "id": "EV-LINK-HI-INS",
+      "name": "현대해상 대표 주소",
+      "hosts": [
+        "www.hi.co.kr"
+      ],
+      "source_url": "https://knia.or.kr/eng/member/member01",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "현대해상 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "손해보험협회 정회원 명부에서 현대해상의 대표 호스트를 확인했다."
+    },
+    {
+      "id": "EV-LINK-KEPCO",
+      "name": "한국전력공사 대표 주소",
+      "hosts": [
+        "www.kepco.co.kr"
+      ],
+      "source_url": "https://www.kepco.co.kr/KEPCO_FILE/html/2025_08/story02.html",
+      "directory_url": "https://www.mcee.go.kr/home/mob/main.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "한국전력공사 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "한국전력이 홈페이지 개편 안내에서 공식 주소를 명시했다."
+    },
+    {
+      "id": "EV-LINK-KDHC",
+      "name": "한국지역난방공사 대표 주소",
+      "hosts": [
+        "www.kdhc.co.kr"
+      ],
+      "source_url": "https://www.nabis.go.kr/localSocietyDetailView.do?menucd=248&societyIdx=1388",
+      "directory_url": "https://www.mcee.go.kr/home/mob/main.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "한국지역난방공사 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "NABIS 기관 정보에 명시된 공사 대표 주소다."
+    },
+    {
+      "id": "EV-LINK-KWATER",
+      "name": "한국수자원공사 대표 주소",
+      "hosts": [
+        "www.kwater.or.kr"
+      ],
+      "source_url": "https://www.kwater.or.kr/web/download/recr/advice/notice_K-water.pdf",
+      "directory_url": "https://www.mcee.go.kr/home/mob/main.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "한국수자원공사 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "공사의 청년자문단 공고가 홈페이지로 명시한 주소다."
+    },
+    {
+      "id": "EV-LINK-KOGAS",
+      "name": "한국가스공사 대표 주소",
+      "hosts": [
+        "kogas.or.kr"
+      ],
+      "source_url": "https://www.nabis.go.kr/localSocietyDetailView.do?menucd=248&societyIdx=348",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "한국가스공사 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "NABIS가 기관 홈페이지로 안내한 www 없는 호스트다. 지역 도시가스 소매사는 별개다."
+    },
+    {
+      "id": "EV-LINK-KOREANAIR",
+      "name": "대한항공 대표 주소",
+      "hosts": [
+        "www.koreanair.com"
+      ],
+      "source_url": "https://www.airport.co.kr/muan/ajaxf/frFlightSchSvc/getAirlineList.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "대한항공 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "한국공항공사 항공사 명부의 대한항공 홈페이지 필드에서 확인했다."
+    },
+    {
+      "id": "EV-LINK-ASIANA",
+      "name": "아시아나항공 대표 주소",
+      "hosts": [
+        "flyasiana.com"
+      ],
+      "source_url": "https://www.airport.co.kr/muan/ajaxf/frFlightSchSvc/getAirlineList.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "아시아나항공 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "한국공항공사가 안내한 www 없는 항공사 호스트다."
+    },
+    {
+      "id": "EV-LINK-JEJUAIR",
+      "name": "제주항공 대표 주소",
+      "hosts": [
+        "www.jejuair.net"
+      ],
+      "source_url": "https://www.airport.co.kr/muan/ajaxf/frFlightSchSvc/getAirlineList.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "제주항공 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "한국공항공사 항공사 명부에서 제주항공의 대표 호스트를 확인했다."
+    },
+    {
+      "id": "EV-LINK-JINAIR",
+      "name": "진에어 대표 주소",
+      "hosts": [
+        "www.jinair.com"
+      ],
+      "source_url": "https://www.airport.co.kr/muan/ajaxf/frFlightSchSvc/getAirlineList.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "진에어 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "한국공항공사 항공사 명부에서 진에어 홈페이지 주소를 확인했다."
+    },
+    {
+      "id": "EV-LINK-AIRBUSAN",
+      "name": "에어부산 대표 주소",
+      "hosts": [
+        "www.airbusan.com"
+      ],
+      "source_url": "https://www.airport.co.kr/muan/ajaxf/frFlightSchSvc/getAirlineList.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "에어부산 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "한국공항공사가 항공사 홈페이지로 안내한 호스트다."
+    },
+    {
+      "id": "EV-LINK-EMART-CORP",
+      "name": "이마트 기업 소개 대표 주소",
+      "hosts": [
+        "company.emart.com"
+      ],
+      "source_url": "https://company.emart.com/ko/company/business.do",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "이마트 기업 소개 대표 호스트 1개",
+      "terms_checked": false,
+      "status": "source_checked",
+      "check_note": "이마트 기업 소개 페이지에서 확인했다. 쇼핑몰·입점 판매자·계정 페이지는 범위 밖이다."
     }
   ]
 }

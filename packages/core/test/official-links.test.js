@@ -85,6 +85,31 @@ describe("은행 카드의 대표 주소 범위", () => {
   });
 });
 
+describe("멘토링 후속 공식 주소 카드", () => {
+  const hosts = [
+    "www.imbank.co.kr", "www.jejubank.co.kr", "www.kdb.co.kr", "www.kfcc.co.kr",
+    "www.cu.co.kr", "securities.miraeasset.com", "www.samsungpop.com", "www.samsungfire.com",
+    "www.hi.co.kr", "www.kepco.co.kr", "www.kdhc.co.kr", "www.kwater.or.kr",
+    "kogas.or.kr", "www.koreanair.com", "flyasiana.com", "www.jejuair.net",
+    "www.jinair.com", "www.airbusan.com", "company.emart.com",
+  ];
+
+  for (const host of hosts) {
+    it(`${host} 단독·혼합 안내와 카드 범위`, () => {
+      const link = `https://${host}/`;
+      const mixed = `자료 목록 ${link} https://sample.invalid/guide`;
+      assert.equal(level(link), "확인필요");
+      assert.ok(extractCodeSignals(link).signals.includes(SIG_OFFICIAL_LINK));
+      assert.equal(level(mixed), "주의");
+      assert.ok(!extractCodeSignals(mixed).signals.includes(SIG_OFFICIAL_LINK));
+
+      const other = host.startsWith("www.") ? host.slice(4) : `www.${host}`;
+      assert.equal(isOfficialLink(`https://${other}/`), false);
+      assert.equal(isOfficialLink(`https://sub.${host}/`), false);
+    });
+  }
+});
+
 describe("판정: 공식 주소 링크만 있으면 '확인 필요'", () => {
   it("공식 택배 조회 링크만 있는 안내 문자", () => {
     const s = extractCodeSignals("[CJ대한통운] 배송 조회 https://www.cjlogistics.com/ko/tool/parcel/tracking").signals;

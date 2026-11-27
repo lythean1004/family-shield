@@ -7,9 +7,9 @@
  * 확인하는 것:
  *   - 필수 필드와 값 범위(group, split, level, 신호 ID, 사칭 유형)
  *   - case_id 중복(파일끼리도)
- *   - 작성 원칙: 번호는 010-0000-XXXX만, 링크 도메인은 .invalid만(단축 URL 서비스 예외)
+ *   - 합성 연락처·주소 검사. 문자형 세트의 정상·경계 문장에는 근거 카드의 대표 홈페이지를 허용한다.
  *   - level_rule이 규칙 엔진 결과와 같은지(정답을 규칙에 맞춰 바꾸지 말 것 — 다르면 알려만 준다)
- *   - 묶음별 건수(목표 A35 B45 C25 D1 50 D2 35 E10)
+ *   - 묶음별 건수(기존 평가 200건, 문자형 평가 120건)
  *   - 평가용(test)과 개발용(dev) 문장이 너무 비슷하지 않은지(말만 바꿔 쓰기 방지, 15-1)
  * 출력에 원문을 찍지 않는다(case_id로만).
  */
@@ -18,11 +18,30 @@ import { decide } from "../packages/core/src/rule-engine.js";
 import { AI_ALLOWED_SIGNALS, IMPERSONATION_TYPES } from "../packages/core/src/signals.js";
 import * as SIG from "../packages/core/src/signals.js";
 import { findLinks, toDomain, isShortener } from "../packages/core/src/links.js";
+import { inspectLinkCandidates } from "../packages/core/src/link-candidates.js";
+import { isOfficialLink, OFFICIAL_LINK_HOST_CARDS } from "../packages/core/src/official-links.js";
+import { OFFICIAL_DOMAIN_CARDS } from "../packages/core/src/lookalike.js";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 const ALL_SIGNALS = new Set(Object.entries(SIG).filter(([k]) => k.startsWith("SIG_")).map(([, v]) => v));
 const LEVELS = new Set(["위험", "주의", "확인필요"]);
 const GROUPS = new Set(["A", "B", "C", "D1", "D2", "E"]);
 const TARGET = { A: 35, B: 45, C: 25, D1: 50, D2: 35, E: 10 };
+const MESSAGE_TARGET = { A: 16, B: 18, C: 16, D1: 50, E: 20 };
+const MESSAGE_DATASET = fileURLToPath(new URL("./messages-2026-11.jsonl", import.meta.url));
+const homeHosts = new Set(OFFICIAL_LINK_HOST_CARDS.filter(c => c.status === "source_checked").flatMap(c => c.hosts));
+for (const card of OFFICIAL_DOMAIN_CARDS.filter(c => c.status === "source_checked")) {
+  for (const domain of card.official_domains) {
+    homeHosts.add(domain);
+    homeHosts.add(`www.${domain}`);
+  }
+}
+
+function fixtureHomepage(candidate, group) {
+  return (group === "D1" || group === "E") && candidate.complete && homeHosts.has(candidate.host)
+    && candidate.rest === "/" && isOfficialLink(candidate.raw);
+}
 
 export function loadJsonl(path) {
   return readFileSync(path, "utf8").split(/\r?\n/).filter((l) => l.trim()).map((l, i) => {
@@ -31,7 +50,7 @@ export function loadJsonl(path) {
 }
 
 /** @returns {string[]} 이 케이스의 문제 목록 */
-export function checkCase(c) {
+export function checkCase(c, { messageDataset = false } = {}) {
   const errs = [];
   const need = ["case_id", "split", "group", "message_text", "gold"];
   for (const k of need) if (c[k] == null) errs.push(`필드 없음: ${k}`);
@@ -59,19 +78,34 @@ export function checkCase(c) {
   for (const m of text.matchAll(/01[016789][-\s.]?(\d{3,4})[-\s.]?\d{4}/g)) {
     if (!/^01[016789][-\s.]?0000[-\s.]?\d{4}$/.test(m[0])) errs.push("010-0000-XXXX가 아닌 휴대폰 번호");
   }
-  for (const link of findLinks(text)) {
-    const d = toDomain(link);
-    if (d && !isShortener(d) && !d.endsWith(".invalid")) errs.push(`.invalid가 아닌 링크 도메인`);
+  if (messageDataset) {
+    const { candidates, complete } = inspectLinkCandidates(text);
+    if (!complete || candidates.some(link => !link.host.endsWith(".invalid") && !fixtureHomepage(link, c.group))) {
+      errs.push("문자형 평가 주소는 합성 주소 또는 정상·경계 사례의 공식 대표 홈페이지만 허용");
+    }
+  } else {
+    for (const link of findLinks(text)) {
+      const d = toDomain(link);
+      if (d && !isShortener(d) && !d.endsWith(".invalid")) errs.push(".invalid가 아닌 링크 도메인");
+    }
   }
   return [...new Set(errs)];
 }
 
 /** 규칙 엔진 결과와 level_rule이 다르면 문구, 같으면 null */
-export function ruleMismatch(c) {
+export function ruleMismatch(c, { messageDataset = false } = {}) {
   const pi = c.parent_inputs ?? {};
-  const all = [...new Set([...(c.gold.signals_code ?? []), ...(c.gold.signals_ai ?? [])])];
+  const code = [...(c.gold.signals_code ?? [])];
+  if (messageDataset && code.includes(SIG.SIG_LINK)) {
+    const { candidates, complete } = inspectLinkCandidates(c.message_text);
+    if (complete && candidates.length && candidates.every(link => fixtureHomepage(link, c.group))) {
+      code.push(SIG.SIG_OFFICIAL_LINK);
+    }
+  }
+  const all = [...new Set([...code, ...(c.gold.signals_ai ?? [])])];
   const { level } = decide({
     signals_final: all,
+    ...(messageDataset ? { signals_code: code } : {}),
     call_in_progress: Boolean(pi.call_in_progress),
     called_before: Boolean(pi.called_before),
     family_denied: Boolean(pi.family_denied),
@@ -101,12 +135,13 @@ function main(paths) {
   let bad = 0;
   const seen = new Map();
   for (const c of cases) {
-    const errs = checkCase(c);
+    const options = { messageDataset: resolve(c._file) === MESSAGE_DATASET };
+    const errs = checkCase(c, options);
     if (seen.has(c.case_id)) errs.push(`case_id 중복(${seen.get(c.case_id)})`);
     seen.set(c.case_id, c._file);
     if (errs.length) { bad++; console.log(`ERR  ${c.case_id ?? "?"}  ${errs.join(" / ")}`); }
     else {
-      const mm = ruleMismatch(c);
+      const mm = ruleMismatch(c, options);
       if (mm) console.log(`NOTE ${c.case_id}  ${mm} (정답을 규칙에 맞추지 말고 이유를 PRD 15-1에 기록)`);
     }
   }
@@ -120,18 +155,19 @@ function main(paths) {
     }
   }
 
-  const count = (arr) => Object.fromEntries(Object.keys(TARGET).map((g) => [g, arr.filter((c) => c.group === g).length]));
   console.log("-".repeat(60));
   console.log(`전체 ${cases.length}건 (dev ${dev.length}, test ${test.length})  문제 ${bad}건`);
-  if (test.length) {
-    const tc = count(test);
-    console.log("평가용 묶음별: " + Object.entries(TARGET).map(([g, n]) => `${g} ${tc[g]}/${n}`).join("  "));
+  for (const [label, target, rows] of [
+    ["평가용 묶음별", TARGET, test.filter(c => resolve(c._file) !== MESSAGE_DATASET)],
+    ["문자형 묶음별", MESSAGE_TARGET, test.filter(c => resolve(c._file) === MESSAGE_DATASET)],
+  ]) {
+    if (!rows.length) continue;
+    const counts = Object.entries(target).map(([g, n]) => `${g} ${rows.filter(c => c.group === g).length}/${n}`);
+    console.log(`${label}: ${counts.join("  ")}`);
   }
   process.exitCode = bad ? 1 : 0;
 }
 
-import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const args = process.argv.slice(2);

@@ -27,6 +27,25 @@ describe("평가 케이스 검사 (PRD 15-1)", () => {
     assert.deepEqual(checkCase({ ...base, message_text: "http://bank.invalid/login bit.ly/x" }), []);
   });
 
+  it("문자형 평가의 정상·경계 사례만 근거 카드의 대표 홈페이지를 사용할 수 있다", () => {
+    const official = { ...base, group: "D1", message_text: "은행 첫 화면 www.kbanknow.com" };
+    assert.deepEqual(checkCase(official, { messageDataset: true }), []);
+    assert.deepEqual(checkCase({ ...official, group: "E" }, { messageDataset: true }), []);
+    assert.ok(checkCase(official).length);
+    assert.ok(checkCase({ ...official, group: "B" }, { messageDataset: true }).length);
+    for (const link of ["www.example.org", "www.kbanknow.com/archive", "other.epost.go.kr"]) {
+      assert.ok(checkCase({ ...official, message_text: link }, { messageDataset: true }).length, link);
+    }
+  });
+
+  it("문자형 평가의 공식 주소 정답 대조에는 공식 주소 조건과 동봉된 통화 정보가 반영된다", () => {
+    const sample = { ...base, group: "D1", message_text: "공식 첫 화면 www.kbanknow.com",
+      gold: { ...base.gold, signals_code: ["SIG_LINK"], signals_ai: [], level_rule: "확인필요" } };
+    assert.equal(ruleMismatch(sample, { messageDataset: true }), null);
+    assert.equal(ruleMismatch({ ...sample, parent_inputs: { called_before: true },
+      gold: { ...sample.gold, level_rule: "위험" } }, { messageDataset: true }), null);
+  });
+
   it("모르는 신호·잘못된 판정 값", () => {
     const errs = checkCase({ ...base, gold: { ...base.gold, signals_ai: ["SIG_WHAT"], level_rule: "안전" } });
     assert.ok(errs.some((e) => e.includes("SIG_WHAT")));
