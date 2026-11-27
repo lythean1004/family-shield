@@ -29,7 +29,7 @@ import { hasCardServiceRequest } from "./card-sender.js";
 import { classifyCallback } from "./callback-number.js";
 import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover } from "./cash-handover.js";
-import { requestedPayments, requiresAdvancePayment } from "./payment-request.js";
+import { ACCOUNT_NUMBER, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
 /** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
@@ -46,8 +46,6 @@ const gap = (n) => `[^.!?\\n]{0,${n}}`;
 const ASK = "(?:해\\s*(?:줘|줄래|주세요|주실|주라|줄\\s*수)|하세요|해라|해\\s*달라|부탁|바랍니다|좀\\s*해)";
 const AGENCY = '(?:대검찰청|검찰(?:청)?|경찰(?:청|서)?|지검|금융감독원|금감원|법원|수사관|수사팀|검사|국세청|세무서|관세청|보건소|출입국관리소)';
 const PROTECTED_ACCOUNT = '(?:(?:국가\\s*)?안전(?:한)?\\s*계좌|보호\\s*계좌)';
-const ACCOUNT_DIGITS = '[0-9Xx*○●]';
-const ACCOUNT_NUMBER = '(?:' + ACCOUNT_DIGITS + '{2,6}(?:-' + ACCOUNT_DIGITS + '{2,6}){2,3}|' + ACCOUNT_DIGITS + '{9,16})';
 const ACCOUNT_FIELD = '(?:계좌\\s*번호[ \\t]*[:：]?[ \\t]*)?' + ACCOUNT_NUMBER;
 const LABELED_ACCOUNT = '(?:\\([ \\t]*' + ACCOUNT_FIELD + '(?:[ \\t]+예금주[ \\t]*[:：]?[ \\t]*[가-힣A-Za-z○●*]{1,16})?[ \\t]*\\)|' + ACCOUNT_FIELD + ')';
 const NOT_PROHIBITION = '(?!\\s*(?:주)?(?:하)?지\\s*(?:마|않))';
@@ -243,6 +241,7 @@ export function extractCodeSignals(text, options = {}) {
   if (requiresAdvancePayment(input)) signals.add(SIG_PREPAYMENT);
   if (payments.money) signals.add(SIG_MONEY);
   if (payments.gift) signals.add(SIG_GIFTCARD);
+  if (payments.thirdPartyAccount) signals.add(SIG_THIRD_PARTY_ACCOUNT);
   if (hasInvestigativeCashHandover(input)) signals.add(SIG_CASH_HANDOVER);
   if (callback.signal) signals.add(SIG_CALL_THIS_NUMBER);
   const disclosure = personalDisclosure(input);

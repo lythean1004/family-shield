@@ -1,6 +1,15 @@
 // 계좌는 송금의 목적지이고, 상품권은 수량을 세어 사는 물건이다. 같은 문장의 목적어와 요청을 확인한다.
 const polite = "(?:줘|주라|줄래|주세요|주실래요|줄\\s*수\\s*(?:있어|있니|있을까))";
 const end = "(?=[\\s,.!?~ㅋㅎㅠㅜ]|$)";
+const accountDigits = "[0-9Xx*○●]";
+export const ACCOUNT_NUMBER = "(?:" + accountDigits + "{2,6}(?:-" + accountDigits + "{2,6}){2,3}|" + accountDigits + "{9,16})";
+const shortAmount = new RegExp("(?:이체|송금|통장|계좌)[^,.!?\\n]{0,24}?\\d+\\s*(?:천|만)(?:만)?\\s*(?:좀\\s*)?보내\\s*" + polite + end);
+const nonMoneyItem = /(?:파일|서류|사진|우편|엽서|자료|물품)/;
+const borrow = new RegExp("(?:돈|금액|[가-힣]{1,6}비|\\d+\\s*(?:만|천)?\\s*원)(?:을|를|만)?\\s*(?:좀\\s*)?빌려\\s*" +
+  "(?:" + polite + "|줄\\s*수\\s*있(?:나|나요|을까요))" + end);
+const owner = "(?:(?:우리|내|제)[ \\t]*)?(?:딸|아들|동생|형|언니|누나|오빠|친구|가족|동료|지인)(?:의)?[ \\t]*";
+const namedAccount = new RegExp("(?:계좌(?:[ \\t]*번호)?|통장)(?:는|은)?[ \\t:：]*(?:" + ACCOUNT_NUMBER + "[ \\t,]*)?" +
+  owner + "(?:(?:이름|명의)(?:으)?로[ \\t]*(?:돼|되어)[ \\t]*있(?:어|어요|습니다)|명의(?:야|예요|입니다))" + end);
 const toAccount = new RegExp("(?:계좌|통장)(?:로|으로|에)\\s*(?:(?:바로|좀|지금|대신)\\s*){0,2}보내" +
   "(?:\\s*" + polite + "|(?=\\s*(?:[0-9]+\\s*만?\\s*원|$)))" + end);
 const oneTransfer = /(?:송금|이체)(?:을|를)?\s*(?:한\s*(?:번|건)|하나)만\s*(?:부탁(?:해|할게요?|드릴게요?|드려요|드립니다)?|해\s*(?:줘|주세요))(?=[\s,.!?~ㅋㅎ]|$)/;
@@ -32,11 +41,22 @@ export function requiresAdvancePayment(text) {
 export function requestedPayments(text) {
   let money = false;
   let gift = false;
+  let thirdPartyAccount = false;
+  let precedingLoanRequest = false;
   for (const clause of text.split(/[.!?\n]/)) {
-    if (reported.test(clause)) continue;
-    if (toAccount.test(clause) || oneTransfer.test(clause) || (remit.test(clause) && !mail.test(clause))) money = true;
+    if (!clause.trim()) continue;
+    if (reported.test(clause)) {
+      precedingLoanRequest = false;
+      continue;
+    }
+    const loanRequest = borrow.test(clause);
+    // 대여할 물건과 받는 계좌가 따로 언급될 수 있어, 금전 차용을 부탁한 같은 절이나 바로 다음 절만 본다.
+    if ((loanRequest || precedingLoanRequest) && namedAccount.test(clause)) thirdPartyAccount = true;
+    precedingLoanRequest = loanRequest;
+    if (toAccount.test(clause) || oneTransfer.test(clause) || (remit.test(clause) && !mail.test(clause)) ||
+        (shortAmount.test(clause) && !nonMoneyItem.test(clause))) money = true;
     const product = voucher.exec(clause);
     if (product && buyCount.test(clause.slice(product.index + product[0].length, product.index + 90))) gift = true;
   }
-  return { money, gift };
+  return { money, gift, thirdPartyAccount };
 }
