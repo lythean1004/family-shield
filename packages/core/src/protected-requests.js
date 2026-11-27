@@ -100,7 +100,8 @@ const continuedFormAddress = /^(?:(?:그|해당|이|같은)\s*)?(?:확인\s*)?(?
 
 
 const oneTimeConfirmationValue = "(?:일회용\\s*(?:(?:본인\\s*확인|인증|확인)\\s*)?(?:값|코드|숫자|번호)|OTP)";
-const deliveredToRecipient = /(?<![\p{L}\p{N}])(?:내|제|수신자(?:의)?|저에게|저한테|제게|나에게|나한테)(?:\s*(?:휴대전화|휴대폰|핸드폰|전화기|기기|단말(?:기)?|화면|번호|연락처|수신함|알림(?:창)?|메일|채팅(?:방)?|계정|쪽|앞|문자|앱)(?:에|로|으로|에서)?|에게|한테)?\s*(?:온|오는|오면|도착한|도착하는|받은|받게\s*된|뜬|표시된|나타난|발급된|생긴)/u;
+const recipientDeliveryOrigin = /(?<![\p{L}\p{N}])(?:내|제|수신자(?:의)?|저에게|저한테|제게|나에게|나한테)(?:\s*(?:휴대전화|휴대폰|핸드폰|전화기|기기|단말(?:기)?|화면|번호|연락처|수신함|알림(?:창)?|메일|채팅(?:방)?|계정|쪽|앞|문자|앱)(?:에|로|으로|에서)?|에게|한테)?/u;
+const deliveredToRecipient = new RegExp(recipientDeliveryOrigin.source + "\\s*(?:온|오는|오면|도착한|도착하는|받은|받게\\s*된|뜬|표시된|나타난|발급된|생긴)", "u");
 const deliveredToPhone = /(?:휴대전화|휴대폰|핸드폰|전화기|전화|단말기?|기기|폰)(?:에|로|으로)\s*(?:온|오는|오면|도착한|뜬|표시된|발급된)\s*$/u;
 const anotherHolder = /(?:상대(?:방)?|발신자|직원|담당자|상담원|다른\s*사람|친구|동료|타인|그|제삼자|제3자)(?:의|가|이|는|은)?\s*(?:본인(?:의)?|자기(?:의)?|자신(?:의)?)?\s*$|(?:그의|타인의|남의|다른\s*사람의)\s*$/u;
 const assignedRecipient = "(?:(?:지정(?:된|한)|정한|지목한|별도(?:의)?|다른|전담|상담|접수|지원)\\s*)*(?:직원|접수원|상담원|담당자|관리자)";
@@ -271,6 +272,36 @@ function reportsSupportCodeToIssuer(clause) {
 
 const otherBookingActor = /(?:발신자|상담원|담당자|직원|상대(?:방)?|다른\s*사람)(?:이|가|은|는)\s/u;
 
+const completedRecipientArrival = new RegExp("(?:" + recipientDeliveryOrigin.source + "|제가|내가|수신자(?:가|는))\\s*" +
+  "(?:(?:이미|방금|막|앞서|아까)\\s*)?(?:(?:와|들어와|도착해|표시돼)\\s*있(?:는|던)|도착한|온|들어온|수신한|받은|표시된|발급된)", "u");
+const conversationParticipant = /^(?<setting>(?:(?:[가-힣]{1,16}\s+){0,3}[가-힣]{1,16}에서\s*)?)(?:(?:먼저|처음|방금)\s*)?(?:말|이야기|대화|채팅)(?:을|를)?\s*(?:나눈|나누던|한|하던)\s*(?:참가자|사람|상대(?:방)?)(?:가|이|은|는)\s+/u;
+const dialogueActor = /(?:^|\s)(?<person>[가-힣]{1,16}?)(?:이|가|은|는)\s/u;
+const recipientNarrator = /^(?:제|내|저|나|수신자|신고인)$/u;
+const receivedAuthArtifact = "(?:(?:본인\\s*)?인증\\s*(?:값|번호|코드|암호)|" + oneTimeConfirmationValue + ")";
+const onlyCurrentChannel = "(?:이|같은|해당|현재)\\s*(?:대화(?:방|창)?|채팅(?:방|창)?|문자|메시지)(?:로|으로|에)";
+const arrivedCodeArgument = new RegExp(
+  "^\\s*(?:(?<agent>제가|내가|수신자가|받은\\s*사람이)|" +
+  "(?<value>" + completedRecipientArrival.source + "\\s*" + receivedAuthArtifact + "(?:을|를|만))|" +
+  "(?<destination>" + deliveryToIssuer + "|" + onlyCurrentChannel + "))(?=\\s|$)", "iu");
+
+const describesNonSecretArtifact = /^(?:그|이|해당|같은)\s*(?:(?:인증|확인)\s*)?(?:번호|코드|값|정보)(?:은|는|이|가)\s*(?:(?:누구나\s*조회할\s*수\s*있는|외부에서도\s*볼\s*수\s*있는)\s*)?(?:(?:공개(?:용)?\s*(?:표식|코드|번호|정보|조회(?:코드|번호)))|(?:(?:업무|예약|수거)용\s*(?:조회|확인)\s*(?:번호|코드|정보)))(?:이?라고|이라는|이었다|였습니다|(?:으)?로\s*쓰인다고)/u;
+
+function reportsArrivedCodeInDialogue(clause) {
+  if (inactiveReport.test(clause) || localEntry.test(clause) || otherRelayTopic.test(clause) ||
+      supportIllustration.test(clause) || valueDescriptorOnly.test(clause) || clause.endsWith("?")) return false;
+  const speaker = respondingParty.exec(clause) ?? conversationParticipant.exec(clause) ?? relayReportLead.exec(clause);
+  if (!speaker || speaker.groups?.request) return false;
+  const actor = dialogueActor.exec(speaker.groups?.setting ?? "");
+  if (actor && !recipientNarrator.test(actor.groups.person)) return false;
+  const request = clause.slice(speaker[0].length);
+  const action = supportRelayPredicate.exec(request) ?? /\s*(?:보내|전해)(?:라(?:고|는|며)|도록)\s*(?<ending>[^.!?\n]*)[.!?]?$/u.exec(request);
+  if (!action) return false;
+  const ending = action.groups.ending.trim();
+  if (!relayRequestEnding.test(ending) && !supportReportedEnding.test(ending)) return false;
+  const roles = relayArguments(request.slice(0, action.index), arrivedCodeArgument);
+  return Boolean(roles?.has("value") && roles.has("destination"));
+}
+
 function receiverInitiatedSupport(text) {
   return !otherBookingActor.test(text) && (ownSupportBooking.test(text) || earlierSupportBooking.test(text));
 }
@@ -279,8 +310,10 @@ function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
   if (hasUnverifiedLink && reportsSecretInLinkedForm(text)) return true;
   const hasOwnedCode = deliveredToRecipient.test(text);
   const hasAccessCode = hasReportedAccessCode.test(text);
-  if (hasOwnedCode || hasAccessCode) {
-    const identifiesIssuer = clause => currentRelayIssuer.test(clause) || relayReportLead.test(clause) || readHandoff(clause).claimed ||
+  const hasArrivedCode = completedRecipientArrival.test(text);
+  if (hasOwnedCode || hasAccessCode || hasArrivedCode) {
+    const identifiesIssuer = clause => currentRelayIssuer.test(clause) || relayReportLead.test(clause) ||
+      readHandoff(clause).claimed || readHandoff(clause).arrived ||
       (hasAccessCode && (supportOfferIssuer.test(clause) || reportedAccessIssuer.test(clause) ||
         ownedAccessDisplay.test(clause) && helperOffer.test(clause)));
     const observations = new Map();
@@ -291,18 +324,20 @@ function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
         claimed: hasOwnedCode && claimsRecipientsCode(clause),
         remote: hasAccessCode && reportsSupportCodeToIssuer(clause),
         requested: hasOwnedCode && asksForReceiversCode(clause),
+        arrived: hasArrivedCode && reportsArrivedCodeInDialogue(clause),
       });
       return observations.get(clause);
     }
     const identifiesHandoff = clause => {
       const handoff = readHandoff(clause);
-      return handoff.owned || handoff.claimed || handoff.remote || handoff.requested;
+      return handoff.owned || handoff.claimed || handoff.remote || handoff.requested || handoff.arrived;
     };
     for (const { body, previous, next } of currentReceivedRequests(text, identifiesIssuer, identifiesHandoff)) {
       if (withdrewCodeRelay.test(next)) continue;
       const handoff = readHandoff(body);
       if (handoff.owned) return true;
-      if (handoff.requested && !supportIllustration.test(previous) && !supportIssuerWithdrawal.test(next)) return true;
+      const requestedCode = handoff.requested || handoff.arrived && !describesNonSecretArtifact.test(next);
+      if (requestedCode && !supportIllustration.test(previous) && !supportIssuerWithdrawal.test(next)) return true;
       if (handoff.claimed && !supportIllustration.test(previous) && !supportIssuerWithdrawal.test(next)) return true;
       if (handoff.remote && !supportIssuerWithdrawal.test(next) && !supportIllustration.test(previous) &&
           ![previous, body, next].some(receiverInitiatedSupport)) return true;
