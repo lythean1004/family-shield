@@ -34,9 +34,9 @@ export function hasSensitiveRequest(text, patterns) {
 }
 
 const reportedReplyChannel = "(?:(?:문자|메시지)(?:로|으로|에)|(?:답장|회신)(?:으로|로|에))";
-const mandatoryReply = "(?:답|회신|전송|전달|첨부|제출)하(?:라(?:고|는)|도록)|(?:보내|알려|붙여)\\s*달라(?:고|는)";
+const mandatoryReply = "(?:답|회신|전송|전달|첨부|제출)하(?:라(?:고|는)|도록)|적으라(?:고|는)|(?:보내|알려|붙여)\\s*달라(?:고|는)";
 const reportedIdentityContents = "(?:신분증|주민등록증)(?:의)?[ \\t]*(?:(?:모든|전체)[ \\t]*(?:기재[ \\t]*)?(?:항목|내용|사항)|기재[ \\t]*(?:사항|내용)[ \\t]*전부)";
-const reportedField = "(?:주민\\s*등록\\s*번호|" + reportedIdentityContents + "|" + FIELD + ")" + "(?:을|를|만)?[ \\t]*";
+const reportedField = "(?:주민\\s*등록\\s*번호(?:[ \\t]*(?:전부|전체|모두))?|" + reportedIdentityContents + "|" + FIELD + ")" + "(?:을|를|만)?[ \\t]*";
 const REPORTED_REPLY = new RegExp("(?:" + reportedField + reportedReplyChannel + "\\s*|" +
   reportedReplyChannel + "\\s*" + reportedField + ")(?:" + mandatoryReply + ")" + ending, "gi");
 

@@ -282,6 +282,25 @@ function issuerAskedForIdentityReply(clause) {
   return personalDisclosure(action, { recordedReply: true, atStart: true }).reply;
 }
 
+const receiptHeader = /^(?:수신|신고|상담|민원|연락)\s*(?:메모|기록|요약|정리)(?:\s*(?:요약|중\s*일부|발췌|일부))?\s*[:：]\s*/u;
+const billingOfficialClaim = new RegExp(
+  "^(?:문자\\s*)?발신(?:처|자|인)(?:은|는|이|가)\\s*(?:상하)?수도\\s*요금\\s*" +
+  "(?:처리|납부|부과|접수|징수)?\\s*담당\\s*(?:부서|팀|기관|창구)(?:을|를)?\\s*" +
+  "(?:자칭|자처)(?:함|했음|했다|했습니다)?[.。]?$", "u");
+const reporterOfDifferentRequest = /(?:^|[,，]\s*)(?:제가|저는|내가|나는|수신자(?:가|는)|신고인(?:이|은))\s*[^.!?\n]{0,55}(?:(?:요구|요청|부탁)(?:했|하였|함)|(?:물었|문의했))/u;
+
+function hasRecordedIssuerClaim(clause) {
+  const claim = clause.replace(receiptHeader, "");
+  return openDirectedReport(clause) && roleBelongsToReportedSource(clause) &&
+    (recordedSelfClaim.test(claim) || billingOfficialClaim.test(claim));
+}
+
+function hasRecordedIdentityReply(clause) {
+  return openDirectedReport(clause) && !independentIdentityCheck.test(clause) && !questionedDemand.test(clause) &&
+    !reporterOfDifferentRequest.test(clause) && !excludedReply.test(clause) &&
+    personalDisclosure(clause, { recordedReply: true }).reply;
+}
+
 function requiresRecipientIdentity(action) {
   if (independentIdentityCheck.test(action) || ORDINARY_LOOKUP.test(action)) return false;
   const transfer = requiredDisclosure.exec(action);
@@ -498,14 +517,18 @@ function issuerForCurrentReport(text) {
 }
 
 function* institutionTransactionReports(text, unverifiedLinks) {
-  const identifiesIssuer = clause => issuerForCurrentReport(clause) || concurrentIssuerClaim.test(clause);
-  const identifiesAction = clause => issuerAskedForIdentityReply(clause) || Boolean(linkedDestination(clause, unverifiedLinks)) ||
+  const identifiesIssuer = clause => issuerForCurrentReport(clause) || concurrentIssuerClaim.test(clause) || hasRecordedIssuerClaim(clause);
+  const identifiesAction = clause => issuerAskedForIdentityReply(clause) || hasRecordedIdentityReply(clause) ||
+    Boolean(linkedDestination(clause, unverifiedLinks)) ||
     formName.test(clause) || requiresRecipientIdentity(clause) ||
     reportsWorkerCashCollection(clause) || reportsAppointedCashHandover(clause);
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
     for (const { body, previous, next } of currentReceivedRequests(record, identifiesIssuer, identifiesAction)) {
       if (!openDirectedReport(body) || closedRemainder.test(next)) continue;
       if (issuerAskedForIdentityReply(body) || recordedSelfClaim.test(previous) && requiresRecipientIdentity(body)) yield SIG_PERSONAL_INFO;
+      if (hasRecordedIssuerClaim(previous) && hasRecordedIdentityReply(body) && !identifiesIssuer(body)) {
+        yield SIG_PERSONAL_INFO;
+      }
       const current = issuerForCurrentReport(body);
       const previousSender = current ? null : issuerForCurrentReport(previous);
       if (!current && (!previousSender || !receivedArtifactHere.test(previous))) continue;
@@ -728,6 +751,18 @@ const printedContactPrefix = /^(?:(?:(?:그|이|같은|해당|받은)\s*)?(?:문
 const requiredBodyCallback = /^\s*(?:으로|로|에)(?:만)?\s*(?:(?:다시|직접|먼저)\s*)?(?:전화|통화|회신|연락)(?:을|를)?\s*(?:하라(?:고|는)|하도록|해야)(?!\s*(?:했는지|해야\s*하는지|하는지|하는\s*건지|하는\s*것인지|건지|할지|할\s*필요))/u;
 const requestQuotedAsExample = /(?:라는|다는)\s*(?:인용|예시|가정|설명문)/u;
 
+const recordedInstallationIssuer = new RegExp(
+  "^(?:(?:받은|수신한)\\s*)?" + reportedRole + "\\s*" +
+  "(?:(?:[가-힣]{1,10}\\s+){0,3}(?:팀|부서|담당(?:자|부서)?|센터|창구|직원)\\s*)?" +
+  "이?라고\\s*(?:적힌|기재된|표시된)\\s*" + deliveryArtifact + "(?:에|에는|에서)(?=\\s|$)", "u");
+const selectedInstallation = /(?:(?:새(?:로운)?\s*전용|별도(?:의)?(?:\s*외부)?|외부(?:의)?)\s*)(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를)?\s*설치(?:를|가)?\s*(?:요구|지시|요청|필수)/u;
+const installationDemandInquiry = /(?:설치\s*)?(?:요구|지시|요청|의무)(?:는|은|이|가)?\s*(?:있는지|있었는지|인지를?|하였는지|했는지|하는지)|설치\s*(?:조건|사실)\s*여부/u;
+
+function hasRecordedInstallationDemand(action) {
+  return openDirectedReport(action) && !staffInstallation.test(action) && !noInstallation.test(action) &&
+    !installationDemandInquiry.test(action) && selectedInstallation.test(action);
+}
+
 function hasClaimedArtifact(clause) {
   return selfClaimedArtifact.test(clause) && openDirectedReport(clause) &&
     !anotherTopic.test(clause) && roleBelongsToReportedSource(clause);
@@ -779,19 +814,25 @@ function localUnverifiedLink(action, unverifiedLinks) {
 // 기관 역할과 각 행동은 같은 수신 문장의 현재 범위에서 확인한다.
 function* sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPatterns) {
   const hasAction = clause => localUnverifiedLink(clause, unverifiedLinks) || asksToUseSentLink(clause) || hasBodyContactDemand(clause) ||
+    hasRecordedInstallationDemand(clause) ||
     installFromDirectPatterns(clause) || personalDisclosure(clause, { recordedReply: true }).reply ||
     classifyCallback(clause, [], { includeReportedDirective: true }).directed;
   const requiresRecipientApp = clause => !staffInstallation.test(clause) && !noInstallation.test(clause) &&
     !questionedDemand.test(clause) && (requiresRecipientInstallation(clause) || installFromDirectPatterns(clause));
 
   for (const report of text.split(/\r?\n[ \t]*\r?\n/u)) {
-    const reportedIssuer = clause => issuerOfReceivedEvent(clause) || hasClaimedArtifact(clause);
+    const reportedIssuer = clause => issuerOfReceivedEvent(clause) || hasClaimedArtifact(clause) || recordedInstallationIssuer.test(clause);
     for (const { body, previous, next } of currentReceivedRequests(report, reportedIssuer, hasAction)) {
       const action = body.split(quoteBoundary, 1)[0];
       if (!openDirectedReport(action) || !roleBelongsToReportedSource(action) || closedRemainder.test(next) ||
           questionedDemand.test(action)) continue;
       // 소개된 발신 문서와 같은 수신 기록 안에서만 명시된 목적지를 결합한다.
       const here = hasClaimedArtifact(action);
+      const reportedInstallation = recordedInstallationIssuer.exec(action);
+      if (reportedInstallation &&
+          hasOpenInstallationReport(action.slice(reportedInstallation[0].length), next, hasRecordedInstallationDemand)) {
+        yield SIG_APP_INSTALL;
+      }
       const prior = !otherEventActor.test(action) && hasClaimedArtifact(previous);
       if ((here && asksToUseSentLink(action) || prior && asksToUseSentLink(previous) && displayedNoticeAddress.test(action)) &&
           onlyUnverifiedNoticeAddress(report, action, unverifiedLinks)) yield SIG_LINK;
