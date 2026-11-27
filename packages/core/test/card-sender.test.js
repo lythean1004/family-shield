@@ -4,6 +4,28 @@ import { extractCodeSignals } from "../src/extract.js";
 import { decide } from "../src/rule-engine.js";
 import { SIG_AGENCY_IMPERSONATION } from "../src/signals.js";
 
+describe("확인된 기관·서비스 이름과 기한부 신청 조건", () => {
+  const link = "https://forms.invalid/demo";
+  const tagged = text => extractCodeSignals(text).signals.includes(SIG_AGENCY_IMPERSONATION);
+  for (const text of [
+    `[정부24] 서식 예시 / 교육 이용권 미신청자, 신청 마감 임박. 신청하기 ${link}`,
+    `[SKT] 견본 / 고객님께 지급된 공연 쿠폰은 오늘 소멸 예정. 쿠폰 받기 ${link}`,
+    `에너지바우처 신청 안내 서식 / 지원금 수령은 전용 앱 설치 후 신청 가능. ${link}`,
+    `(교통범칙금) 모의 양식 / 미납분 조회 시 카드번호로 본인인증 필수. ${link}`,
+    `[교통범칙금] 모의 양식 / 조회 시 본인인증(성명, 연락처, 카드번호) ${link}`,
+    `[현대카드] 개인별 도서 쿠폰 소멸 예정. 금요일까지 받기 ${link}`,
+  ]) it(text, () => assert.ok(tagged(text)));
+  for (const text of [
+    `[SKT] (광고) 공연 쿠폰 오늘 소멸 예정. 쿠폰 받기 ${link} 무료 수신거부`,
+    `[SKT] 고객님의 쿠폰 소멸 내역입니다. 목록 보기 ${link}`,
+    `[정부24] 신청 마감일 변경 공고. 일정 보기 ${link}`,
+    `에너지바우처 사업 설명회 자료를 게시했습니다. ${link}`,
+    `(교통범칙금) 모의 양식 / 카드번호로 본인인증하지 마세요. ${link}`,
+    `학교 독서회에서 에너지바우처 신청 사례를 소개합니다. ${link}`,
+    "[정부24] 교육 이용권 미신청자, 신청 마감. 신청하기 https://www.gov.kr/",
+  ]) it(text, () => assert.ok(!tagged(text)));
+});
+
 describe("확인되지 않은 주소에서 반송·거래 취소를 처리하는 발신 주장", () => {
   const outside = "https://review.invalid/box";
   const tagged = text => extractCodeSignals(text).signals.includes(SIG_AGENCY_IMPERSONATION);
