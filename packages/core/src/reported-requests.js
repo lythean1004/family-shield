@@ -1,4 +1,5 @@
 import { SIG_APP_INSTALL, SIG_DELETE_APP, SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "./signals.js";
+import { addReportedTransactionConditions } from "./reported-transaction-conditions.js";
 
 // 수신자가 현재 요구를 옮겨 적은 경우도 원래의 신호로 읽는다.
 // 피해 사례를 가르치거나 거절·철회한 요구를 설명하는 문맥에는 이 경로를 쓰지 않는다.
@@ -96,5 +97,6 @@ export function reportedRequestSignals(text) {
     if (illustrative.test(passage) || withdrawn.test(passage)) continue;
     addConditions(passage, signals);
   }
+  addReportedTransactionConditions(text, signals);
   return signals;
 }
