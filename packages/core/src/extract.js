@@ -62,11 +62,32 @@ const REPORTED_SPEECH = /[?‘“"'「]|(?:그때|지난번|예전에)|(?:다는
 const SELF_RELATION = /^(?:(?:나|저)(?:는)?\s*)?(?:(?:큰|작은|막내)?(?:아들|딸)|손자|손녀|손주|동생)(?:인데|이야|야|이에요|예요|입니다)/;
 const FIRST_PERSON = /^(?:나야|저예요|저에요|나|저)(?=[\s.,!~]|$)/;
 const REPLACED_DEVICE = /(?:휴대폰|핸드폰|폰)(?:을)?\s*바꿨어/;
+const OWN_OPENING = /^(?:(?:이거|이게|이건)\s*)?(?:나야|내다|나는|내가|제가|저는|나|저|내|제)(?=[\s,.!~ㅠㅜ]|$)/;
+const OTHER_SUBJECT = /(?:친구|동생|언니|형|기사님|아이|직원)(?:는|은|가|이)\s+/;
+const NEW_CONTACT = /새로\s*(?:받은|만든|개통한)\s*번호(?:예요|야|입니다|니까|인데|\s*저장)/;
+const BORROWED = "(?:임시\\s*(?:번호|폰)|(?:빌린|친구|동생|지인)\\s*(?:휴대폰|핸드폰|폰))";
+const USING_BORROWED = new RegExp(BORROWED + "(?:으로|로)\\s*(?:문자(?:를)?\\s*)?(?:보냅니다|보낸다|보내요|보내)" +
+  "(?!\\s*(?:줘|주|달|보라))(?=[\\s,.!~ㅠㅜ]|$)|" + BORROWED + "(?:이야|예요|입니다)[\\s.!~,]*이\\s*번호로");
+const SAVE_CONTACT = /이\s*번호(?:를|로)?\s*저장(?:해|하세)/;
+
+function statesCurrentNumber(opening) {
+  if (!OWN_OPENING.test(opening) || /번호(?:는|가)?\s*(?:그대로|같아)/.test(opening)) return false;
+  const contact = opening.split(/(?:근데|그런데|그나저나)/, 1)[0];
+  const clauses = (contact.match(/[^.!?\n]+[.!?]?/g) ?? []).slice(0, 3);
+  const stop = clauses.findIndex(clause => REPORTED_SPEECH.test(clause) || OTHER_SUBJECT.test(clause));
+  const statement = (stop < 0 ? clauses : clauses.slice(0, stop)).join(" ");
+  return NEW_CONTACT.test(statement) || USING_BORROWED.test(statement) ||
+    (REPLACED_DEVICE.test(statement) && SAVE_CONTACT.test(statement));
+}
 
 function addFamilySignals(input, signals) {
   const greeting = FAMILY_GREETING.exec(input);
   if (!greeting) return;
   const opening = input.slice(greeting[0].length, greeting[0].length + 100);
+  if (statesCurrentNumber(opening)) {
+    signals.add(SIG_FAMILY_IMPERSONATION);
+    signals.add(SIG_NEW_NUMBER);
+  }
   const clauses = (opening.match(/[^.!?\n]+[.!?]?/g) ?? []).slice(0, 2);
   const first = clauses[0]?.trim() ?? "";
   if (!REPORTED_SPEECH.test(first) && SELF_RELATION.test(first)) signals.add(SIG_FAMILY_IMPERSONATION);

@@ -3,6 +3,28 @@ import assert from "node:assert/strict";
 import { extractCodeSignals } from "../src/extract.js";
 import { SIG_FAMILY_IMPERSONATION, SIG_NEW_NUMBER } from "../src/signals.js";
 
+describe("발신자가 지금 쓰는 번호를 설명하는 말", () => {
+  for (const text of [
+    "아버지, 제가 새로 받은 번호입니다. 주말에 뵈어요.",
+    "어머니, 나 정류장에 있어. 임시번호로 보내요.",
+    "누나 나야. 폰을 바꿨어. 이 번호 저장해 둬.",
+    "아빠, 내 휴대폰을 잃어버려서 친구 폰으로 보내. 다행히 집에 왔어.",
+    "언니 나야. 빌린 폰이야. 이 번호로 잠깐 연락할게.",
+    "엄마 나야. 임시번호로 보내. 내일 만날까?",
+  ]) it(text, () => {
+    const { signals } = extractCodeSignals(text);
+    assert.ok(signals.includes(SIG_FAMILY_IMPERSONATION) && signals.includes(SIG_NEW_NUMBER));
+  });
+  for (const text of [
+    "어머니, 제가 새로 받은 번호표입니다. 여기서 기다릴게요.",
+    "아버지, 내 친구가 새로 받은 번호예요.",
+    "누나 나야. 친구 폰으로 보내 주세요.",
+    "누나 나야. 폰을 바꿨어. 이 번호는 수리점 번호니까 저장해 둬.",
+    "아빠, 예전에 임시번호로 보냈어요. 지금은 원래 번호예요.",
+    "언니, 친구 폰으로 받은 사진을 보내요.",
+  ]) it(text, () => assert.ok(!extractCodeSignals(text).signals.includes(SIG_NEW_NUMBER)));
+});
+
 describe("가족에게 신분을 밝히는 발신자", () => {
   for (const text of [
     "어머니, 저 큰딸인데요. 주말에 뵐게요.",
