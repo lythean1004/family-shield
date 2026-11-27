@@ -26,7 +26,7 @@ import {
 import { findLinks, toDomain, isShortener } from "./links.js";
 import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
 import { allLinksOfficial, isOfficialLink } from "./official-links.js";
-import { hasCardServiceRequest } from "./card-sender.js";
+import { hasCardServiceRequest, hasVaccinationBooking } from "./card-sender.js";
 import { classifyCallback } from "./callback-number.js";
 import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
 import { hasCredentialDisclosure, hasDocumentBundle } from "./protected-requests.js";
@@ -215,7 +215,7 @@ const PATTERNS = {
 /**
  * @param {string} text
  * @param {{ senderLast4?: string, registeredLast4?: string, inputComplete?: boolean, shortUrlKeys?: Set<string> }} [options]
- * @returns {{ signals: string[], domains: string[] }}
+ * @returns {{ signals: string[], domains: string[], localHealthClaim?: boolean }}
  */
 export function extractCodeSignals(text, options = {}) {
   const signals = new Set();
@@ -277,6 +277,9 @@ export function extractCodeSignals(text, options = {}) {
     signals.add(SIG_AGENCY_IMPERSONATION);
   }
   addFamilySignals(input, signals);
+  const localHealthClaim = !signals.has(SIG_AGENCY_IMPERSONATION) && signals.has(SIG_SHORT_URL) &&
+    hasVaccinationBooking(input, outside.filter(c => isShortener(c.host)).map(c => c.raw));
+  if (localHealthClaim) signals.add(SIG_AGENCY_IMPERSONATION);
 
   // 끝 4자리 비교
   const { senderLast4, registeredLast4 } = options;
@@ -285,5 +288,5 @@ export function extractCodeSignals(text, options = {}) {
     signals.add(SIG_NEW_NUMBER);
   }
 
-  return { signals: [...signals], domains: [...domains] };
+  return { signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }) };
 }

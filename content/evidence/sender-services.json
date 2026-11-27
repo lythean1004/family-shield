@@ -2,6 +2,17 @@
   "_note": "문자 첫머리가 어느 공공서비스를 자처하는지 판단할 때만 쓰는 표기다. 공식 링크 허용 목록과 독립이다.",
   "cards": [
     {
+      "id": "EV-SENDER-KDCA",
+      "name": "질병관리청",
+      "request_kind": "vaccination_booking",
+      "source_url": "https://nip.kdca.go.kr/irhp/infm/goVcntInfo.do?menuCd=134&menuLv=1",
+      "posted_at": null,
+      "checked_at": "2026-11-27",
+      "scope": "국가예방접종 사업을 운영하는 기관의 이름과 업무 범위",
+      "terms_checked": false,
+      "status": "source_checked"
+    },
+    {
       "id": "EV-SENDER-TRAFFIC-FINE",
       "name": "교통범칙금",
       "source_url": "https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1007&q_bbscttSn=20221124131158691",

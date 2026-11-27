@@ -1,8 +1,37 @@
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { extractCodeSignals } from "../src/extract.js";
 import { decide } from "../src/rule-engine.js";
 import { SIG_AGENCY_IMPERSONATION } from "../src/signals.js";
+import { SHORTENER_DOMAINS } from "../src/links.js";
+import { analyze } from "../src/pipeline.js";
+
+describe("예방접종 기관을 자처한 단축 주소 예약", () => {
+  const host = "short-booking.invalid";
+  const short = "https://" + host + "/sample";
+  before(() => SHORTENER_DOMAINS.add(host));
+  after(() => SHORTENER_DOMAINS.delete(host));
+  for (const notice of [
+    "[질병관리청] 모의 서식 / 무료 예방접종. 아래에서 예약하세요",
+    "(질병관리청) 모의 서식 / 백신 무료 접종. 이 링크에서 신청해 주세요",
+    "질병관리청입니다. 모의 서식 / 예방접종 무료 대상. 다음 주소로 예약하십시오",
+  ]) it(notice, async () => {
+    let calls = 0;
+    const result = await analyze({ text: notice + " " + short, ai: {
+      model: "fixture", apiKey: "fixture", fetchImpl: async () => { calls++; throw Error("fixture"); },
+    } });
+    assert.deepEqual([result.level, result.fired_rules.includes("R6"), result.ai_skipped, calls], ["위험", true, "health", 0]);
+  });
+  for (const notice of [
+    "[질병관리청] 무료 예방접종 일정표. 이전 회차 자료 " + short,
+    "[질병관리청] 무료 예방접종. 아래에서 예약하세요 https://form.invalid/",
+    "[질병관리청] 무료 예방접종. 아래에서 예약하세요 https://form.invalid/ 부록 " + short,
+    "[질병관리청] 예방접종 예약을 마쳤습니다. 시설 지도 " + short,
+    "[질병관리청] 무료 예방접종이 끝났습니다. 별도 문화 행사 안내. 아래에서 예약하세요 " + short,
+    "[질병관리청] 사칭 주의. 무료 예방접종. 아래에서 예약하세요 " + short,
+    "[지역 독서회] 무료 접종 안내. 아래에서 예약하세요 " + short,
+  ]) it(notice, () => assert.ok(!extractCodeSignals(notice).signals.includes(SIG_AGENCY_IMPERSONATION)));
+});
 
 describe("기관 명의의 미확인 납부·인증 경로", () => {
   const outside = "https://form.invalid/";

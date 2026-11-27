@@ -42,8 +42,9 @@ export function maskHealth(text) {
 }
 
 /** 건강 표현이 있고 요구 신호·미끼가 없으면 true(해외 AI로 보내지 않음) */
-export function shouldSkipAiForHealth(text, codeSignals = []) {
+export function shouldSkipAiForHealth(text, codeSignals = [], localHealthClaim = false) {
   if (!hasHealthInfo(text)) return false;
-  if (codeSignals.some((s) => REQUEST_SIGNALS.has(s))) return false;
+  // 단축 주소로 예방접종 예약을 받아 R6을 켜더라도, 그 사실만으로 해외 AI 전송을 열지 않는다.
+  if (codeSignals.some(s => REQUEST_SIGNALS.has(s) && !(localHealthClaim && s === "SIG_AGENCY_IMPERSONATION"))) return false;
   return !SCAM_CUE_RE.test(text);
 }

@@ -3,8 +3,8 @@ import { OFFICIAL_LINK_HOST_CARDS } from "./official-links.js";
 import { readFileSync } from "node:fs";
 
 const serviceFile = new URL("../../../content/evidence/sender-services.json", import.meta.url);
-const serviceNames = new Set(JSON.parse(readFileSync(serviceFile, "utf8")).cards
-  .filter(c => c.status === "source_checked").map(c => c.name));
+const services = new Map(JSON.parse(readFileSync(serviceFile, "utf8")).cards
+  .filter(c => c.status === "source_checked").map(c => [c.name, c]));
 
 const compactName = (name) => name.replace(/\s+/g, "").toLowerCase();
 const senderCards = new Map(
@@ -27,14 +27,37 @@ const collectionNotice = /(?:압류\s*(?:예정|예고)|체납\s*처분)/;
 const collectionRoute = /납부\s*(?:(?:및|또는|·)\s*)?이의\s*신청/;
 
 // 금융위·경찰청 등 합동 예방 안내의 택배·기관 발신 사칭 유형. https://www.fsc.go.kr/no010101/87779
-export function hasCardServiceRequest(text, { externalLink, unverifiedLink, sensitiveRequest, directedCallback, personalReply }) {
+function readSender(text) {
   const opening = text.trimStart().replace(/^(?:\[(?:Web발신|국제발신|국외발신)\]\s*)+/i, "");
   const sender = /^\[([^\]\n]{1,30})\]\s*/.exec(opening) ?? /^\(([^()\n]{1,30})\)\s*/.exec(opening) ??
     /^([가-힣a-z0-9]{2,20})[ \t]+[가-힣]{1,10}(?:과|부|팀)[ \t]+(?:알림|안내)(?=[\s.!]|$)/i.exec(opening) ??
     /^([가-힣a-z0-9]{2,24}?)(?:\s*[:：]|입니다(?=[\s.!]|$)|\s+(?=배송|결제|민원|공지|서비스\s*안내|신청|추가\s*지원))/i.exec(opening);
-  const card = sender && senderCards.get(compactName(sender[1]));
-  if (!sender || (!card && !serviceNames.has(sender[1]))) return false;
-  const body = opening.slice(sender[0].length).trimStart();
+  if (!sender) return null;
+  return { name: sender[1], body: opening.slice(sender[0].length).trimStart() };
+}
+
+export function hasVaccinationBooking(text, shortUrls) {
+  if (!shortUrls.length) return false;
+  const sender = readSender(text);
+  if (!sender || services.get(sender.name)?.request_kind !== "vaccination_booking") return false;
+  const { body } = sender;
+  if (/(?:사칭|피싱|스미싱|예시|피해\s*예방|예방\s*(?:교육|안내)|교육\s*자료)|[‘’“”「」]|(?:라는|다는)\s*(?:문자|요구)/.test(body)) return false;
+  const route = /(?:아래|다음|이)(?:\s*(?:주소|링크))?(?:에서|로)\s*(?:예약|신청)(?:하세요|하십시오|해\s*주세요)\s*[:：]?\s*(\S+)/g;
+  for (const match of body.matchAll(route)) {
+    if (!shortUrls.includes(match[1])) continue;
+    const offer = body.slice(0, match.index).split(/[.!?\n]+/).slice(-2).join(" ");
+    if (/(?:무료.{0,18}접종|접종.{0,18}무료)/.test(offer)) return true;
+  }
+  return false;
+}
+
+export function hasCardServiceRequest(text, { externalLink, unverifiedLink, sensitiveRequest, directedCallback, personalReply }) {
+  const sender = readSender(text);
+  if (!sender) return false;
+  const card = senderCards.get(compactName(sender.name));
+  const service = services.get(sender.name);
+  if (!card && (!service || service.request_kind)) return false;
+  const { body } = sender;
   if (/^[.!:\s]*(?:(?:보이스|메신저)?피싱|스미싱|사칭)\s*(?:문자\s*)?(?:주의|예방|교육|경고)/.test(body)) return false;
   if (unverifiedLink && !/수신\s*거부|[(（]광고[)）]|[‘“「]|(?:라는|다는)\s*(?:문구|문자)|(?:설치|인증)하지\s*마/.test(body)) {
     if (!/(?:예방\s*(?:안내|교육)|교육\s*자료|(?:라는|다는)\s*(?:사례|요구))/.test(body) &&
