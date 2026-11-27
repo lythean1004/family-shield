@@ -267,6 +267,21 @@ const recordedSelfClaim = new RegExp("^(?:문자\\s*)?발신(?:처|자|인)(?:�
 const nameAndBirth = /(?:수신자의|받은\s*사람의|저의|제|내)\s*(?:(?:이름|성명)(?:과|와|·)\s*(?:생년월일|출생\s*(?:일자|일))|(?:생년월일|출생\s*(?:일자|일))(?:과|와|·)\s*(?:이름|성명))(?:을|를)\s*$/u;
 const requiredDisclosure = /(?:제공|제출|전달)해야(?:만)?\s*(?:한다(?:고|는)|된다는)\s*(?:내용|설명|안내|요구|말|기재|표시|적혀)/u;
 const independentIdentityCheck = /(?:본인|자기|개인)\s*기기|현장|대면|직접\s*(?:방문|방문한)|방문\s*창구|공식\s*(?:앱|창구|사이트|누리집)/u;
+const concurrentIssuerClaim = new RegExp(
+  "^(?:(?:발신(?:자|인)|상대(?:방)?|보낸\\s*(?:사람|쪽))(?:이|가|은|는)\\s*)?" +
+  "(?:" + recordRole + "|복지\\s*(?:(?:접수|상담)\\s*)?창구)(?:(?:의)?\\s*(?:직원|담당자|상담원))?\\s*" +
+  "(?:이?라고\\s*(?:(?:자신|자기)(?:을|를)\\s*)?(?:하|말하|소개하|밝히|설명하|주장하)면서|이?라며)\\s*", "u");
+const identityReplyPreface = /^(?:(?:제게|저에게|저한테|내게|수신자에게|직접)\s+)?/u;
+const identityReplyInquiry = /(?:라고|라는|하도록)\s*(?:(?:요청|요구)(?:을|를|이|가)?\s*)?(?:받았|있었|요청했|요구했|말했)는지|(?:여부|뜻인지|하는지|할지를?)\s*(?:물|문의|확인)/u;
+
+function issuerAskedForIdentityReply(clause) {
+  const claim = concurrentIssuerClaim.exec(clause);
+  if (!claim || !openDirectedReport(clause) || !roleBelongsToReportedSource(clause)) return false;
+  const action = clause.slice(claim[0].length).replace(identityReplyPreface, "");
+  if (independentIdentityCheck.test(action) || identityReplyInquiry.test(action) || excludedReply.test(action)) return false;
+  return personalDisclosure(action, { recordedReply: true, atStart: true }).reply;
+}
+
 function requiresRecipientIdentity(action) {
   if (independentIdentityCheck.test(action) || ORDINARY_LOOKUP.test(action)) return false;
   const transfer = requiredDisclosure.exec(action);
@@ -483,13 +498,14 @@ function issuerForCurrentReport(text) {
 }
 
 function* institutionTransactionReports(text, unverifiedLinks) {
-  const identifiesAction = clause => Boolean(linkedDestination(clause, unverifiedLinks)) ||
+  const identifiesIssuer = clause => issuerForCurrentReport(clause) || concurrentIssuerClaim.test(clause);
+  const identifiesAction = clause => issuerAskedForIdentityReply(clause) || Boolean(linkedDestination(clause, unverifiedLinks)) ||
     formName.test(clause) || requiresRecipientIdentity(clause) ||
     reportsWorkerCashCollection(clause) || reportsAppointedCashHandover(clause);
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
-    for (const { body, previous, next } of currentReceivedRequests(record, issuerForCurrentReport, identifiesAction)) {
+    for (const { body, previous, next } of currentReceivedRequests(record, identifiesIssuer, identifiesAction)) {
       if (!openDirectedReport(body) || closedRemainder.test(next)) continue;
-      if (recordedSelfClaim.test(previous) && requiresRecipientIdentity(body)) yield SIG_PERSONAL_INFO;
+      if (issuerAskedForIdentityReply(body) || recordedSelfClaim.test(previous) && requiresRecipientIdentity(body)) yield SIG_PERSONAL_INFO;
       const current = issuerForCurrentReport(body);
       const previousSender = current ? null : issuerForCurrentReport(previous);
       if (!current && (!previousSender || !receivedArtifactHere.test(previous))) continue;
