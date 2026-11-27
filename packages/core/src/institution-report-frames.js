@@ -1,6 +1,7 @@
 import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
+import { isOfficialLink } from "./official-links.js";
 import { hasOpenInstallationReport, ORDINARY_LOOKUP, startsOtherOrganizer } from "./reported-notice-fields.js";
 import { currentReceivedRequests, isReceivedContinuation, receivedFieldLines } from "./received-message.js";
 import {
@@ -18,7 +19,7 @@ const closedRemainder = /^(?:그|해당|같은|이)\s*(?:요청|요구|접수|�
 const requestReport = /(?:요구|요청|지시)(?:했|했다|하|을|를|이|가|였|라고|라|라는|함)|(?:하라|하라고|하라는|하도록|해야|달라|필요하다고)(?:[\s,，]|적|는|고|$)/u;
 
 function claimedIssuer(text) {
-  if (!receivingContext.test(text) || notCurrent.test(text) || anotherTopic.test(text)) return "";
+  if (!receivingContext.test(text) || notCurrent.test(text) || anotherTopic.test(text) || !roleBelongsToReportedSource(text)) return "";
   return declaredAuthority.exec(text)?.groups.role ?? "";
 }
 
@@ -109,7 +110,7 @@ function requestsDesignatedPrivateReply(action) {
 }
 const remoteInstall = /(?:원격\s*(?:지원|제어))\s*(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를)?\s*설치/u;
 const extraInstall = /(?:별도(?:의)?|외부(?:의)?|추가(?:로)?)\s*(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를)?\s*설치/u;
-const receiverProcedure = /(?:접수|처리|심사|검토|상담|열람|신청|확인)(?:를|을)?\s*(?:이어가|진행하|받|계속하|하)려면/u;
+const receiverProcedure = /(?:접수|처리|심사|검토|상담|열람|신청|확인)(?:\s*절차)?(?:를|을)?\s*(?:이어가|진행하|받|계속하|하)려면/u;
 const installationPurpose = /(?:필요|필수|요건)(?!\s*(?:없|아니))|하라(?:는|고)?|하도록|해야/u;
 const staffInstallation = /(?:직원용|업무용|운영용|관리용|운영자|전산팀|직원\s*교육|공식\s*(?:앱|스토어|마켓))|(?:직원|담당자|운영진)(?:의)?\s*(?:개인\s*)?(?:기기|단말|컴퓨터|휴대\s*(?:폰|전화))|(?:직원|담당자)(?:가|는)\s*(?:직접|먼저)?\s*설치/u;
 const noInstallation = /(?:설치\s*(?:없이|하지\s*않)|(?:설치|필수|요건)(?:가|는|은)?\s*(?:필요(?:하지\s*않|가\s*없)|아니)|필수(?:는|가)?\s*아니|설치\s*(?:여부|이력|기록))/u;
@@ -148,8 +149,8 @@ function reportsLoanCollection(fields, sender, heading) {
     staffVisit.test(value) && collects.test(value) && (cash || fieldCash.test(value)));
 }
 
-const reportedRole = "(?:" + authority + "|공공\\s*(?:고지|통지|민원)|통신\\s*(?:사|회사|업체)|보험사|카드사|택배\\s*(?:사|회사)|공단)";
-const roleTitle = "(?<role>" + reportedRole + ")(?<unit>(?:\\s+(?:가입|관리|고객|민원|업무|수사|사건|통지|지원|상담|대출|상환|금융|담당(?:자|부서)?|부서|직원|팀|소속|창구)){0,5})";
+const reportedRole = "(?:" + authority + "|공공\\s*(?:고지|통지|민원)|통신\\s*(?:사|회사|업체)|보험사|건강\\s*보험(?:공단)?|카드사|택배\\s*(?:사|회사)|공단)";
+const roleTitle = "(?<role>" + reportedRole + ")(?<unit>(?:\\s+(?:가입|관리|고객|민원|업무|수사|조사|사건|통지|지원|상담|대출|상환|금융|담당(?:자|부서)?|부서|직원|팀|소속|창구)){0,5})";
 const reportingSender = "(?:발신(?:자|인|처)|보낸\\s*(?:사람|이|쪽)|상대(?:방)?)";
 const roleMarker = "(?:이?라고\\s*(?:소개한|밝힌|말한|주장한)|(?:[을를]\\s*)?(?:자처하(?:는|던)|자처한|자칭하(?:는|던)|자칭한))";
 const introducedSender = new RegExp("(?<![\\p{L}\\p{N}])" + roleTitle + "\\s*" + roleMarker + "\\s*" + reportingSender + "(?:이|가|은|는)?(?=[\\s,，]|$)", "u");
@@ -157,6 +158,20 @@ const selfDescription = new RegExp("^(?:(?:문자|메시지|연락)(?:를|을)?\
   "\\s*(?:이?라고\\s*(?:했|하였|말했|소개했|밝혔|주장했)|(?:[을를]\\s*)?(?:자처했|자칭했))", "u");
 const describedRole = new RegExp("^" + roleTitle + "이?라는\\s*(?:사람|쪽|상대(?:방)?)(?:이|가|은|는)?(?=[\\s,，]|$)", "u");
 const institutionTitle = new RegExp("^" + roleTitle + "$", "u");
+const receivedRoleNotice = new RegExp("^(?:(?:수신한|받은)\\s*)?" + roleTitle +
+  "\\s*(?:이?라는|이?라고\\s*(?:소개|설명|밝히|밝혔|표시)[가-힣]*)\\s*" +
+  "(?:문자|메시지|연락|안내|통지|쪽지)(?:였|이었|입니다|이라고\\s*(?:기록|적었))", "u");
+const reportedRoleOrigin = new RegExp("(?<![\\p{L}\\p{N}])(?:자신|본인|자기)(?:이|가)\\s*" + roleTitle +
+  "\\s*(?:에서|\\s*소속으로)\\s*(?:(?:현재|지금|직접)\\s*){0,2}(?:연락|안내|전화|통지)하(?:는\\s*중이|고\\s*있)" +
+  "(?:라고|다고)\\s*(?:한|말한|밝힌|설명한)\\s*(?:사람|상대(?:방)?|발신(?:자|인)|쪽)(?:이|가|은|는)?(?=[\\s,，]|$)", "u");
+const explicitOtherRole = new RegExp(
+  "(?<![\\p{L}\\p{N}])(?!(?:본인|자신|자기)(?:들)?(?:을|를)\\s+)[\\p{L}\\p{N}]{1,18}(?:을|를)\\s+" +
+  roleTitle + "\\s*(?:이?라고|으로|로)\\s*(?:소개|설명|밝)", "u");
+const illustrativeRole = /(?:작성|기재|입력|문서|서식|형식)\s*(?:형식\s*)?(?:예시|견본)/u;
+
+function roleBelongsToReportedSource(clause) {
+  return !explicitOtherRole.test(clause) && !illustrativeRole.test(clause);
+}
 const sameMessageSource = /(?:문자|메시지|쪽지|답장|회신)(?:을|를)?\s*보낸/u;
 const separateActionSource = /(?:^|[,，]\s*|\s+)(?:다른|별도(?:의)?|별개의?)\s*(?:발신(?:자|인|처)|사람|상대(?:방)?|단체|회사|기관|업체|담당자|직원|문자|서식|양식|쪽지)/u;
 const instructionalReport = /(?:예방|교육|훈련|모의|예시|참고)\s*(?:용|자료|사례|문구|설명|대본|상황)|(?:교육|훈련|수업|연극|역할극)(?:에서|의|을\s*위해)|(?:(?:신고|상담|교육)\s*이관용|기록용|참고용|예시용)\s*(?:더미|주소|링크|표기)|(?:절차|요청|통화|문자)(?:[이은가는을를])?\s*(?:취소|철회|종료|거절)|(?:자료|문서|주소|링크|현금)(?:[이은가는을를])?\s*(?:보내지|열지|봐서는|포함하지|전달하지|건네지|인계하지)\s*(?:말|마|않)/u;
@@ -215,7 +230,7 @@ function* reportedDirectedInstitutionActions(text, unverifiedLinks) {
 }
 
 const recordRole = "(?<role>(?:" + reportedRole + "|공공\\s*(?:요금|서비스)|공과금))" +
-  "(?<unit>(?:(?:\\s+|의\\s*)(?:관리|민원|정산|처리|납부|상담|대출|상환|지원|복지|사업|담당(?:자)?|부서|직원|소속|센터|창구|팀)){0,5})";
+  "(?<unit>(?:(?:\\s+|의\\s*)(?:관리|민원|정산|처리|납부|상담|대출|상환|지원|복지|사업|담당(?:자)?|부서|직원|소속|센터|창구|팀|쪽)){0,5})";
 const selfAttributedRole = "(?:이?라고\\s*(?:한|소개한|밝힌|주장한)|(?:[을를]\\s*)?(?:자처|자칭)(?:한|하는))";
 const deliveryArtifact = "(?:문자|메시지|알림|통지|안내(?:문)?|연락|회신|쪽지)";
 const receivedPredicate = "(?:받았|왔|도착했|수신했|받아\\s*(?:확인|기록))";
@@ -305,7 +320,7 @@ const reportCashRole = new RegExp(String.raw`(?<![\p{L}\p{N}])(?<role>(?:${INVES
   String.raw`(?:이?라는|이?라고\s*(?:한|밝힌|소개한|말한)|(?:[을를]\s*)?자처한)\s*` +
   String.raw`(?:발신(?:자|인)|사람|상대(?:방)?|쪽)(?:이|가|은|는|에게|한테|에서)?(?=[\s,，]|$)`, "u");
 const meetForDelivery = /(?:직접\s*)?(?:만나(?:서|는\s*(?:자리|곳)(?:에서|에)?)?|대면(?:해서|으로)?)(?=\s|$)/u;
-const directedHandover = /(?:건네|넘겨|인계해|전달해|교부해)(?:야|라(?:고|는)|\s*달라)|(?:인계|전달|교부)하(?:라고|라는|도록)/u;
+const directedHandover = /(?:건네|넘겨|인계해|전달해|교부해)(?:야|라(?:고|는)|\s*달라)|(?:인계하|전달하|교부하|넘기)(?:라고|라는|도록)/u;
 const returnToReceiver = /(?:제게|저에게|내게|나에게|수신자에게)(?:만)?\s*(?:직접\s*)?$/u;
 const anotherCashPayer = /(?:^|[\s,，])(?:직원|담당자|발신(?:자|인)|상대(?:방)?|제삼자)(?:이|가|은|는)(?=[\s,，]|$)/u;
 const otherDeliveryObject = /(?:서류|증빙|신분증|영수증|카드|물건|물품)(?:을|를|만)/u;
@@ -336,13 +351,14 @@ function requiresLoanPickup(action, issuerClause) {
 }
 
 function* reportedCashTransfers(text) {
-  const issuer = clause => openDirectedReport(clause) && (reportCashRole.exec(clause) || issuerForCurrentReport(clause));
+  const issuer = clause => openDirectedReport(clause) && roleBelongsToReportedSource(clause) &&
+    (reportCashRole.exec(clause) || issuerForCurrentReport(clause));
   const request = clause => requiresCashAtMeeting(clause) || cashMedium.test(clause) && reportsPickupPlan.test(clause);
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
     for (const { body, previous, next } of currentReceivedRequests(record, issuer, request)) {
       if (!openDirectedReport(body) || asksAboutCollection.test(body) || closedRemainder.test(next)) continue;
       const speakerHere = issuer(body);
-      const speaker = speakerHere || (receivedArtifactHere.test(previous) && issuer(previous));
+      const speaker = speakerHere || ((receivedArtifactHere.test(previous) || receivedRoleNotice.test(previous)) && issuer(previous));
       if (!speaker) continue;
       const { role, unit } = speaker.groups;
       const action = speakerHere ? body.slice(speaker.index + speaker[0].length) : body;
@@ -354,8 +370,9 @@ function* reportedCashTransfers(text) {
 }
 
 function issuerForCurrentReport(text) {
-  if (!openDirectedReport(text) || anotherTopic.test(text)) return null;
-  return claimedNotice.exec(text) ?? claimedPerson.exec(text) ?? issuerInReport(text);
+  if (!openDirectedReport(text) || anotherTopic.test(text) || !roleBelongsToReportedSource(text)) return null;
+  return receivedRoleNotice.exec(text) ?? reportedRoleOrigin.exec(text) ??
+    claimedNotice.exec(text) ?? claimedPerson.exec(text) ?? issuerInReport(text);
 }
 
 function* institutionTransactionReports(text, unverifiedLinks) {
@@ -492,19 +509,29 @@ const redirectSelfDescription = new RegExp(reportingSender + String.raw`(?:이|�
   String.raw`\s*(?:이?라고)\s*(?:(?:자신|자기)(?:을|를)\s*)?` + dispatchAssertion, "u");
 
 function claimsRedirectIssuer(clause) {
-  return openDirectedReport(clause) && !anotherTopic.test(clause) &&
+  return openDirectedReport(clause) && !anotherTopic.test(clause) && roleBelongsToReportedSource(clause) &&
     Boolean(issuerForCurrentReport(clause) || declaredDispatch.test(clause) ||
       attributedRedirect.test(clause) || redirectSelfDescription.test(clause));
 }
 
-const establishedRoute = /(?:기존|(?:평소|늘)\s*(?:알던|쓰던|쓰는|사용하던)|청사에서\s*(?:쓰는|사용하는)|공식|대표)(?:\s*공식)?\s*(?:접수처|창구|민원실|페이지|주소|연락처|전화번호)(?:가|이|을|를|와는?|과는?)?\s*(?:아닌|아니라|대신|말고|별개|다른)/u;
-const requiredAddressUse = /^\s*(?:에서|으로|로|에)(?:만)?\s*(?:[가-힣]{1,12}\s+){0,4}?(?:(?:확인|열람|조회|접속|신청|접수)(?:하도록|하라고|하라는|해야)|읽(?:으라고|으라는|어야)|보(?:라고|라는)|봐야)/u;
+const establishedRoute = /(?:기존|(?:평소|늘)\s*(?:알던|쓰던|쓰는|사용하던)|(?:청사|(?:시|군|구|도)청|해당\s*기관)(?:에서|이|가)\s*(?:쓰는|사용하는|운영하는)|공식|대표)(?:\s*공식)?\s*(?:접수처|창구|민원실|페이지|주소|연락처|전화번호|곳)(?:가|이|을|를|와는?|과는?)?\s*(?:아닌|아니라|대신|말고|별개|다른)/u;
+const requiredAddressUse = /^\s*(?:에서|으로|로|에)(?:만)?\s*(?:[가-힣]{1,12}\s+){0,4}?(?:(?:확인|열람|조회|접속|신청|접수)(?:하도록|하라고|하라는|해야|할(?:\s*것)?을\s*(?:요구|요청))|들어가(?:도록|라고|야)|들어갈\s*것을\s*(?:요구|요청)|읽(?:으라고|으라는|어야)|보(?:라고|라는)|봐야)/u;
+const hostWithDirection = /^(?<host>[A-Za-z0-9.-]+)(?<direction>으로|로|에서|에)$/u;
+function requiresParsedAddressToken(token, after, unverifiedLinks) {
+  if (!isUnverifiedAddressToken(token, unverifiedLinks)) return false;
+  if (requiredAddressUse.test(after)) return true;
+
+  // 조사가 붙어 두 호스트로 해석될 수 있으면 어느 쪽도 공식 주소에 해당하지 않아야 한다.
+  const attached = hostWithDirection.exec(token)?.groups;
+  if (!attached || !requiredAddressUse.test(attached.direction + after) || isOfficialLink(attached.host)) return false;
+  const { candidates, complete } = inspectLinkCandidates(attached.host);
+  return complete && candidates.length === 1 && candidates[0].raw === attached.host && candidates[0].complete;
+}
 function replacesEstablishedAddress(action, unverifiedLinks) {
   if (!unverifiedLinks.length || ORDINARY_LOOKUP.test(action) || informationalAddress.test(action) ||
       !establishedRoute.test(action)) return false;
   for (const token of action.matchAll(/\S+/gu)) {
-    if (requiredAddressUse.test(action.slice(token.index + token[0].length)) &&
-        isUnverifiedAddressToken(token[0], unverifiedLinks)) return true;
+    if (requiresParsedAddressToken(token[0], action.slice(token.index + token[0].length), unverifiedLinks)) return true;
   }
   return false;
 }
@@ -522,8 +549,30 @@ function requiresSenderSelectedCallback(action) {
   return false;
 }
 
+const actualPhone = /(?<![\d-])(?:0\d{1,2}[- ]?\d{3,4}[- ]?\d{4}|1\d{3}[- ]?\d{4})(?![\d-])/gu;
+const noticeContainsNumber = /(?:(?:그|이|해당|받은)\s*(?:문자|메시지|통지|안내|안|본문)(?:\s*안)?|본문)(?:에|에는|속에)\s*(?:(?:번호|연락처)\s*[:：]?\s*)?$/u;
+const numberIsPrinted = /^\s*(?:이|가|은|는)?\s*(?:적혀|실려|표시(?:돼|되어)|기재(?:돼|되어)|나와|있)/u;
+const referencedNumber = /(?:그|이|해당)\s*(?:전화\s*)?(?:번호|연락처)/u;
+const asksIfRequired = /(?:해야|하는지)\s*(?:하는지|하는지를|하는\s*건지|물었|문의했)|(?:할지|할\s*필요가\s*있는지)/u;
+
+function requiresPrintedCallback(action) {
+  const numbers = [...action.matchAll(actualPhone)];
+  if (numbers.length !== 1 || optionalRoute.test(action) || excludedReply.test(action) || asksIfRequired.test(action)) return false;
+  const [number] = numbers;
+  if (isCardCallbackNumber(number[0]) || !noticeContainsNumber.test(action.slice(0, number.index))) return false;
+  const tail = action.slice(number.index + number[0].length);
+  const reference = referencedNumber.exec(tail);
+  return numberIsPrinted.test(tail) && Boolean(reference && requiredCallback.test(tail.slice(reference.index + reference[0].length)));
+}
+
+function requiresReportedExternalInstallation(action) {
+  return /(?:휴대\s*(?:전화|폰)|스마트폰|기기|단말|컴퓨터)(?:에서|에)(?=\s|$)/u.test(action) &&
+    !asksIfRequired.test(action) && requiresRecipientInstallation(action);
+}
+
 function* reportedRouteChanges(text, unverifiedLinks) {
-  const request = clause => replacesEstablishedAddress(clause, unverifiedLinks) || requiresSenderSelectedCallback(clause);
+  const request = clause => replacesEstablishedAddress(clause, unverifiedLinks) || requiresSenderSelectedCallback(clause) ||
+    requiresPrintedCallback(clause) || requiresReportedExternalInstallation(clause);
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
     for (const { body, previous, next } of currentReceivedRequests(record, claimsRedirectIssuer, request)) {
       if (!openDirectedReport(body) || closedRemainder.test(next)) continue;
@@ -532,7 +581,8 @@ function* reportedRouteChanges(text, unverifiedLinks) {
         (receivingContext.test(previous) || attributedRedirect.test(previous)) && claimsRedirectIssuer(previous);
       if (!sameReceivedSource) continue;
       if (replacesEstablishedAddress(action, unverifiedLinks)) yield SIG_LINK;
-      if (requiresSenderSelectedCallback(action)) yield SIG_CALL_THIS_NUMBER;
+      if (requiresSenderSelectedCallback(action) || requiresPrintedCallback(action)) yield SIG_CALL_THIS_NUMBER;
+      if (hasOpenInstallationReport(action, next, requiresReportedExternalInstallation)) yield SIG_APP_INSTALL;
     }
   }
 }
