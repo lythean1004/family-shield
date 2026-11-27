@@ -1,3 +1,4 @@
+import { classifyCallback } from "./callback-number.js";
 import { SIG_DELETE_APP, SIG_ISOLATION } from "./signals.js";
 
 const TOKEN_START = "(?<![\\p{L}\\p{N}_])";
@@ -93,6 +94,48 @@ function mandatesDeletion(text) {
   }, ["", "부터", "을", "를", "은", "는", "만"]);
 }
 
+// 기존 보호 도구의 제거와, 기관을 자처하며 업무 앱 삭제 후 자기 연락처로 바꾸라는 요구를 확인한다.
+const inUseApp = /(?:이미\s*있던|기존|(?:사용|이용)\s*중인|쓰던|제가\s*쓰는|(?:내|제|저의|수신자의|개인(?:용)?)\s*(?:휴대\s*(?:전화|폰)|스마트폰|단말|기기|컴퓨터)|수신자의)\s*[^.!?\n]{0,18}$/u;
+const otherAppRecipient = /(?:관리자|직원|운영자|전산\s*담당자|기사|제삼자)(?:에게|한테|의)\s*[^.!?\n]{0,28}$/u;
+const senderReport = /(?:상대(?:방)?|발신(?:자|인)|상담(?:자|원)|보낸\s*(?:사람|쪽|곳))(?:가|이|는|은|의)?(?=[\s,.:]|$)/u;
+const removalProcedure = /^(?:삭제|제거)(?:하는\s*(?:절차|단계|순서)(?:를|을)\s*(?:요구|요청|지시)|(?:를|을)\s*(?:선행|필수|첫|우선)\s*(?:절차|단계|순서|조건)(?:로|으로)\s*(?:정|지정|요구))/u;
+const ordinaryRemoval = /(?:약관|이용\s*규정|정상\s*(?:교체|전환|정비)|공식\s*(?:앱\s*)?(?:장터|마켓)|삭제\s*(?:여부|이력|기록)|(?:삭제|제거)하는\s*(?:절차|단계|순서)(?:가|는)?\s*(?:필요한지|있는지))/u;
+const senderClosedRemoval = /^(?:(?:발신(?:자|인)|상대(?:방)?)(?:가|이)\s*(?:그|해당|같은|이)\s*(?:(?:삭제|제거)\s*)?(?:요구|요청|지시)(?:를|을)?\s*(?:철회|취소)|(?:그|해당|같은|이)\s*(?:(?:삭제|제거)\s*)?(?:요구|요청|지시)(?:는|가|이|은)?\s*(?:이미\s*)?(?:철회|취소)(?:됐|되었))/u;
+
+const serviceApp = nounPattern("(?:(?:모바일|인터넷|스마트)\\s*)?(?:뱅킹|은행|통신사)\\s*(?:앱|어플(?:리케이션)?|프로그램)");
+const serviceRemovalHeader = /^\s*\[[^\]\n]{0,18}(?:은행|금융\s*(?:기관|회사)|통신사)(?:의)?\s*(?:보안\s*(?:팀|부서|담당)|안전\s*(?:관리|담당)|고객\s*(?:지원|센터)|담당자|상담원)\s*\]/u;
+const claimsServiceRole = /(?:은행|금융\s*(?:기관|회사)|통신사)(?:의)?\s*(?:보안|안전|고객\s*지원|담당|상담)[가-힣\s]{0,12}?(?:을|를)?\s*자처한\s*(?:발신(?:자|인)|상대(?:방)?|보낸\s*사람)/u;
+const serviceDeletion = verbPattern("삭제|제거|지우고|없애고|지운|없앤");
+const removalBeforeCallback = /^(?:(?:삭제|제거)하(?:고|면)|(?:삭제|제거)한\s*(?:뒤|후)|(?:지우|없애)고|(?:지운|없앤)\s*(?:뒤|후))/u;
+const senderDesignatesCallback = /(?:본인|자신|발신(?:자|인)|상대(?:방)?|보낸\s*사람)(?:이|가)?\s*(?:지정한|정한|알려\s*준)\s*(?:전화\s*)?(?:번호|연락처)(?:로|으로|에)(?:만)?\s*(?:회신|전화|연락|통화)(?:하(?:라|래|도록)|해\s*달라)/u;
+
+function mandatesContextualRemoval(clause, previous, next, hasReport) {
+  if (DEVICE_ADMIN.test(clause) || SELF_REQUEST.test(clause) || COMPARISON_ONLY.test(clause) ||
+      ordinaryRemoval.test(clause) || senderClosedRemoval.test(next)) return false;
+
+  const possibleRecipientApp = (object, before) => {
+    const leading = clause.slice(0, object.index);
+    return OTHER_APPLICATION.test(before) || otherAppRecipient.test(leading) ? null : leading;
+  };
+  const protectionRemoved = related(clause, protection, deletion, ({ before, after, object }) => {
+    const leading = possibleRecipientApp(object, before);
+    return leading !== null && inUseApp.test(leading) && (hasReport || senderReport.test(leading)) &&
+      !NOT_REQUEST.test(after) && removalProcedure.test(after);
+  }, ["", "부터", "을", "를", "의"]);
+  if (protectionRemoved) return true;
+
+  return related(clause, serviceApp, serviceDeletion, ({ before, between, after, object }) => {
+    const leading = possibleRecipientApp(object, before);
+    if (leading === null || NOT_REQUEST.test(after)) return false;
+    const action = clause.slice(object.index + object[0].length + between.length);
+    const direct = serviceRemovalHeader.test(leading) || serviceRemovalHeader.test(previous);
+    if (direct && removalBeforeCallback.test(action) && classifyCallback(action, []).directed) return true;
+
+    return inUseApp.test(leading) && claimsServiceRole.test(leading) && senderDesignatesCallback.test(action) &&
+      (removalBeforeCallback.test(action) || removalDirective.test(action) && /(?:이어서|그\s*뒤|그\s*다음)/u.test(action));
+  }, ["", "부터", "을", "를", "의"]);
+}
+
 const senderLimitsOutsideAdvice = /(?:연락(?:한|하던|했던|을\s*한|해\s*온)\s*(?:사람|상대)|발신(?:자|인)|상대(?:방)?)(?:가|이|은|는)?\s*(?:제가|내가|수신자가)?[^.!?\n]{0,25}(?:다른\s*사람|가족|지인|친구)(?:과|와|에게|한테|하고)?\s*[^.!?\n]{0,12}(?:상의|의논|조언)(?:를|을)?\s*(?:하지\s*못\s*(?:하게|하도록)|할\s*수\s*없(?:게|도록)|못\s*하게|해선\s*안\s*된다고)/u;
 const senderDemandsContinuingAlone = /(?:혼자(?:서)?(?:만)?|단독(?:으로)?)\s*[^.!?\n]{0,16}(?:다음|계속|이어)[^.!?\n]{0,18}(?:이야기|대화|통화|연락|상담|응답)[^.!?\n]{0,17}(?:요구|요청|지시)/u;
 
@@ -128,6 +171,9 @@ export function addReportedContactRestrictions(text, signals) {
     const isolationClosure = sameIsolationDemandEnded.test(next) || sameTopic(next) && sameIsolationDemandEnded.test(clauses[index + 2] ?? "");
     if ((narrates || indirect) && !isolationClosure && mandatesIsolation(body)) signals.add(SIG_ISOLATION);
     const administrative = sameTopic(previous) && DEVICE_ADMIN.test(previous);
-    if ((narrates || indirect || requiredRemovalReported) && !administrative && mandatesDeletion(body)) signals.add(SIG_DELETE_APP);
+    if (!administrative && ((narrates || indirect || requiredRemovalReported) && mandatesDeletion(body) ||
+        mandatesContextualRemoval(clause, sameTopic(previous) ? previous : "", next, narrates))) {
+      signals.add(SIG_DELETE_APP);
+    }
   }
 }
