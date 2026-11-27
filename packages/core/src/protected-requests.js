@@ -1,5 +1,6 @@
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { isOfficialLink } from "./official-links.js";
+import { SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE } from "./signals.js";
 
 const credential = "(?:(?:일회용|인증|원격\\s*(?:지원|제어|접속))\\s*(?:번호|코드|암호|값)|OTP)";
 const recipient = "(?:(?:나|저|담당자|상담원|직원)(?:한테|에게)|(?:이\\s*)?(?:문자|메시지|채팅창)(?:로|으로))";
@@ -24,6 +25,37 @@ const docs = new RegExp("(?:" + identityCopy + together + bankCopy + "|" + bankC
 
 function externalOnly(parsed) {
   return parsed.complete && parsed.candidates.length > 0 && parsed.candidates.every(c => c.complete && !isOfficialLink(c.raw));
+}
+
+const humanRecipient = "(?:대화\\s*상대(?:방)?|상대(?:방)?|자기|(?:그|다른)\\s*(?:사람|분)|(?:상담|접수)\\s*(?:자|원|직원|담당자)|담당자|직원)(?:에게|한테)";
+const reportedRelay = new RegExp(credential + "(?:을|를|만)?\\s*(?:그대로\\s*)?" + humanRecipient +
+  "\\s*(?:그대로\\s*)?(?:불러|알려|읽어|전달해|보내|넘겨|말해)\\s*(?:달라고|달라는|달라네|달래|줘야)", "iu");
+const inactiveReport = /(?:요청|요구|부탁)(?:을|를)?\s*(?:이미\s*)?(?:거절|취소|철회)|(?:예방|보안)\s*(?:교육|강의)|(?:수업|교육|연수)에서|(?:예시|사례)(?:로|예요|입니다)|(?:역할극|극본|대본)\s*(?:대본|속|연습)|(?:하는|그런)\s*(?:일|경우)(?:이|가)?\s*없|(?:달라고|요구|부탁|요청)\s*한\s*적(?:이|은)?\s*없|(?:절차|접수)(?:가|는)?\s*(?:종료|마감|완료)됐|하지\s*(?:말|마|않)|(?:필요|의무)(?:가|는)?\s*없/;
+const documentPair = new RegExp("(?:" + identityCopy + together + bankCopy + "|" + bankCopy + together + identityCopy + ")");
+const requiredCopies = /^\s*(?:이|가|을|를)?\s*(?:(?:함께|한꺼번에|모두|둘\s*다)\s*)?(?:내라|내야|보내야|(?:제출|첨부|접수|등록)해야|들어가|포함(?:돼|되|된)|(?:이?라고|이래|이랍니다|입니다))/;
+const destinationField = /(?:접수처|(?:제출|접수)\s*(?:주소|링크)|(?:두\s*서류|둘|자료)(?:를|을)?\s*(?:낼|보낼|제출할|올릴)\s*곳)(?:라고\s*적힌(?:\s*곳)?|라\s*적힌|로\s*적힌|라는\s*곳)?\s*(?:은|는|이|가|[:：])?\s*(?<token>https?:\/\/[^\s"'<>]+)/giu;
+const topicBoundary = /다른\s*(?:서류|업무|행사|기관|신청)|별개로|(?:행사|교육|일정|그림|홍보)\s*(?:참고|안내)/;
+
+function hasNamedDestination(text) {
+  return [...text.matchAll(destinationField)].some(match => externalOnly(inspectLinkCandidates(match.groups.token)));
+}
+
+export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
+  const clauses = text.split(clauseBreak).map(clause => clause.trim()).filter(Boolean);
+  for (const [index, clause] of clauses.entries()) {
+    if (inactiveReport.test(clause)) continue;
+    if (reportedRelay.test(clause)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
+    if (!hasUnverifiedLink) continue;
+    const pair = documentPair.exec(clause);
+    if (!pair || !requiredCopies.test(clause.slice(pair.index + pair[0].length))) continue;
+    const previous = clauses[index - 1] ?? "";
+    if (!aidOrWork.test(clause) && (!aidOrWork.test(previous) || inactiveReport.test(previous) || topicBoundary.test(clause))) continue;
+    const afterPair = clause.slice(pair.index + pair[0].length);
+    const next = clauses[index + 1] ?? "";
+    if (hasNamedDestination(afterPair) || (!topicBoundary.test(next) && !inactiveReport.test(next) && hasNamedDestination(next))) {
+      signals.add(SIG_DOCUMENT_BUNDLE);
+    }
+  }
 }
 
 // 제출을 요구한 절의 주소, 또는 바로 다음에 단독으로 제시한 양식 주소만 결합한다.

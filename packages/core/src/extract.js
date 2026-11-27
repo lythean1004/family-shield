@@ -29,7 +29,7 @@ import { allLinksOfficial, isOfficialLink } from "./official-links.js";
 import { hasCardServiceRequest, hasVaccinationBooking } from "./card-sender.js";
 import { classifyCallback } from "./callback-number.js";
 import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
-import { hasCredentialDisclosure, hasDocumentBundle } from "./protected-requests.js";
+import { addReportedProtectedRequests, hasCredentialDisclosure, hasDocumentBundle } from "./protected-requests.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover, hasLoanCashPickup } from "./cash-handover.js";
 import { ACCOUNT_NUMBER, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
 import { reportedRequestSignals } from "./reported-requests.js";
@@ -293,6 +293,7 @@ export function extractCodeSignals(text, options = {}) {
   }
 
   const directSignals = [...signals];
+  addReportedProtectedRequests(input, signals, unverifiedLink);
   for (const signal of reportedRequestSignals(input)) signals.add(signal);
   addReportedFamilySignals(input, signals);
   addReportedNoticeFields(input, signals, { unverifiedLinks: outside.map(candidate => candidate.raw) });

@@ -6,6 +6,41 @@ import { AI_ALLOWED_SIGNALS, codeOnlyFrom } from "../src/signals.js";
 
 const secret = "SIG_CREDENTIAL_DISCLOSURE";
 const external = "https://form.invalid/";
+describe("수신자가 전한 인증값 전달 요구와 본인 기기 입력", () => {
+  const samples = [
+    [true, "경품 문의 답변에서 인증 코드를 상대방한테 불러 달라고 했다는 제보예요."],
+    [true, "제게 새로 온 쪽지에는 원격지원 번호를 상담자에게 전달해 달라는 요청이 남아 있어요."],
+    [true, "윗글은 인증 코드를 공유하지 말라는 보안 안내였어요. 그 아래 새로 온 답장에서는 인증 코드를 자기한테 알려 달래요."],
+    [false, "상담받은 분이 인증 코드를 자기 기기에 직접 적었다는 이용 후기예요."],
+    [false, "인증 코드를 상담자에게 불러 달라는 요구를 거절하고 상담을 종료했어요."],
+    [false, "수업에서는 인증 코드를 상대방한테 불러 달라는 요청을 예시로 다뤘어요."],
+    [false, "접수 번호를 상담자에게 전달해 달라는 답이 왔는데 본인인증 문자는 따로 받았어요."],
+    [false, "기관의 안내는 인증 코드를 상대방에게 넘겨 달라고 하는 일이 없다는 내용이에요."],
+    [false, "인증 코드를 상대방에게 알려 달라는 상황은 역할극 대본 속 이야기였어요."],
+    [false, "상담자가 인증 코드를 자기한테 불러 달라고 한 적은 없대요."],
+    [true, "인증 코드를 다른 사람에게 읽어 달라는 부탁을 받고 멈칫했어요."],
+  ];
+  for (const [expected, text] of samples) it(text, async () =>
+    assert.equal((await analyze({ text })).fired_rules.includes("R16"), expected));
+});
+
+describe("지원금·부업 서류와 명시된 접수 주소", () => {
+  const samples = [
+    [true, "지원금 안내를 받았어요. 신청 서류로 통장 사본과 신분증 사진을 한꺼번에 제출해야 한다네요. 서류 접수처라고 적힌 곳은 " + external],
+    [true, "재택 부업에 필요한 서류는 주민등록증 사본이랑 통장 사본이라고 했어요. 두 서류를 낼 곳은 " + external],
+    [true, "부업 신청 서류에는 신분증 사진과 통장 사본이 포함돼요. 제출 주소: " + external],
+    [false, "지원금 안내 자료에 신분증 사진과 통장 사본이 함께 실린 것은 사례 소개예요. 전시 일정 " + external],
+    [false, "지원금 신청에는 통장 사본과 신분증 사진을 함께 제출했어요. 도서관 행사 참고 주소 " + external],
+    [false, "부업 신청 서류에 신분증 사진이랑 통장 사본은 필요 없어요. 접수 주소: " + external],
+    [false, "지원금 신청 서류로 신분증 사진만 제출해야 한대요. 설명 그림에는 통장 사본도 있어요. 제출 주소: " + external],
+    [false, "부업 신청 서류에 신분증 사진과 통장 사본이 포함돼요. 제출 주소는 종이 양식에 있어요. 행사 참고 " + external],
+    [false, "부업 신청 서류에 신분증 사진과 통장 사본이 포함돼요. 제출 주소는 https://www.gov.kr/ 이고, 참고 게시판은 " + external],
+    [false, "지원금 신청 서류로 신분증 사진과 통장 사본을 제출해야 했던 절차가 종료됐어요. 자료 보관 담당자의 제출 주소: " + external],
+    [false, "지원금 신청 서류에 신분증 사진과 통장 사본이 포함돼요. 다른 기관의 제출 주소: " + external],
+  ];
+  for (const [expected, text] of samples) it(text, async () =>
+    assert.equal((await analyze({ text })).fired_rules.includes("R17"), expected));
+});
 describe("D54 지원금·부업 신청에 신분 자료와 통장 자료를 함께 요구", () => {
   const bundle = "SIG_DOCUMENT_BUNDLE";
   for (const text of [
