@@ -80,6 +80,33 @@ function requestedValue(text, pattern) {
   return null;
 }
 
+const compactFilingHeader = /^(?:(?:\[Web발신\]|\[국외발신\])[ \t]*)?(?:\[(?<bracket>[^\]\r\n]{2,30})\]|(?<plain>[가-힣a-zA-Z0-9]{2,24}(?:[ \t]+[가-힣]{1,12})??))[ \t]+(?:(?:신청|접수|제출)[ \t]*)?(?:서류|자료|문서)[ \t]*(?:보완|보정|확인|제출|정리)(?:[ \t]*(?:요청|안내))?[ \t]*[:：][ \t]*(?:\r?\n[ \t]*)?/u;
+const compactInvestigator = new RegExp("^(?:" + INVESTIGATIVE + "|수사\\s*기관)$", "u");
+const residentIdentifier = "(?:주민\\s*(?:등록\\s*)?번호)(?:의)?(?:\\s*(?:(?:앞|뒷)\\s*자리|일부|전체|전부))?";
+const accompanyingIdentity = "(?:(?:(?:현재|등록(?:된)?|실거주)\\s*)?주소|성명|이름|생년월일)";
+const joinIdentityItems = "\\s*(?:과|와|및|[,·])\\s*";
+const requiredCompactReply = new RegExp(
+  "^(?:(?:본인|수신자|귀하)의\\s*)?(?:" + residentIdentifier + joinIdentityItems + accompanyingIdentity + "|" +
+  accompanyingIdentity + joinIdentityItems + residentIdentifier + ")(?:을|를)?\\s*" +
+  "(?:답장|회신)(?:을|를)?\\s*(?:요망|바람|요청(?:함|드립니다)?|해\\s*(?:주세요|주십시오|주시기\\s*바랍니다)|하기\\s*바랍니다)(?=[.!。!\\n]|$)", "u");
+const withdrewCompactReply = /^(?:(?:그|같은|이|해당)\s*)?(?:(?:회신|답장)\s*)?(?:요청|요구)(?:은|는|이|가|를|을)?\s*(?:이미\s*)?(?:취소|철회|거절)/u;
+
+const contextualReplyExample = /^(?:(?:그|이|해당|앞(?:의)?|위(?:의)?|직전)\s*)?(?:문장|문구|내용|안내|표제|회신\s*(?:요청|요구))(?:은|는|이|가)\s*(?:(?:교육|훈련|모의)용\s*)?(?:예시|가정|견본)(?:였|이었|입니다|에\s*불과)/u;
+
+function hasCompactIssuerIdentityReply(text) {
+  const notice = text.trimStart();
+  const header = compactFilingHeader.exec(notice);
+  if (!header) return false;
+  const name = (header.groups.bracket ?? header.groups.plain).trim();
+  // A compact title counts as a source claim only for an existing investigative role or checked card name.
+  if (!compactInvestigator.test(name) && !isCardSenderName(name)) return false;
+  const body = notice.slice(header[0].length);
+  const [clause, following = ""] = body.split(/[.!。]+\s*|\r?\n/u, 2);
+  const next = following.trimStart();
+  return !noObligation.test(clause) && !locallyEntered.test(clause) && !noDisclosure.test(clause) &&
+    !withdrewCompactReply.test(next) && !contextualReplyExample.test(next) && requiredCompactReply.test(clause.trimEnd());
+}
+
 function hasPersonalRequest(clause) {
   if (locallyEntered.test(clause) || noDisclosure.test(clause)) return false;
   const entry = requestField.exec(clause);
@@ -298,6 +325,10 @@ export function addInstitutionRequestContext(text, signals) {
   addReceivedInstitutionRequests(text, signals);
   addLevyInstallation(text, signals);
   if (teachingOrWithdrawn.test(text)) return;
+  if (hasCompactIssuerIdentityReply(text)) {
+    signals.add(SIG_AGENCY_IMPERSONATION);
+    signals.add(SIG_PERSONAL_INFO);
+  }
   const clauses = text.split(/[.!?。]+(?=\s|$)|[\r\n;]+|[,，]\s*(?=(?:한편|다른|별개|이와\s*별개))/u)
     .map(clause => clause.trim()).filter(Boolean);
   if (hasPaymentCallback(text, clauses)) signals.add(SIG_FOREIGN_PAYMENT_CALLBACK);
