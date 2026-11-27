@@ -174,13 +174,39 @@ function mandatesContextualRemoval(clause, previous, next, hasReport) {
 const senderLimitsOutsideAdvice = /(?:연락(?:한|하던|했던|을\s*한|해\s*온)\s*(?:사람|상대)|발신(?:자|인)|상대(?:방)?)(?:가|이|은|는)?\s*(?:제가|내가|수신자가)?[^.!?\n]{0,25}(?:다른\s*사람|가족|지인|친구)(?:과|와|에게|한테|하고)?\s*[^.!?\n]{0,12}(?:상의|의논|조언)(?:를|을)?\s*(?:하지\s*못\s*(?:하게|하도록)|할\s*수\s*없(?:게|도록)|못\s*하게|해선\s*안\s*된다고)/u;
 const senderDemandsContinuingAlone = /(?:혼자(?:서)?(?:만)?|단독(?:으로)?)\s*[^.!?\n]{0,16}(?:다음|계속|이어)[^.!?\n]{0,18}(?:이야기|대화|통화|연락|상담|응답)[^.!?\n]{0,17}(?:요구|요청|지시)/u;
 
-const sameIsolationDemandEnded = /^(?:그|해당|같은|이)\s*(?:요구|요청|조건|지시)(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:(?:취소|철회)(?:됐|되었)|(?:발신자|발신인|상대(?:방)?)(?:가|이)\s*(?:취소|철회)(?:했|하였))/u;
+const completedIsolationEnding = /^(?:다(?:고\s*(?:했|하였|말했|설명했|알렸|기록했|적었)(?:다|습니다|어요|음))?|습니다|어요|음)[.!。]?\s*$/u;
+const coordinatedWithdrawal = /^(?:고|으며|지만)\s+[^.!?？。]+(?:다|요|음)[.!。]?\s*$/u;
+const repeatedIsolationDemand = /(?:다시|재차|여전히|계속)[^.!?。]{0,30}(?:요구|요청|지시|조건|명령)|(?:조건|지시|요구)(?:을|를|가|이)?\s*(?:되살|재개|부활)/u;
+const sameIsolationDemandEnded = new RegExp(
+  String.raw`^(?:그|해당|같은|이)\s*(?:요구|요청|조건|지시)(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:(?:취소|철회)(?:됐|되었)|(?:발신자|발신인|상대(?:방)?)(?:가|이)\s*(?:취소|철회)(?:했|하였))`, "u",
+);
+const isolationReporterRole = String.raw`(?<role>담당자|상담원|발신(?:자|인)|상대(?:방)?)(?:가|이|은|는)\s+`;
+const isolationReporter = new RegExp("^" + isolationReporterRole, "u");
+const reporterWithdrawsIsolation = new RegExp(
+  String.raw`^(?:(?:한편|이후|뒤이어|그\s*뒤|다만|그러나)(?:[,，])?\s+)?(?:(?:그|같은)\s+)?` + isolationReporterRole +
+    String.raw`(?:그|해당|같은)\s*(?:요구|요청|조건|지시)(?:을|를)\s*(?:이미\s*)?(?:취소|철회)(?:했|하였)`, "u",
+);
+function hasCompletedWithdrawal(clause, match) {
+  if (!match) return false;
+  const ending = clause.slice(match[0].length);
+  return completedIsolationEnding.test(ending) || coordinatedWithdrawal.test(ending) &&
+    !repeatedIsolationDemand.test(ending) && !mandatesIsolation(ending);
+}
+
+function sameDemandEnded(clause) {
+  return hasCompletedWithdrawal(clause, sameIsolationDemandEnded.exec(clause));
+}
+
+function sameReporterWithdrawsIsolation(clause, next) {
+  const withdrawal = reporterWithdrawsIsolation.exec(next);
+  return hasCompletedWithdrawal(next, withdrawal) && isolationReporter.exec(clause)?.groups.role === withdrawal.groups.role && mandatesIsolation(clause);
+}
 const asksForOutsideAdvice = /(?:조언|자문|도움)(?:을|를)?\s*(?:받아\s*보|받|구해\s*보|구하|얻어\s*보|얻)(?:겠다고|려고\s*한다고)\s*(?:했|설명했|말했)더니\s*[,，]?\s*/u;
 const returnedProhibition = /^(?:아예|일절|전혀|절대)?\s*(?:얘기|이야기|상의|의논|상담|연락|말)(?:하)?지\s*말라는\s*(?:답(?:만|이|을)?|응답(?:만|이|을)?|대답(?:만|이|을)?|회신(?:만|이|을)?)(?=\s|$)/u;
 const secondSupportParty = /^\s*(?:(?:상담\s*(?:창구|기관|센터)|상담원)(?:와는|과는|하고는|에게는)\s*)?(?:아예|일절|전혀|절대)?\s*$/u;
 
 function adviceBlockedInReply(clause, next) {
-  if (NARROW_CONTEXT.test(clause) || allowedSupport.test(clause) || sameIsolationDemandEnded.test(next)) return false;
+  if (NARROW_CONTEXT.test(clause) || allowedSupport.test(clause) || sameDemandEnded(next)) return false;
   const offer = asksForOutsideAdvice.exec(clause);
   if (!offer) return false;
   const reply = clause.slice(offer.index + offer[0].length);
@@ -195,7 +221,7 @@ function mustContinueWithoutSupport(clauses) {
     return senderLimitsOutsideAdvice.test(clause) && !PAST_OR_REJECTED.test(clause) &&
       !SELF_REQUEST.test(clause) && !NARROW_CONTEXT.test(clause) && !BREAK.test(next) && !PAST_OR_REJECTED.test(next) &&
       !NARROW_CONTEXT.test(next) && !allowedSupport.test(clause + " " + next) &&
-      !sameIsolationDemandEnded.test(clauses[index + 2] ?? "") && senderDemandsContinuingAlone.test(next);
+      !sameDemandEnded(clauses[index + 2] ?? "") && senderDemandsContinuingAlone.test(next);
   });
 }
 
@@ -214,7 +240,7 @@ function requiresSeparationBeforeReply(text) {
       const context = [clauses[index - 2] ?? "", previous, clause, BREAK.test(following) ? "" : following].join(" ");
       return !PAST_OR_REJECTED.test(previous + " " + clause) && !NARROW_CONTEXT.test(context) &&
         !chosePrivateSession.test(context) && !allowedSupport.test(context) &&
-        !sameIsolationDemandEnded.test(following) && !senderWithdrewCompanionCondition.test(following);
+        !sameDemandEnded(following) && !senderWithdrewCompanionCondition.test(following);
     });
   });
 }
@@ -271,7 +297,8 @@ export function addReportedContactRestrictions(text, signals) {
     const indirect = ARTIFACT.test(body) && (DIRECTIVE.test(body) || CUT_CONTACT.test(body) || ONLY_ALONE_AFTER_CUTOFF.test(body));
     const requiredRemovalReported = /(?:발신자|상대(?:방)?|보낸\s*사람|상담원?|안내(?:문)?|조건|절차|지시|요구|내용|라(?:고|는|며)|다(?:고|는|며)|(?:해야|해라|하라|하래)\s*[.!?]?)/u.test(body);
 
-    const isolationClosure = sameIsolationDemandEnded.test(next) || sameTopic(next) && sameIsolationDemandEnded.test(clauses[index + 2] ?? "");
+    const isolationClosure = sameDemandEnded(next) || sameReporterWithdrawsIsolation(clause, next) ||
+      sameTopic(next) && sameDemandEnded(clauses[index + 2] ?? "");
     if (!isolationClosure && ((narrates || indirect) && mandatesIsolation(body) || adviceBlockedInReply(clause, next))) {
       signals.add(SIG_ISOLATION);
     }
