@@ -33,6 +33,7 @@ import { addReportedProtectedRequests, hasCredentialDisclosure, hasDocumentBundl
 import { INVESTIGATIVE, hasInvestigativeCashHandover, hasLoanCashPickup } from "./cash-handover.js";
 import { ACCOUNT_NUMBER, requestedPayments, requiresAdvancePayment } from "./payment-request.js";
 import { reportedRequestSignals } from "./reported-requests.js";
+import { addReportedContactRestrictions } from "./reported-contact-restrictions.js";
 import { addReportedFamilySignals } from "./reported-family.js";
 import { addFamilyRequestContextSignals } from "./family-request-context.js";
 import { addReportedNoticeFields } from "./reported-notice-fields.js";
@@ -295,6 +296,7 @@ export function extractCodeSignals(text, options = {}) {
   }
 
   const directSignals = [...signals];
+  if (options.inputComplete !== false) addReportedContactRestrictions(input, signals);
   addReportedProtectedRequests(input, signals, unverifiedLink);
   for (const signal of reportedRequestSignals(input)) signals.add(signal);
   addReportedFamilySignals(input, signals);
