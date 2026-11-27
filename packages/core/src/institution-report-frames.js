@@ -267,7 +267,7 @@ function linkedDestination(action, unverifiedLinks) {
 const attributedLoan = /(?:남은|미상환|잔여)\s*(?:대출(?:금)?|융자금)|(?:대출(?:금)?|융자금)\s*(?:잔액|잔금|상환(?:금|액)?|갚)|(?:^|[\s,，])상환(?:금|액)(?=$|[을를은는이가\s,，])/u;
 const cashMedium = /(?:현금|현찰)(?:으로|로|을|를|은)?(?=$|[\s,，.!?])/u;
 const employeeVisit = /(?:^|[\s,，])(?:금융\s*(?:회사|기관)\s*|은행\s*)?(?:담당\s*(?:자|직원)|직원|수거인|수령인)(?:이|가|은|는)\s*(?:(?:직접|나중에|당일에?|별도로)\s*)?(?:(?:집|댁|자택|수신지|거주지)(?:으로|로|에)\s*)?(?:방문(?:해(?:서)?|하여(?:서)?|하고)|찾아\s*(?:와서|가서|온\s*뒤|간\s*뒤))/u;
-const cashReceipt = /^\s*(?:(?:직접|따로|당일에?)\s*)?(?:(?:현금|현찰)(?:으로|로|을|를)?\s*)?(?:받아\s*가(?:는|겠다고|기로)|받아\s*간(?:다는|다고)|(?:수거|회수|수령)하(?:는|겠다고|기로)|가져\s*가(?:는|겠다고)|가져\s*간(?:다는|다고))/u;
+const cashReceipt = /^\s*(?:(?:직접|따로|당일에?)\s*)?(?:(?:현금|현찰)(?:으로|로|을|를)?\s*)?(?:받아\s*가(?:는|겠다고|기로)|받아\s*간(?:다는|다고)|(?:수거|회수|수령)하(?:는|겠다고|겠다는|기로)|가져\s*가(?:는|겠다고)|가져\s*간(?:다는|다고))/u;
 const currentCollection = /(?:겠다고|ㄴ다고|다고|다는)\s*(?:연락|알려|적|설명|안내|내용|했다|했음)|(?:방식|방법|절차)(?:이)?라고\s*(?:연락|알려|알렸|적|안내|통보|설명)|(?:받아\s*간다는|수거한다는)\s*(?:내용|안내|연락)/u;
 const separateCashPart = /(?:하지만|다만|한편|와는?\s*별개|이번엔\s*다른)|(?:같은\s*(?:금액|자료|요금)|[가-힣]{1,10})(?:을|를)\s*(?:환급|반환|돌려주|지원)/u;
 
@@ -276,8 +276,12 @@ function reportsWorkerCashCollection(action) {
   const visit = employeeVisit.exec(action);
   if (!debt || !visit || noCashCollection.test(action) || separateCashPart.test(action) ||
       !cashMedium.test(action) || !currentCollection.test(action)) return false;
+  return pickupVerbAfterVisit(action, debt, visit);
+}
+
+function pickupVerbAfterVisit(action, debt, visit) {
   const visitEnd = visit.index + visit[0].length;
-  if (debt.index < visit.index) return cashReceipt.test(action.slice(visitEnd));
+  if (debt.index < visit.index) return cashReceipt.test(action.slice(visitEnd).replace(/^서(?=\s)/u, ""));
   if (debt.index < visitEnd || action.slice(visitEnd, debt.index).trim()) return false;
   const afterDebt = action.slice(debt.index + debt[0].length).replace(/^[을를은는](?=\s|$)/u, "");
   return cashReceipt.test(afterDebt);
@@ -294,6 +298,59 @@ function reportsAppointedCashHandover(action) {
   if (!money || !target || cashReturn.test(action) || separateCashPart.test(action) || !explicitDemand.test(action)) return false;
   const actionStart = Math.max(money.index + money[0].length, target.index + target[0].length);
   return inPersonDelivery.test(action.slice(actionStart));
+}
+
+const reportCashRole = new RegExp(String.raw`(?<![\p{L}\p{N}])(?<role>(?:${INVESTIGATIVE}|수사\s*기관|금융\s*(?:사|회사|기관)|은행))` +
+  String.raw`(?:의)?(?<unit>(?:\s+(?:조사|수사|대출|상환|확인|담당(?:자)?|직원|심사|업무)){0,5})\s*` +
+  String.raw`(?:이?라는|이?라고\s*(?:한|밝힌|소개한|말한)|(?:[을를]\s*)?자처한)\s*` +
+  String.raw`(?:발신(?:자|인)|사람|상대(?:방)?|쪽)(?:이|가|은|는|에게|한테|에서)?(?=[\s,，]|$)`, "u");
+const meetForDelivery = /(?:직접\s*)?(?:만나(?:서|는\s*(?:자리|곳)(?:에서|에)?)?|대면(?:해서|으로)?)(?=\s|$)/u;
+const directedHandover = /(?:건네|넘겨|인계해|전달해|교부해)(?:야|라(?:고|는)|\s*달라)|(?:인계|전달|교부)하(?:라고|라는|도록)/u;
+const returnToReceiver = /(?:제게|저에게|내게|나에게|수신자에게)(?:만)?\s*(?:직접\s*)?$/u;
+const anotherCashPayer = /(?:^|[\s,，])(?:직원|담당자|발신(?:자|인)|상대(?:방)?|제삼자)(?:이|가|은|는)(?=[\s,，]|$)/u;
+const otherDeliveryObject = /(?:서류|증빙|신분증|영수증|카드|물건|물품)(?:을|를|만)/u;
+
+function requiresCashAtMeeting(action) {
+  const cash = cashObject.exec(action);
+  if (!cash || cashReturn.test(action) || separateCashPart.test(action)) return false;
+  const afterCash = action.slice(cash.index + cash[0].length);
+  const delivery = directedHandover.exec(afterCash);
+  if (!delivery || delivery.index > 54) return false;
+  const beforeDelivery = afterCash.slice(0, delivery.index);
+  const meeting = action.slice(Math.max(0, cash.index - 42), cash.index) + " " + beforeDelivery;
+  return meetForDelivery.test(meeting) && !anotherCashPayer.test(meeting) &&
+    !returnToReceiver.test(beforeDelivery) && !otherDeliveryObject.test(beforeDelivery);
+}
+
+const loanRoleContext = /(?:대출(?:금)?|융자(?:금)?)(?:을|를|의)?\s*(?:업무(?:를)?\s*)?(?:담당|맡)/u;
+const recipientRepayment = /(?:갚을|갚아야\s*할|갚기로\s*한)\s*(?:몫|금액|액수|돈)/u;
+const reportsPickupPlan = /(?:수령|수거|회수)하겠(?:다고|다는)|(?:받아|가져)\s*가겠(?:다고|다는)|(?:받아|가져)\s*간(?:다고|다는)/u;
+const asksAboutCollection = /(?:수거|수령|받아\s*가|가지러\s*오|방문)(?:하는지|할지|할\s*수\s*있는지|하는\s*건지)|(?:방문|수거|수령)\s*여부/u;
+
+function requiresLoanPickup(action, issuerClause) {
+  if (!cashMedium.test(action) || noCashCollection.test(action) || separateCashPart.test(action) ||
+      asksAboutCollection.test(action) || !reportsPickupPlan.test(action)) return false;
+  const debt = attributedLoan.exec(action) ?? (loanRoleContext.test(issuerClause) && recipientRepayment.exec(action));
+  const visit = employeeVisit.exec(action) ?? staffVisit.exec(action);
+  return Boolean(debt && visit && pickupVerbAfterVisit(action, debt, visit));
+}
+
+function* reportedCashTransfers(text) {
+  const issuer = clause => openDirectedReport(clause) && (reportCashRole.exec(clause) || issuerForCurrentReport(clause));
+  const request = clause => requiresCashAtMeeting(clause) || cashMedium.test(clause) && reportsPickupPlan.test(clause);
+  for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    for (const { body, previous, next } of currentReceivedRequests(record, issuer, request)) {
+      if (!openDirectedReport(body) || asksAboutCollection.test(body) || closedRemainder.test(next)) continue;
+      const speakerHere = issuer(body);
+      const speaker = speakerHere || (receivedArtifactHere.test(previous) && issuer(previous));
+      if (!speaker) continue;
+      const { role, unit } = speaker.groups;
+      const action = speakerHere ? body.slice(speaker.index + speaker[0].length) : body;
+      if (investigator.test(role) && requiresCashAtMeeting(action)) yield SIG_CASH_HANDOVER;
+      if ((financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "") &&
+          requiresLoanPickup(action, speakerHere ? body : previous)) yield SIG_LOAN_CASH_PICKUP;
+    }
+  }
 }
 
 function issuerForCurrentReport(text) {
@@ -504,6 +561,7 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     if (signal === SIG_LINK || signal === SIG_CALL_THIS_NUMBER || signal === SIG_PERSONAL_INFO) addAgencyAction(signal);
     else signals.add(signal);
   }
+  for (const signal of reportedCashTransfers(text)) signals.add(signal);
   if (hasStructuredInstallation(text)) addAgencyAction(SIG_APP_INSTALL);
   for (const { issuer, sender, heading, fields } of structuredFrames(text)) {
     if (financialIssuer.test(issuer) && reportsLoanCollection(fields, sender, heading)) signals.add(SIG_LOAN_CASH_PICKUP);
