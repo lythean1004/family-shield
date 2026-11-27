@@ -61,6 +61,8 @@ const independentVoiceChallenge = /^(?!(?:그|해당|같은|내가|저는|제가
 const VOICE_REFUSAL = /거절(?:해|하|했)|(?:회피|피하|피했|피해)|(?:응하지|답하지)\s*않|(?:확인|전화|통화|답변)(?:을|를)?\s*(?:하지|해\s*주지)\s*않|(?:문자|채팅|메시지)(?:로|만|로만)\s*(?:하자고\s*)?(?:고집|강요)|(?:통화|전화|음성)(?:로|으로)?\s*(?:(?:신원|본인)\s*)?확인(?:은|을|하는\s*(?:것|건|일))?\s*(?:안\s*(?:하겠|돼|된)|하지\s*않겠다)/u;
 const SECRET = /(?:비밀로\s*(?:해|하|남겨|두)|(?:알리지|말하지|얘기하지|전하지|공유하지)\s*(?:말|마)|(?:알리면|말하면|전하면)\s*안\s*된)(?:라는|다고|라고|달라|리라|\s*(?:요구|요청|부탁))|(?:알리|말하|전하|공유하)지\s*(?:않는|않을|말라는)\s*(?:것|걸)(?:을)?\s*(?:조건|전제)|숨기(?:라고|라는|래(?:요|서)|는\s*(?:(?:것|걸)(?:을)?\s*)?(?:조건|전제))/u;
 const PRESSURE = /재촉(?:해|하|했|하며|한다|도)|(?:재촉|독촉)(?:이|가)\s*(?:(?:또|다시(?:금)?|더|잇따라|연달아|거듭|반복해서|한\s*(?:번|차례)(?:\s*더)?|곧바로|바로|이어|뒤이어|계속|곧|금세)\s+){0,2}(?:왔|들어왔|이어졌|계속됐)|(?:반복|거듭)\s*(?:독촉|재촉)|기다(?:려|릴)\s*(?:주지\s*않|수\s*없)/u;
+// 늦으면 큰일이 난다는 보고는 앞선 금전 요구와 같은 연락에 연결된 경우에만 쓴다.
+const delayConsequenceReport = /^(?:늦으면|지체하면|미루면)\s*[^,，.!?\n]{0,15}(?:큰\s*일(?:이)?\s*(?:나|난|날|생긴)|불이익(?:이)?\s*(?:생긴|있)|기회(?:를)?\s*놓친)(?:다고|다는|다며|단|다)(?:\s|[,.!?]|$)/u;
 const receivedVoiceChallenge = /^(?:제가|내가|수신자(?:는|가)|받은\s*사람(?:은|이))\s*[^,，.!?\n]{0,13}(?:통화|전화|음성|목소리)[^,，.!?\n]{0,16}(?:자고\s*(?:했|말했|제안했)(?:더니|는데|지만)?|(?:요청|제안)했(?:더니|는데|지만)|(?:확인하|묻)자|물었더니)/u;
 
 const PROHIBITED_ACTION = /(?:(?:보내|부치|빌리|사|받|내|깔|넘기|주|공유하|제출하|작성하|전달하|결제하|구매하|송금하|입금하|이체하|설치하)지|(?:송금|입금|이체|결제|구매|설치|제출|공유)(?:은|는|을|를)?\s*하지)\s*(?:말|않)/u;
@@ -83,15 +85,17 @@ const GIFT_CODE = "(?:의)?\\s*(?:번호|코드|핀)";
 const GIFT = GIFT_ITEM + "(?:" + GIFT_CODE + ")?";
 const GIFT_WITH_CODE = new RegExp("^" + GIFT_ITEM + GIFT_CODE, "u");
 const PROP_GIFT = /(?:무대|연극|공연|촬영|연습|전시)\s*소품(?:인|으로\s*쓰는)?\s*(?:종이|모형|인쇄(?:한|된))?\s*$/u;
+const nonTransferGiftAction = /(?:보관|정리|기록|분류|폐기|보전|조회|확인)(?:해|하)(?:\s*(?:달(?:라|랬)|라(?:고|는|며)))/u;
 const PRIVATE = "(?:비공개\\s*(?:계정|로그인)\\s*(?:정보|자료)|민감\\s*정보|개인(?:의)?\\s*(?:정보|신분)|신상\\s*정보|신분증|신분(?:을|를)?\\s*(?:정보|자료|사진|증명|확인)|가족\\s*관계\\s*증명서|가족의\\s*(?:[가-힣]{1,8}\\s+){0,2}(?:서류|증명서)|(?:신원|신분|가족\\s*관계)(?:을|를|의)?\\s*(?:관련|확인|증명|입증)(?:용|을|를|할|하는)?\\s*(?:수\\s*있는\\s*)?서류|주민\\s*(?:등록\\s*)?(?:증|번호)|인증\\s*(?:코드|번호)|일회용\\s*(?:코드|비밀번호)|(?:카드|계좌)\\s*번호|비밀\\s*번호|OTP)";
 const APPLICATION = "(?:앱|어플(?:리케이션)?|(?:원격|보안)\\s*프로그램)";
 const INSTALL = "(?:설치|다운로드|내려받기)";
 const REQUIREMENT = "[^.!?\\n]{0,14}?(?:조건|전제|필수)(?:라|이|에|입|인)";
 const PAYMENT_DEADLINE = new RegExp(`${PAYMENT}[^.!?\\n]{0,12}?(?:오늘|내일|지금)[^.!?\\n]{0,12}?아니면\\s*안\\s*(?:된대|된다고|된다며)`, "u");
 
+const moneyRequest = requestPattern(PAYMENT, "(?:모아|보내|옮겨|부쳐|빌려|보태|내|내놓으|대납해|마련해|(?:결제|이체|입금|송금)해)");
 const REQUESTS = [
-  [SIG_MONEY, requestPattern(PAYMENT, "(?:모아|보내|옮겨|부쳐|빌려|보태|내|내놓으|대납해|마련해|(?:결제|이체|입금|송금)해)")],
-  [SIG_GIFTCARD, requestPattern(GIFT, "(?:사|구매해|결제해|보내|전달해|공유해|알려)")],
+  [SIG_MONEY, moneyRequest],
+  [SIG_GIFTCARD, requestPattern(GIFT, "(?:사(?:다)?|구매해|구입해|구해(?:다)?|마련해|장만해|결제해|보내|전달해|건네(?:어|줘)?|넘겨|가져(?:다|와)|공유해|알려)")],
   [SIG_PERSONAL_INFO, requestPattern(PRIVATE, "(?:보내|보여|제출해|제시해|전달해|공유해|알려|적어|입력해|촬영해|넘겨)")],
   [SIG_APP_INSTALL, requestPattern(APPLICATION, "(?:설치해|깔아|설치하|내려받아|다운로드해)",
     { reported: `${INSTALL}\\s*(?:해야(?:만)?\\s*(?:한다(?:는|고)|한대|된대)|${REQUEST}|(?:하는\\s*(?:게|것)|하기가?)${REQUIREMENT})`, allowBare: false })],
@@ -130,7 +134,8 @@ function hasCurrentRequest(clause, signal, pattern) {
     const start = match.index;
     const end = start + match[0].length;
     if (PROHIBITED_ACTION.test(match[0]) || RECIPIENT_REQUEST.test(clause.slice(0, end))) continue;
-    if (signal === SIG_GIFTCARD && !GIFT_WITH_CODE.test(match[0]) && PROP_GIFT.test(clause.slice(0, start))) continue;
+    if (signal === SIG_GIFTCARD && (nonTransferGiftAction.test(match[0]) ||
+        !GIFT_WITH_CODE.test(match[0]) && PROP_GIFT.test(clause.slice(0, start)))) continue;
     return true;
   }
   return false;
@@ -142,14 +147,23 @@ function hasVoiceRefusal(clause) {
 }
 
 // 수신자가 먼저 본인 확인을 제안한 보고에서, 이어지는 발신자의 거절을 확인한다.
+const verificationChallenge = /^(?:(?:제가|내가|수신자(?:는|가)|받은\s*사람(?:은|이))\s*)?(?:(?:통화|전화|음성|목소리)[^,，.!?\n]{0,17}(?:확인|본인|신원|맞는지)|(?:본인|신원|맞는지)[^,，.!?\n]{0,17}(?:통화|전화|음성|목소리))[^,，.!?\n]{0,9}?(?:자고\s*(?:말|답|대답|제안|요청)?했더니|(?:요청|제안)했더니|자고\s*(?:묻|말하)(?:자|니)|자고\s*했을\s*때|(?:확인하|묻)자)/u;
+const claimantWrittenResponse = /(?:문자|메시지|채팅|글)(?:로|으로)만\s*(?:(?:계속|이어|말|대화|소통|연락|답변|회신|얘기|이야기|진행|확인|상담|정리)(?:을|를)?\s*){0,2}(?:하라고|하자는|하자고|하겠다|고집|요구|강요)/u;
+
+const offersIdentityCheckLater = /(?:오늘\s*(?:저녁|오후)|내일|모레|다음\s*(?:날|번)|이따가?|나중에)[^,，.!?\n]{0,12}(?:다시\s*)?(?:전화|통화)(?:를)?\s*(?:하겠|하자|드리겠|하겠습니다)/u;
+const completedIdentityCall = /(?:전화|통화|목소리)(?:로|를\s*통해)?\s*(?:직접\s*)?(?:본인|신원|맞는지)\s*(?:여부를?\s*)?확인(?:했|을\s*마쳤)/u;
 export function reportedFamilyVoiceResponse(clause) {
-  const challenge = receivedVoiceChallenge.exec(clause);
-  if (!challenge || SPURIOUS_REPORT.test(clause) || DENIAL.test(clause) || HYPOTHETICAL.test(clause) ||
-      CLOSED_REQUEST.test(clause) || !hasVoiceRefusal(clause)) return false;
-  const response = clause.slice(challenge[0].length);
-  return VOICE_REFUSAL.test(response) && !hasOtherSource(response.trimStart()) &&
-    !RECIPIENT_REFUSAL.test(response) && !temporaryVoiceLimit.test(response) &&
-    !laterVoiceOffer.test(response) && !closedVoiceRecord.test(response);
+  if (SPURIOUS_REPORT.test(clause) || DENIAL.test(clause) || HYPOTHETICAL.test(clause) ||
+      CLOSED_REQUEST.test(clause) || clause.endsWith("?")) return false;
+  const verifiedChallenge = verificationChallenge.exec(clause);
+  const challenge = verifiedChallenge ?? receivedVoiceChallenge.exec(clause);
+  if (!challenge) return false;
+  const response = clause.slice(challenge[0].length).trimStart();
+  if (hasOtherSource(response) || RECIPIENT_REFUSAL.test(response) || temporaryVoiceLimit.test(response) ||
+      laterVoiceOffer.test(response) || closedVoiceRecord.test(response)) return false;
+  return (VOICE_REFUSAL.test(response) && hasVoiceRefusal(clause)) ||
+    Boolean(verifiedChallenge && claimantWrittenResponse.test(response) && !offersIdentityCheckLater.test(response) &&
+      !completedIdentityCall.test(response));
 }
 
 function hasWrittenOnlyResponse(context) {
@@ -181,7 +195,8 @@ export function addReportedFamilySignals(text, signals) {
     }
     if (context.some(clause => VERIFIED_FAMILY.test(clause) || (CLOSED_REQUEST.test(clause) && !hasVoiceRefusal(clause)))) continue;
 
-    const active = context.filter(clause => !DENIAL.test(clause) && !HYPOTHETICAL.test(clause) && !clause.endsWith("?"));
+    const isCurrent = clause => !DENIAL.test(clause) && !HYPOTHETICAL.test(clause) && !clause.endsWith("?");
+    const active = context.filter(isCurrent);
     const newContact = active.some(clause => NEW_CONTACT.test(clause)) &&
       !active.some(clause => NEGATED_CONTACT.test(clause));
     const requested = new Set(REQUESTS.filter(([signal, pattern]) =>
@@ -191,7 +206,12 @@ export function addReportedFamilySignals(text, signals) {
     const groupedSecret = active.some(clause => secretPaymentReceipt.test(clause));
     if (groupedSecret) requested.add(SIG_MONEY);
     const secret = groupedSecret || requested.has(SIG_MONEY) && active.some(clause => SECRET.test(clause));
-    const pressured = requested.has(SIG_MONEY) && active.some(clause => PRESSURE.test(clause));
+    const pressured = requested.has(SIG_MONEY) && context.some((clause, position) => {
+      if (!isCurrent(clause)) return false;
+      const precedingRequest = context[position - 1] ?? "";
+      return PRESSURE.test(clause) || delayConsequenceReport.test(clause) && isCurrent(precedingRequest) &&
+        hasCurrentRequest(precedingRequest, SIG_MONEY, moneyRequest);
+    });
 
     if (!voice && !requested.has(SIG_GIFTCARD) && !secret && !pressured && !(newContact && requested.size)) continue;
     signals.add(SIG_FAMILY_IMPERSONATION);

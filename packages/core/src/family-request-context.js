@@ -137,8 +137,19 @@ const senderDisplayKinship = new RegExp(
 
 const exampleReceiptHeading = /^(?:낭독극|연극|역할극|대본|극본|수업|교육|예방)\s*(?:자료|안내|연습|대본|예시)/u;
 
+const receivedArtifact = new RegExp(
+  message + "(?:가|이|를|을)?\\s*(?:왔|받|도착|들어왔|수신)|(?:받은|수신한|도착한)\\s*" + message, "u",
+);
+const selfClaimInReceipt = new RegExp(
+  "(?:^|\\s)(?:본인|자신|자기)(?:은|는|이|가)\\s*(?:(?:제|내|우리)\\s*)?" +
+  role + "(?:이야|야|이에요|예요|입니다|이고|인데|이라고|이라며)(?=[\\s\\p{P}]|$)", "u",
+);
+const disputedRole = /(?:본인|가족)(?:이|가)?\s*(?:아니|아닌|맞는지\s*모르)|(?:관계|발신자|친족)(?:이|가)?\s*(?:확인되지|불명확)/u;
+
 function hasFramedFamilySource(clause, previous) {
   if (recipientField.test(clause) || closed.test(clause)) return false;
+  if (receivedArtifact.test(clause) && selfClaimInReceipt.test(clause) && !disputedRole.test(clause) &&
+      !exampleReceiptHeading.test(clause) && !exampleReceiptHeading.test(previous)) return true;
   if (senderDisplayKinship.test(clause) && !exampleReceiptHeading.test(clause) && !exampleReceiptHeading.test(previous)) return true;
   if ((familyMessageClaim.test(clause) || pretendedFamilySource.test(clause)) &&
       newContact.test(clause) && !/(?:아닌|아니라고|가족이\s*아니)/u.test(clause)) return true;
@@ -353,7 +364,9 @@ function addTableFamilyDisclosure(text, signals) {
 /** 발신자를 표시한 명사구·간접인용과 같은 연락의 현재 요구만 결합한다. */
 export function addFamilyRequestContextSignals(text, signals, { numberMismatch = false } = {}) {
   addTableFamilyDisclosure(text, signals);
-  const clauses = text.split(/\.(?=\s|$)|[!?。…\r\n]+/u).map(clause => clause.trim()).filter(Boolean);
+  const segments = text.split(/\.(?=\s|$)|(?<=\?)|[!。…\r\n]+/u)
+    .map(text => text.trim()).filter(text => text.replace(/\?$/u, "").trim());
+  const clauses = segments.map(segment => segment.replace(/\?$/u, "").trim());
   for (const [index, start] of clauses.entries()) {
     const previous = clauses[index - 1] ?? "";
     const framed = hasFramedFamilySource(start, previous);
@@ -368,7 +381,8 @@ export function addFamilyRequestContextSignals(text, signals, { numberMismatch =
 
     // 발신 표시와 거절은 같은 수신 보고 안에서만 대응시킨다.
     const followup = clauses[index + 1];
-    if (context.includes(followup) && reportedFamilyVoiceResponse(followup)) {
+    if (context.includes(followup) && !segments[index].endsWith("?") &&
+        reportedFamilyVoiceResponse(segments[index + 1])) {
       signals.add(SIG_FAMILY_IMPERSONATION);
       signals.add(SIG_AVOID_VOICE);
     }
