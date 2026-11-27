@@ -1,3 +1,4 @@
+import { currentReceivedRequests } from "./received-message.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
 import { isOfficialLink } from "./official-links.js";
 import { SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE } from "./signals.js";
@@ -53,7 +54,43 @@ function hasCurrentReportedRelay(clause) {
   return false;
 }
 
+const bankAuthentication = /(?:금융\s*비밀(?:값|정보|자료)?|금융\s*인증\s*정보)(?:을|를|의)?\s*(?=입력)|(?:계좌|통장)\s*(?:비밀번호|비번|암호)|(?:복구|시드)\s*(?:문구|구문)|보안\s*카드\s*(?:번호\s*)?(?:전체|전부)/u;
+const remoteEntry = /(?:발신처|보낸\s*(?:사람|곳)|상대(?:방)?|상담(?:원|직원|자)|담당자)(?:가|이)\s*(?:지정한|보낸|준|운영하는|관리하는)\s*(?:별도\s*)?(?:확인\s*)?(?:입력\s*(?:칸|란|창)|접수\s*(?:창|란|양식)|양식|서식|폼)(?:에|으로)/u;
+const reportedEntry = /입력(?:을\s*요구|해야|하라고|하라는|해\s*달라)/u;
+const entryValue = "(?:" + bankAuthentication.source + ")(?:\\s*(?:값|전체|전부))?\\s*(?:을|를)?\\s*";
+const entryAfterValue = new RegExp(entryValue + "(?:직접\\s*)?" + reportedEntry.source, "u");
+const valueBeforeForm = new RegExp(entryValue + "$", "u");
+const entryAfterForm = new RegExp("^\\s*(?:직접\\s*)?" + reportedEntry.source, "u");
+const localEntry = /(?:공식\s*(?:앱|사이트|스토어|홈페이지)|(?:자기|본인|자신)(?:의)?\s*(?:기기|앱)에서|(?:바꾸|재설정|변경)\s*(?:기한|여부|일자)|글자\s*(?:수|길이)|문자\s*종류)/u;
+
+const senderRelay = new RegExp(
+  "(?:발신자|발신처|보낸\\s*사람)(?:가|는|이|은)[^,.!?\\n]{0,22}(?:" + credential + ")" +
+  "(?:을|를|만)?\\s*(?:본인|자신|자기)(?:에게|한테)\\s*(?:알려|불러|전달해|읽어|보내)\\s*" +
+  "(?:달라고|달라는|달래|줘야)[^,.!?\\n]{0,10}(?:요구|요청|부탁|했다고|했다|했어)", "iu");
+const formEntryReport = /(?:발신처|상대|담당자|직원)(?:가|이)\s*(?:보낸|관리하는|운영하는)\s*[^,.!?\n]{0,14}(?:양식|폼|서식)(?:에|으로)[^,.!?\n]{0,15}(?:계좌\s*(?:비밀번호|암호)|금융\s*비밀(?:값|정보|자료)?|금융\s*인증\s*정보)(?:의|을|를)?\s*입력(?:을\s*(?:요구|요청)|하라고|해야)/u;
+
+const statedFormAddress = /(?:양식|서식|접수창|입력창|폼)\s*(?:의\s*)?(?:주소|링크)(?:는|가|이|[:：])?\s+(?<token>\S+)/u;
+const continuedFormAddress = /^(?:(?:그|해당|이|같은)\s*)?(?:확인\s*)?(?:양식|서식|접수창|입력창|폼)\s*(?:의\s*)?(?:주소|링크)/u;
+
+function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
+  for (const { body, next } of currentReceivedRequests(text)) {
+    if (localEntry.test(body)) continue;
+    if (senderRelay.test(body)) return true;
+    if (!hasUnverifiedLink) continue;
+    const form = remoteEntry.exec(body);
+    const afterForm = form && body.slice(form.index + form[0].length);
+    const asksForSecret = formEntryReport.test(body) || (form && (
+      entryAfterValue.test(afterForm) || (valueBeforeForm.test(body.slice(0, form.index)) && entryAfterForm.test(afterForm))
+    ));
+    if (!asksForSecret) continue;
+    const address = statedFormAddress.exec(body) ?? (continuedFormAddress.test(next) && statedFormAddress.exec(next));
+    if (address && externalOnly(inspectLinkCandidates(address.groups.token))) return true;
+  }
+  return false;
+}
+
 export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
+  if (hasReceivedCredentialRequest(text, hasUnverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
   const clauses = text.split(clauseBreak).map(clause => clause.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
     if (inactiveReport.test(clause)) continue;

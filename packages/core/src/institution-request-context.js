@@ -1,3 +1,4 @@
+import { currentReceivedRequests } from "./received-message.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
 import { startsOtherOrganizer } from "./reported-notice-fields.js";
@@ -130,7 +131,90 @@ function hasPaymentCallback(text, clauses) {
   });
 }
 
+const senderRole = "(?:" + INVESTIGATIVE + "|(?:금융|수사|공공)\\s*기관|금융\\s*(?:회사|감독(?:원|\\s*기관|\\s*부서)?)|은행|보험(?:사|기관)|민원\\s*(?:안내|창구|접수(?:처|\\s*부서)|담당(?:자|\\s*부서)?)|카드사|건강\\s*보험(?:공단)?|(?:시|구|군|도)청|세무서|등기소|공단|우체국)";
+const roleInReport = new RegExp(
+  "(?<role>" + senderRole + ")(?:\\s*(?:쪽|직원|사람|담당자|민원\\s*창구|업무\\s*담당))?" +
+    "(?:에서\\s*(?:보낸|보냈|연락|문자)|(?:이|가)\\s*(?:보낸|보냈)|(?:이?라고|라는|으로|로|이?라며)\\s*(?:적힌|표시|쓰[인였]|기재|밝힌|(?:자기(?:를)?\\s*)?소개))|" +
+    "(?:발신처|발신자|보낸\\s*(?:곳|이))[^,.!?\\n]{0,18}(?<named>" + senderRole + ")", "u");
+// 수신자가 옮겨 적은 자칭 기관·담당자와 동일 연락의 행동을 연결한다.
+const declaredSender = new RegExp(
+  "(?<role>" + senderRole + ")(?:\\s*(?:팀|직원|담당자|창구|사람|부서))?\\s*(?:[을를]\\s*자처|(?:이?라고|라는|이라며)[^,.!?\\n]{0,26}(?:발신(?:자|처)|보낸\\s*사람))", "u");
+const senderConversation = /(?:발신처|발신자|보낸\s*사람)(?:와|과|에게|한테|가|는)?(?:의)?\s*(?:그|현재|같은|이|해당)?\s*(?:대화(?:창|방)?|채팅(?:창|방)?)(?:으로|로|에)/u;
+const bypassesOfficialContact = /(?:대표\s*(?:전화|연락처|번호)|공식\s*(?:연락처|번호))(?:를|을|가|이)?\s*[^,.!?\n]{0,19}(?:대신|말고|아니라)\s*$/u;
+const reportSource = /(?:그|해당|같은|이)\s*(?:발신처|발신자|보낸\s*곳|상대(?:방)?|문자|메시지|채팅|대화(?:창|방)?)|발신(?:처|자)(?:에게|한테|로|에|가|이)?\s*(?:직접|답장|회신|받겠)|(?:답장|회신)(?:으로|로|에)/u;
+const sensitiveObject = /(?:신분증|주민\s*등록\s*번호|여권\s*(?:사진|사본|번호)|(?:개인\s*)?신상\s*(?:자료|정보)|개인(?:의)?\s*(?:정보|자료|서류)|(?:카드|계좌|통장|현관)\s*(?:번호|비번|비밀번호|암호))/u;
+const handIn = /(?:보내|전송해?|제출해?|회신해?|첨부해?|넘겨|올려|내)\s*(?:달라|달래|야|라(?:고|는)|하라|하래|해야)|(?:같은|그|해당)\s*발신(?:처|자)[^,.!?\n]{0,14}받겠|발신(?:처|자)(?:가|는|이|은)?[^,.!?\n]{0,20}받겠/u;
+const inspectOrRedact = /(?:분실|변경|수령|재발급|발급|갱신|첨부|제출)(?:했는지|\s*(?:여부|유무|날짜|이력))|(?:가리고|가려진|지운|가린|삭제한|제외한|뺀|마스킹|익명\s*처리|비식별)|개인\s*정보(?:는|가)?\s*(?:제외|삭제)|(?:공식\s*앱|자기\s*기기|본인\s*기기|영업점|창구)에서/u;
+const appObject = /(?:별도(?:의)?|추가(?:로)?|외부(?:의)?|기존[^,.!?\n]{0,16}(?:없던|없는))\s*(?:앱|프로그램|어플|소프트웨어)(?:[을를이가])?.{0,18}?설치(?:가\s*)?(?:필요|필수|해야|하라|하래|하도록|안내|요구|요청)/u;
+const appOnReceiver = /(?:수신자(?:의)?|제가|내가|받은\s*사람|(?:개인|제|내)\s*(?:기기|휴대\s*(?:폰|전화)|단말))|설치하라는\s*(?:요구|내용|대목|문자|메시지)/u;
+const addressedInstallation = /(?:설치|프로그램\s*추가)(?:\s*(?:안|항목|절차))?[가이]?[^,.!?\n]{0,22}(?:수신자|받은\s*사람|제가|내가)(?:가|이|는)?[^,.!?\n]{0,20}(?:진행|담당|수행|하기로|하라는|해야|하는\s*(?:일|몫|역할))/u;
+const objectTransition = /[,，;]\s*|(?:했고|했으며|하고|하면서|했지만|하지만|받고|봤고|됐고|되고)(?=\s)\s*/u;
+const distinctObject = /(?:^|\s)(?<phrase>[가-힣]+(?:\s+[가-힣]+){0,3})[을를](?=\s|$)/gu;
+const objectReference = /(?:(?:그|이|해당|같은|앞의)\s*(?:것|자료|정보|서류|사본|사진|파일|내용)|그것|이를|원본|사본|복사본)$/u;
+
+function hasSeparateDeliveryObject(modifiers) {
+  if (/(?:와|과)는?\s*(?:별개로|무관하게)/u.test(modifiers)) return true;
+  const clauses = modifiers.split(objectTransition);
+  if (clauses.length === 1) return false;
+  return [...clauses.at(-1).matchAll(distinctObject)].some(({ groups }) => !objectReference.test(groups.phrase));
+}
+
+function hasReportedPrivateDelivery(body) {
+  if ((!reportSource.test(body) && !senderConversation.test(body)) || inspectOrRedact.test(body)) return false;
+  const value = sensitiveObject.exec(body);
+  if (!value) return false;
+  const end = value.index + value[0].length;
+  const followup = body.slice(end, end + 48);
+  const delivery = handIn.exec(followup);
+  return delivery !== null && !hasSeparateDeliveryObject(followup.slice(0, delivery.index)) &&
+    !/^(?:의|을|를|은|는)?\s*(?:직접\s*)?(?:조회|확인하고|확인한|확인용|발급|유무|여부|일정)/u.test(followup);
+}
+
+const staffApp = /(?:공식\s*(?:앱|스토어|마켓)|업무용|직원용|운영용|공용|버전\s*확인|설치된\s*(?:앱|어플|프로그램))|(?:직원|운영자)(?:만|이|가|는)\s*[^,.!?\n]{0,24}설치/u;
+const reportedNumber = /(?:문자|메시지|통지|문서|알림|안내문?|본문)(?:에|\s*속)(?:\s*(?:적힌|있는|기재된|나온|들어\s*있는|실린|표시된))?\s*(?:전화\s*)?(?:번호|연락처)(?:로|으로|에)(?:만)?\s*(?:별도\s*(?:로|의)?\s*)?(?:통화|전화)(?:를|을)?\s*(?:하라|하래|해야|해\s*달라|걸어야)/u;
+const fromReceiver = /(?:제게서|저에게서|저한테서|내게서|나에게서|수신자(?:에게서|한테서|의)|(?:제가|내가|수신자가)\s*[^,.!?\n]{0,22}(?:현금|현찰))/u;
+const mobileCollector = /(?:방문|찾아[오와가]|댁(?:에|으로)|집(?:에|으로)|자택(?:에|으로))/u;
+const activeCash = /(?:현금|현찰)(?:[을를은는이가]|으로)?[^,.!?\n]{0,44}(?:받아\s*간|받겠|받으러|가지러|가져\s*간|수거|넘겨|건네|인계|징수|회수|찾아[오와가])|(?:받|가지|수거)으?러\s*[^,.!?\n]{0,18}(?:현금|현찰)/u;
+const endedOrDeniedVisit = /(?:수거|징수|회수|방문|인계)(?:는|은|을|를|가|이)?\s*(?:없다|아니다|취소|철회|하지\s*않)|(?:약정|회신)(?:서|만)|모의|가상/u;
+const relativeRepayment = /(?:대출(?:금)?\s*)?상환(?:금|액|을|은|하는|할|과|\s*(?:받|수거|회수))|(?:대출|금융)\s*상담[^,.!?\n]{0,16}(?:갚|상환)/u;
+const removedTransfer = /(?:분실물|습득물|유실물|돌려받|반환|보관함|연습|보증금|예치금|영수증|기록만)/u;
+
+function addReceivedInstitutionRequests(text, signals) {
+  for (const { body, previous } of currentReceivedRequests(text)) {
+    const localSender = declaredSender.exec(body) ?? roleInReport.exec(body);
+    const priorSender = declaredSender.exec(previous) ?? roleInReport.exec(previous);
+    const attribution = localSender ?? priorSender;
+    const name = attribution?.groups.role ?? attribution?.groups.named;
+    const installation = !staffApp.test(body) &&
+      (addressedInstallation.test(body) || appObject.test(body) && appOnReceiver.test(body));
+    if (installation) signals.add(SIG_APP_INSTALL);
+
+    const indirectCallback = reportedNumber.exec(body);
+    if (indirectCallback && bypassesOfficialContact.test(body.slice(0, indirectCallback.index))) {
+      if (name) signals.add(SIG_AGENCY_IMPERSONATION);
+      signals.add(SIG_CALL_THIS_NUMBER);
+    }
+    if (!name) continue;
+
+    if (installation) signals.add(SIG_AGENCY_IMPERSONATION);
+    if (hasReportedPrivateDelivery(body)) {
+      signals.add(SIG_AGENCY_IMPERSONATION);
+      signals.add(SIG_PERSONAL_INFO);
+    }
+    const fromCustomer = /수신자|제게서|저한테서|제\s*자택/.test(body);
+    if (/은행|금융\s*(?:기관|회사)/.test(name) && /직원|담당/.test(attribution[0] + " " + previous) &&
+        relativeRepayment.test(body) && mobileCollector.test(body) && activeCash.test(body) &&
+        fromCustomer && !endedOrDeniedVisit.test(body) && !removedTransfer.test(body)) {
+      signals.add(SIG_LOAN_CASH_PICKUP);
+    }
+    if (!removedTransfer.test(body) && activeCash.test(body) && fromReceiver.test(body) && investigator.test(name)) {
+      signals.add(SIG_CASH_HANDOVER);
+    }
+  }
+}
+
 export function addInstitutionRequestContext(text, signals) {
+  addReceivedInstitutionRequests(text, signals);
   if (teachingOrWithdrawn.test(text)) return;
   const clauses = text.split(/[.!?。]+(?=\s|$)|[\r\n;]+|[,，]\s*(?=(?:한편|다른|별개|이와\s*별개))/u)
     .map(clause => clause.trim()).filter(Boolean);
