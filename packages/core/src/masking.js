@@ -16,6 +16,7 @@
  */
 import { createHmac } from "node:crypto";
 import { SCHEME_URL_RE, BARE_DOMAIN_RE } from "./links.js";
+import { CANONICAL_MASK_PHONE_SOURCE, LEGACY_MASK_LOCAL_PREFIX, normalizePhoneNumber } from "./phone-number.js";
 
 // ── 패턴 ────────────────────────────────────────────────────────────────────
 
@@ -28,21 +29,14 @@ import { SCHEME_URL_RE, BARE_DOMAIN_RE } from "./links.js";
 const PHONE_SEP = "[-.\\s]?";
 const PHONE_HEAD = "(?:\\+?82[-.\\s]?\\(?0?\\)?|0)";
 const PHONE_RE = new RegExp(
-  "(?<![\\d+])(?:" +
+  "(?:" + CANONICAL_MASK_PHONE_SOURCE + "|(?<![\\d+])(?:" +
     `${PHONE_HEAD}50\\d${PHONE_SEP}\\d{3,4}${PHONE_SEP}\\d{4}` +
-    `|${PHONE_HEAD}(?:1[016789]|2|[3-9]\\d)${PHONE_SEP}\\d{3,4}${PHONE_SEP}\\d{4}` +
+    `|${PHONE_HEAD}${LEGACY_MASK_LOCAL_PREFIX}${PHONE_SEP}\\d{3,4}${PHONE_SEP}\\d{4}` +
     `|\\(0\\d{1,2}\\)\\s?\\d{3,4}${PHONE_SEP}\\d{4}` +
     `|1[568]\\d{2}${PHONE_SEP}\\d{4}` +
-  ")(?!\\d)",
-  "g",
+  ")(?!\\d))",
+  "gu",
 );
-
-/** 같은 번호면 형식이 달라도 HMAC이 같도록 숫자만 남기고 국가번호 82를 0으로 바꾼다 */
-function normalizePhone(raw) {
-  let digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("82")) digits = "0" + digits.slice(2).replace(/^0/, "");
-  return digits;
-}
 
 // 계좌번호: 숫자-숫자-숫자 형태, 총 10~14자리
 const ACCOUNT_RE = /(?<!\d)\d{2,6}-\d{2,6}-\d{2,6}(?:-\d{2,3})?(?!\d)/g;
@@ -91,7 +85,7 @@ export function mask(text, options = {}) {
 
   // 계좌처럼 보이는 전화번호가 [계좌]로 바뀌지 않게 전화번호를 먼저 처리하고 HMAC을 기록한다.
   out = out.replace(PHONE_RE, (raw) => {
-    if (hmacKey) phoneHmacs.push(hmacPhone(normalizePhone(raw), hmacKey));
+    if (hmacKey) phoneHmacs.push(hmacPhone(normalizePhoneNumber(raw), hmacKey));
     return "[번호]";
   });
 

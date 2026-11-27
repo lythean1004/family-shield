@@ -1,6 +1,7 @@
 import { currentReceivedRequests, isReceivedContinuation } from "./received-message.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { isCardCallbackNumber, isCardSenderName, isCardSenderService } from "./card-sender.js";
+import { CALLBACK_NUMBER_SOURCE, normalizePhoneNumber } from "./phone-number.js";
 import { hasOpenInstallationReport, startsOtherOrganizer } from "./reported-notice-fields.js";
 import {
   SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_CASH_HANDOVER,
@@ -54,6 +55,8 @@ const foreignHeader = /^\s*(?:\[Web발신\]\s*)?(?:\[(?:국외|국제|해외)\s*
 const approvedPayment = /(?:(?:결제|거래|카드)(?:\s*(?:건|내역))?\s*(?:승인|완료)|(?:결제|거래)(?:가|는|이)?\s*승인됐)(?!\s*(?:예정|대기|실패|보류|취소))/;
 const unauthorizedPayment = /(?:(?:내가|제가|본인이)\s*(?:쓴|산|한|승인한|요청한)\s*적(?:이)?\s*없(?:는|던)|(?:내가|제가|본인이)\s*(?:하지|결제하지|승인하지|신청하지)\s*않(?:은|았던)|(?:미승인|미사용|미결제)\s*)(?:[^!?\n]{0,16})(?:결제|거래|승인)/;
 const designatedCancellation = /취소(?:할\s*때\s*(?:쓰|이용하|사용하)라는\s*|\s*시\s*|\s*(?:접수|신청|문의|전용|상담)?\s*)(?:전화\s*)?(?:번호|연락처)(?:는|가|로|이)?\s*(?:[:：]|로)?\s*$/;
+const cancellationNumber = new RegExp(CALLBACK_NUMBER_SOURCE, "gu");
+const addressContinuation = /^(?:[A-Za-z0-9_/@+-]|\.[\p{L}\p{N}_])/u;
 const cancellationComplete = /(?:취소(?:가)?\s*(?:됐|되었|완료|결과)|이미\s*취소|취소하지|배송\s*문의)/;
 
 function senderIn(clause) {
@@ -154,9 +157,13 @@ function hasPaymentCallback(text, clauses) {
   const [header, body = ""] = clauses;
   return !!header && approvedPayment.test(header) && [header, body].some(clause => {
     if (!unauthorizedPayment.test(clause) || cancellationComplete.test(clause) || separateSource.test(clause)) return false;
-    const number = contactNumber.exec(clause);
-    if (!number || isCardCallbackNumber(number[0])) return false;
-    return designatedCancellation.test(clause.slice(0, number.index));
+    for (const number of clause.matchAll(cancellationNumber)) {
+      if (!designatedCancellation.test(clause.slice(0, number.index))) continue;
+      const normalized = normalizePhoneNumber(number[0]);
+      const after = clause.slice(number.index + number[0].length);
+      if (normalized.length >= 8 && !isCardCallbackNumber(normalized) && !addressContinuation.test(after)) return true;
+    }
+    return false;
   });
 }
 

@@ -28,7 +28,8 @@ import { findLinks, toDomain, isShortener } from "./links.js";
 import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
 import { allLinksOfficial, isOfficialLink } from "./official-links.js";
 import { hasCardServiceRequest, hasVaccinationBooking } from "./card-sender.js";
-import { classifyCallback } from "./callback-number.js";
+import { callbackForHealthRouting, classifyCallback } from "./callback-number.js";
+import { hasHealthInfo } from "./sensitive.js";
 import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
 import { addReportedProtectedRequests, hasCredentialDisclosure, hasDocumentBundle } from "./protected-requests.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover, hasLoanCashPickup } from "./cash-handover.js";
@@ -60,7 +61,7 @@ const PROTECTED_ACCOUNT = '(?:(?:국가\\s*)?안전(?:한)?\\s*계좌|보호\\s*
 const ACCOUNT_FIELD = '(?:계좌\\s*번호[ \\t]*[:：]?[ \\t]*)?' + ACCOUNT_NUMBER;
 const LABELED_ACCOUNT = '(?:\\([ \\t]*' + ACCOUNT_FIELD + '(?:[ \\t]+예금주[ \\t]*[:：]?[ \\t]*[가-힣A-Za-z○●*]{1,16})?[ \\t]*\\)|' + ACCOUNT_FIELD + ')';
 const NOT_PROHIBITION = '(?!\\s*(?:주)?(?:하)?지\\s*(?:마|않))';
-const PHONE = '0\\d{1,2}[-\\s]?\\d{3,4}[-\\s]?\\d{4}';
+const PHONE = '(?<phone>0\\d{1,2}[-\\s]?\\d{3,4}[-\\s]?\\d{4})';
 const NOTICE = '(?:민원|전자|고객님|귀하|본인|대표\\s*(?:번호|연락처)|확인\\s*절차|환급|미환급|피해|고지|통지|송달|과태료|범칙금|신원|건강검진|예방접종|사건|수사|공문|알림|안내|압류|납부|지급|영장|출석|체포|구속)';
 
 // 경찰청 메신저피싱 예방 자료의 가족 호칭·휴대폰 고장 수법.
@@ -320,12 +321,13 @@ function extractRawCodeSignals(text, options) {
   if (hasCredentialDisclosure(input, unverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
   if (hasDocumentBundle(input, unverifiedLink)) signals.add(SIG_DOCUMENT_BUNDLE);
   const externalLink = unverifiedLink && outside.some(c => !isShortener(c.host));
-  if ((unverifiedLink || callback.directed || disclosure.reply) && hasCardServiceRequest(input, {
+  const hadAgencyClaim = signals.has(SIG_AGENCY_IMPERSONATION);
+  const cardRequest = {
     externalLink, unverifiedLink, directedCallback: callback.directed, personalReply: disclosure.reply,
     sensitiveRequest: signals.has(SIG_APP_INSTALL) || signals.has(SIG_PERSONAL_INFO),
-  })) {
-    signals.add(SIG_AGENCY_IMPERSONATION);
-  }
+  };
+  const agencyFromCard = (unverifiedLink || callback.directed || disclosure.reply) && hasCardServiceRequest(input, cardRequest);
+  if (agencyFromCard) signals.add(SIG_AGENCY_IMPERSONATION);
   addFamilySignals(input, signals);
   const localHealthClaim = !signals.has(SIG_AGENCY_IMPERSONATION) && signals.has(SIG_SHORT_URL) &&
     hasVaccinationBooking(input, outside.filter(c => isShortener(c.host)).map(c => c.raw));
@@ -339,7 +341,15 @@ function extractRawCodeSignals(text, options) {
     signals.add(SIG_NEW_NUMBER);
   }
 
-  const directSignals = [...signals];
+  const directSignals = new Set(signals);
+  if (callback.signal && hasHealthInfo(input)) {
+    const prior = callbackForHealthRouting(input, PATTERNS[SIG_CALL_THIS_NUMBER]);
+    if (!prior.signal) directSignals.delete(SIG_CALL_THIS_NUMBER);
+    if (!hadAgencyClaim && agencyFromCard && !prior.directed &&
+        !hasCardServiceRequest(input, { ...cardRequest, directedCallback: false })) {
+      directSignals.delete(SIG_AGENCY_IMPERSONATION);
+    }
+  }
   if (options.inputComplete !== false) addReportedContactRestrictions(input, signals);
   addReportedProtectedRequests(input, signals, unverifiedLink, inspection, options);
   for (const signal of reportedRequestSignals(input, options)) signals.add(signal);
@@ -367,7 +377,7 @@ function extractRawCodeSignals(text, options) {
   return {
     signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }),
     // 수신자가 옮겨 적은 요구는 로컬 판정에만 보탠다. 기존 건강정보 전송 판단에는 직접 검출한 신호를 사용한다.
-    ...(directSignals.length !== signals.size && { healthRoutingSignals: directSignals }),
+    ...(directSignals.size !== signals.size && { healthRoutingSignals: [...directSignals] }),
   };
 }
 

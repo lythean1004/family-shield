@@ -1,9 +1,10 @@
 import { OFFICIAL_DOMAIN_CARDS } from "./lookalike.js";
+import { CALLBACK_NUMBER_SOURCE, normalizePhoneNumber } from "./phone-number.js";
 
-const digits = number => number.replace(/\D/g, "");
 const official = new Set(OFFICIAL_DOMAIN_CARDS.filter(c => c.status === "source_checked")
-  .flatMap(c => c.callback_contact?.numbers ?? []).map(digits));
-const NUMBER = /(?<![\d-])(?:0\d{1,2}[- ]?\d{3,4}[- ]?\d{4}|1[568]\d{2}[- ]?\d{4}|1\d{2,3})(?![\d-])/g;
+  .flatMap(c => c.callback_contact?.numbers ?? []).map(normalizePhoneNumber));
+const HEALTH_ROUTING_NUMBER = /(?<![\d-])(?:0\d{1,2}[- ]?\d{3,4}[- ]?\d{4}|1[568]\d{2}[- ]?\d{4}|1\d{2,3})(?![\d-])/g;
+const NUMBER = new RegExp(CALLBACK_NUMBER_SOURCE, "gu");
 const BEFORE_NUMBER = /(?:(?:아래|이|해당)\s*(?:번호|연락처)(?:로|에)\s*(?:신고|접수|연락)(?:해\s*주세요|하세요|하십시오)|상담원\s*연결|고객\s*센터(?:로|에)\s*(?:취소|접수)\s*요청)[\s.!:☎]*$/;
 const AFTER_NUMBER = /^\s*(?:으로|로|에)\s*(?:(?:바로|직접|즉시)\s*)?(?:신고|연락|전화|문의)\s*(?:주세요|해\s*주세요|하세요|하십시오|바랍니다)/;
 const REPORTED_TARGET = /^\s*(?:(?:은|는)\s*(?:지난|예전)|(?:라는|이라고|라고)\s*(?:문구|예시|사례))/;
@@ -69,7 +70,9 @@ function matchesForeignMemo(fields) {
   if (!foreignOrigin.test(fields.get("origin") ?? "") || !completedMemoApproval.test(fields.get("status") ?? "") ||
       !memoPaymentOwner.test(fields.get("condition") ?? "")) return false;
   const number = fields.get("number") ?? "";
-  return onlyMemoNumber.test(number) && digits(number).length >= 8 && !official.has(digits(number));
+  if (!onlyMemoNumber.test(number)) return false;
+  const normalized = normalizePhoneNumber(number);
+  return normalized.length >= 8 && !official.has(normalized);
 }
 
 function hasReportedForeignPaymentCallback(text, targets) {
@@ -236,37 +239,146 @@ function hasConstrainedCallback(text, { start, end }) {
 
 const requiredReportedCallback = /^\s*(?:으로|로|에)(?:만)?\s*(?:전화|통화|연락|회신)(?:을|를)?\s*(?:하라(?:고|는)|하도록|해야(?!\s*(?:하는지|할지|하는\s*건지|할\s*필요)))/u;
 
-export function classifyCallback(text, legacyPatterns, { includeReportedDirective = false } = {}) {
-  const targets = Array.from(text.matchAll(NUMBER), m => {
-    const number = digits(m[0]);
+function callbackTargets(text, pattern) {
+  return Array.from(text.matchAll(pattern), m => {
+    const number = normalizePhoneNumber(m[0]);
     return { start: m.index, end: m.index + m[0].length, known: official.has(number), long: number.length >= 8 };
   });
-  // R19는 별도의 로컬 근거다. 기존 회신·기관 신호를 바꾸거나 해외 AI 전송 대상을 늘리지 않는다.
-  const foreignPayment = hasForeignPaymentCallback(text, targets) || hasReportedForeignPaymentCallback(text, targets) ||
-    hasForeignReceiptSummary(text, targets);
+}
+
+const fieldGap = /^[ \t]*(?:세요|주세요|십시오|시기[ \t]*바랍니다)?[ \t]*\.?[ \t]*[:：☎]?[ \t]*(?:\r?\n[ \t]*[:：☎]?[ \t]*)?$/u;
+const onlyAfterOnLine = /^[ \t]*(?:[(（][ \t]*(?:대표\s*(?:번호|연락처|전화)|(?:운영|업무|상담|접수)\s*시간|평일|주말|공휴일|[0-2]?\d:[0-5]\d)[^()（）\r\n]{0,42}[)）][ \t]*)?[.!?。]?[ \t]*(?=\r?\n|$)/u;
+
+function followsLegacyField(text, end, target) {
+  return /^\s*(?:세요|주세요|십시오|시기\s*바랍니다)?[\s.!:☎]*$/.test(text.slice(end, target.start));
+}
+
+function followsCallbackField(text, end, target) {
+  const gap = text.slice(end, target.start);
+  if (!fieldGap.test(gap)) return false;
+  return gap.includes("☎") || (!gap.includes("\n") && !gap.includes(".")) ||
+    onlyAfterOnLine.test(text.slice(target.end));
+}
+
+const callbackRequestLabel = /(?:^|[\s,:：‘“"'「])(?:문의|상담)(?:은|는)?[ \t]*[:：]?[ \t]*$/u;
+const labeledRequestAction = /^[ \t]*(?:으로|로)[ \t]*부탁[ \t]*(?:드립니다|드려요|합니다)(?=[\s.!?。’”"'」]|$)/u;
+const explicitRequestReport = /^[ \t]*[.!?。]?[ \t]*(?:[’”"'」][ \t]*)?(?:(?:라는\s*(?:요청|안내|지시)(?:를|을)\s*(?:받았|확인했))|(?:라고\s*(?:요청|부탁|지시)했))/u;
+const callbackExampleOrRecord = /(?:작성|서식|양식|훈련|교육)(?:의|용)?\s*(?:예시|견본)|(?:예시|견본)\s*(?:문구|양식|서식)|(?:완료|종료|마친|끝낸)(?:된|한)?\s*(?:일지|기록|메모|보고)|(?:폐기|취소|철회)(?:된|한)\s*(?:문구|안내|요청|공지|서식)|(?:지난|예전|이전)\s*(?:안내|문자|공지|연락)(?:에서|에|의|를|을)[^.!?\r\n]{0,42}(?:옮|인용|적혀\s*있던|기재됐던)/u;
+const framedAsRecord = /(?:자료|일지|기록|메모|보고|예시|견본|안내|공지|서식|양식)(?:입니다|였습니다|이었다|이다)?$|다음과\s*같(?:습니다|아요)$/u;
+const callbackFrameReference = /^\s*(?:(?:발신자|보낸\s*사람|상대)(?:가|이|는|은)\s+)?(?:그|이|해당|위의)\s*(?:문구|안내|요청|지시|내용)(?:이|가|은|는|을|를)\s+/u;
+const withdrawnCallbackFrame = /^(?:이미\s*)?(?:폐기|취소|철회)/u;
+const opensCurrentRequest = /^(?:(?:오늘|방금|이번에)\s*)?(?:(?:새로|직접)\s*)?(?:받은|수신한|도착한|온)\s*[^.!?\r\n]{0,26}(?:안내|문자|공지|연락|요청)/u;
+
+function hasInactiveCallbackFrame(text, { start, end }) {
+  const before = text.slice(Math.max(0, start - 150), start).split(reportBlockBreak).at(-1);
+  const clauses = before.split(callbackStatementBreak);
+  let current = clauses.pop();
+  const prior = clauses.at(-1) ?? "";
+  if (/^[ \t:：☎]*$/u.test(current) && (BEFORE_NUMBER.test(prior) || callbackField.test(prior))) {
+    current = clauses.pop();
+  }
+  const [after, following = ""] = text.slice(end, end + 130).split(reportBlockBreak, 1)[0].split(callbackStatementBreak, 2);
+  if (callbackExampleOrRecord.test(current + " " + after)) return true;
+  const reference = callbackFrameReference.exec(following);
+  if (reference && (callbackExampleOrRecord.test(following) ||
+      withdrawnCallbackFrame.test(following.slice(reference[0].length)))) return true;
+  const header = clauses.at(-1)?.trim() ?? "";
+  return callbackExampleOrRecord.test(header) && framedAsRecord.test(header) && !opensCurrentRequest.test(current.trimStart());
+}
+
+function hasLabeledCallbackRequest(before, after) {
+  if (!callbackRequestLabel.test(before)) return false;
+  const action = labeledRequestAction.exec(after);
+  if (!action) return false;
+  const rest = after.slice(action[0].length);
+  return explicitRequestReport.test(rest) || !/[‘“"'「][^’”"'」]*$/.test(before) &&
+    /^[ \t]*(?:[.!?。]|(?=\r?\n|$))/u.test(rest);
+}
+
+const legacyDirectiveStem = /(?:해|하|주|부탁|바랍)$/u;
+const legacyDirectiveEnding = /^[ \t]*(?:(?:주세요|주십시오|줘|세요|십시오|(?:주)?시기[ \t]*바랍니다|드립니다|합니다|니다)(?=[\s.!?。]|$)|[.!?。]?[ \t]*(?=\r?\n|$))/u;
+
+const callPurposeStem = /(?:전화|연락)[ \t]*해$/u;
+const interruptedCallPurpose = /(?:그와|이와)\s*별개|별도로|한편|(?:다른|별도의)\s*(?:사람|담당자|직원|발신자|수신자)(?:이|가|은|는|에게|한테)|(?:제가|내가|수신자가|담당자가|직원이|동료가)(?=\s)|(?:했|하였|됐|되었|끝냈|마쳤)(?:고|으며|는데|지만)|지\s*(?:말|않)|(?:뜻|요구|요청|지시|부탁|내용|말)(?:이|가|은|는)\s*(?:아니|없)|(?:한|받은|들은)\s*적(?:이|은)?\s*없/u;
+const directPurposeEnding = /(?:주세요|주십시오|하십시오|하세요|달라|부탁드립니다)$/u;
+const quotedDirective = /(?<!이)(?<!아니)라(?:고|는)[ \t]+(?<account>.+)$/u;
+const affirmativeAccount = /^(?:(?:요청|지시|부탁|안내|내용|말)(?:이|가|을|를)?[ \t]*)?(?:했|하였|있었|받았|이었|였)(?:습니다|어요|다|음)$/u;
+const recordedAccount = /^(?:[^.!?\r\n]{1,44}?(?:에|에서)[ \t]+)?(?:적혔|쓰였|적었|썼|(?:기록|기재|명시|표시)[ \t]*(?:됐|되었)|(?:적혀|쓰여|(?:기록|기재|명시|표시)[ \t]*(?:돼|되어))[ \t]*있(?:었)?)(?:습니다|어요|다|음)$/u;
+const reportedCallAction = /^[ \t]*(?:으로|로|에)(?:만)?[ \t]*(?:(?:직접|다시|바로)[ \t]*)?(?:전화|통화|연락|회신|문의)(?:을|를)?[ \t]*(?:하|해[ \t]*달)(?=라(?:고|는))/u;
+
+function affirmsQuotedDirective(clause) {
+  const directive = quotedDirective.exec(clause);
+  if (!directive || interruptedCallPurpose.test(clause)) return false;
+  const account = directive.groups.account;
+  return affirmativeAccount.test(account) || recordedAccount.test(account);
+}
+
+function reportsCallbackRequest(tail) {
+  const clause = tail.split(callbackStatementBreak, 1)[0].trimEnd();
+  const call = reportedCallAction.exec(clause);
+  return Boolean(call && affirmsQuotedDirective(clause.slice(call[0].length)));
+}
+
+function continuesLegacyDirective(matched, tail) {
+  if (legacyDirectiveEnding.test(tail)) return true;
+  if (!callPurposeStem.test(matched) || !/^[ \t]+[^.\r\n!?。]/u.test(tail)) return false;
+  const purpose = tail.split(callbackStatementBreak, 1)[0].trim();
+  return affirmsQuotedDirective(purpose) ||
+    directPurposeEnding.test(purpose) && !interruptedCallPurpose.test(purpose);
+}
+
+function classifyCallbackAction(text, targets, legacyPatterns, includeReportedDirective, legacyRouting = false) {
+  const isActive = target => legacyRouting || !hasInactiveCallbackFrame(text, target);
   const directed = targets.some(t => {
-    if (t.known || !t.long) return false;
-    const before = text.slice(Math.max(0, t.start - 48), t.start);
-    const after = text.slice(t.end, t.end + 35);
+    if (t.known || !t.long || !isActive(t)) return false;
+    const preceding = text.slice(Math.max(0, t.start - 48), t.start);
+    const following = text.slice(t.end, t.end + 35);
+    const before = legacyRouting ? preceding : preceding.split(reportBlockBreak).at(-1);
+    const after = legacyRouting ? following : following.split(reportBlockBreak, 1)[0];
     if (REPORTED_TARGET.test(after)) return false;
     if (BEFORE_NUMBER.test(before) || AFTER_NUMBER.test(after) ||
         includeReportedDirective && requiredReportedCallback.test(after)) return true;
+    if (!legacyRouting) {
+      const tail = text.slice(t.end).split(reportBlockBreak, 1)[0];
+      if (hasLabeledCallbackRequest(before, tail) || reportsCallbackRequest(tail)) return true;
+    }
     if (/[‘“"'「][^’”"'」]*$/.test(before) || /^[^.!?\n]{0,35}[’”"'」]/.test(after)) return false;
     return (desk.test(before) && deskAction.test(after)) || (reportRisk.test(before) && verifyByPhone.test(after)) ||
       hasConstrainedCallback(text, t);
   });
-  if (directed) return { signal: true, directed, foreignPayment };
-  if (!targets.some(t => t.known)) return { signal: legacyPatterns.some(re => re.test(text)), directed, foreignPayment };
+  if (directed) return { signal: true, directed };
+  if (legacyRouting && !targets.some(t => t.known)) return { signal: legacyPatterns.some(re => re.test(text)), directed };
 
   // 기존 표현이 가리킨 번호만 제외한다. 다른 문장의 공식 번호가 별도 회신 요구를 가리지 않도록 한다.
   const signal = legacyPatterns.some(re => {
-    for (const m of text.matchAll(new RegExp(re.source, re.flags + "g"))) {
+    for (const m of text.matchAll(new RegExp(re.source, "dg" + re.flags.replace(/[dg]/g, "")))) {
       const end = m.index + m[0].length;
-      const bound = targets.filter(t => (t.start >= m.index && t.start < end) ||
-        (t.start >= end && t.start - end <= 18 && /^\s*(?:세요|주세요|십시오|시기\s*바랍니다)?[\s.!:☎]*$/.test(text.slice(end, t.start))));
-      if (bound.length === 0 || bound.some(t => !t.known)) return true;
+      const phone = m.indices.groups?.phone;
+      // 구형 숫자 문법은 050X의 세 번째 숫자부터 맞을 수 있다. 끝이 같은 전체 번호에만 결속한다.
+      const target = !legacyRouting && phone ? targets.find(number => number.end === phone[1] &&
+        (number.start === phone[0] || number.start + 2 === phone[0] && text.startsWith("050", number.start))) : undefined;
+      if (!legacyRouting && phone && !target) continue;
+      if (target && target.start !== phone[0] && legacyDirectiveStem.test(m[0]) &&
+          !continuesLegacyDirective(m[0], text.slice(end))) continue;
+      const bound = target ? [target] : targets.filter(t => (t.start >= m.index && t.start < end) ||
+        (t.start >= end && t.start - end <= 18 && (legacyRouting ? followsLegacyField : followsCallbackField)(text, end, t)));
+      if (bound.length === 0 || bound.some(t => !t.known && isActive(t))) return true;
     }
     return false;
   });
-  return { signal, directed, foreignPayment };
+  return { signal, directed };
+}
+
+export function classifyCallback(text, legacyPatterns, { includeReportedDirective = false } = {}) {
+  const targets = callbackTargets(text, NUMBER);
+  const action = classifyCallbackAction(text, targets, legacyPatterns, includeReportedDirective);
+  // R19는 별도의 로컬 근거다. 기존 회신·기관 신호나 해외 AI 전송 범위에는 관여하지 않는다.
+  const foreignPayment = hasForeignPaymentCallback(text, targets) || hasReportedForeignPaymentCallback(text, targets) ||
+    hasForeignReceiptSummary(text, targets);
+  return { ...action, foreignPayment };
+}
+
+export function callbackForHealthRouting(text, legacyPatterns) {
+  // 새 번호 형식을 찾았다는 사실만으로는 건강 안내를 외부 AI에 보내지 않는다.
+  return classifyCallbackAction(text, callbackTargets(text, HEALTH_ROUTING_NUMBER), legacyPatterns, false, true);
 }
