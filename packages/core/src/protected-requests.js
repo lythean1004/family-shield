@@ -102,7 +102,27 @@ function requiresHandoffToAssignedStaff(clause) {
   return Boolean(phone && !anotherHolder.test(origin.slice(0, phone.index).trimEnd()));
 }
 
+const currentRelayIssuer = /(?:발신자|발신인|발신처|메시지를\s*보낸\s*(?:사람|이)|보낸\s*(?:사람|이|쪽)|상대(?:방)?|상담원)(?:가|이|은|는)(?=\s|$)/u;
+const issuerDestination = "(?:(?:발신인|발신자|발신처|자신|자기|본인|상대(?:방)?|보낸\\s*사람)(?:에게|한테|쪽으로)|" +
+  "(?:자신|자기|발신자|상대|그쪽)(?:이|가)?\\s*(?:지정한|정한|지목한)\\s*" + assignedRecipient + "(?:에게|한테|쪽으로))";
+const receivedCodePurpose = "(?:(?:제가|수신자가|수신자는|받은\\s*사람이)\\s*)?";
+const relayOrderFromIssuer = new RegExp(currentRelayIssuer.source + "[^.!?\\n]{0,43}?" +
+  oneTimeConfirmationValue + "(?:을|를|만)?\\s*" + receivedCodePurpose + issuerDestination +
+  "\\s*(?:(?:구두로|그대로)\\s*)?(?:(?:전달|인계|전송)하|넘기|건네|알리)(?:라(?:고|는|며)|도록)" +
+  "\\s*(?:요구|요청|지시)", "iu");
+
+function reportsCodeHandoffToIssuer(clause) {
+  if (inactiveReport.test(clause) || localEntry.test(clause) || otherRelayTopic.test(clause)) return false;
+  const match = relayOrderFromIssuer.exec(clause);
+  return Boolean(match && !valueDescriptorOnly.test(match[0]));
+}
+
 function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
+  if (relayOrderFromIssuer.test(text)) {
+    for (const { body } of currentReceivedRequests(text, value => currentRelayIssuer.test(value), reportsCodeHandoffToIssuer)) {
+      if (reportsCodeHandoffToIssuer(body)) return true;
+    }
+  }
   for (const { body, next } of currentReceivedRequests(text)) {
     if (localEntry.test(body)) continue;
     if (senderRelay.test(body) || requiresHandoffToAssignedStaff(body) || requiresHandoffToAssignedStaff(next)) return true;
@@ -173,6 +193,33 @@ function addReceivedFormFields(text, signals) {
   addFormFields(rows, signals);
 }
 
+const introducedForm = /(?:신청|접수|확인|제출)\s*(?:확인\s*)?(?:양식|서식|폼)(?:의|은|는|이|가|으로|인|에\s*해당하는)?\s*(?:(?:주소|링크)(?:가|는|은|로)?\s*)?(?:(?:라고|로)\s*)?(?:제시(?:한|된|한\s*주소)|안내(?:한|된)|보낸|적힌)?\s*(?:다음|아래|여기)?\s*[:：]?\s*$/u;
+const formRequestNamed = /^\s*(?:(?:그|해당|같은|이)\s*)?(?:양식|서식|폼)(?:에서|에는|에|의|은|는)?\s*(?:(?:요구(?:하는|한)|필수로)\s*)?제출\s*(?:요구(?:\s*(?:항목|내용|대상|서류|자료))?|대상|항목|서류|자료)(?:은|는|이|가)?\s*[:：]?\s*|^\s*(?:(?:그|해당|같은|이)\s*)?(?:양식|서식|폼)(?:에서|에는|에)\s*제출하라고\s*한\s*(?:것|자료|서류)(?:은|는|이|가|[:：])?\s*/u;
+const identityPhoto = "(?:" + identityMaterial + "|신분\\s*확인(?:용)?\\s*(?:사진|사본))";
+const formRequiredPair = new RegExp(
+  "^(?:" + identityPhoto + together + "(?:계좌를\\s*확인하는\\s*)?" + bankMaterial +
+  "|" + bankMaterial + together + identityPhoto + ")(?=$|[\\s.,!?]|(?:이|가|을|를|입니다|이라고|이라고는|라는))", "u",
+);
+const mereFormReference = /(?:참고|예시|가상|견본|교육용|양식\s*미리보기)(?:로만|로|의|를|은|는|\s*(?:항목|자료|사진|사본))|(?:제출하|올리|보내)지\s*(?:말|마|않)/u;
+
+function reportsPairedSubmissionAtAddress(clause, previous, next) {
+  const context = previous + " " + clause;
+  if (!aidOrWork.test(context) || formNotInUse.test(context) || inactiveReport.test(context) ||
+      mereFormReference.test(context + " " + next)) return false;
+  const parsed = inspectLinkCandidates(clause);
+  if (!externalOnly(parsed) || parsed.candidates.length !== 1) return false;
+  const link = parsed.candidates[0];
+  const start = clause.indexOf(link.raw);
+  if (start < 0 || !introducedForm.test(clause.slice(0, start))) return false;
+  const tail = clause.slice(start + link.raw.length).trimStart()
+    .replace(/^(?:(?:이며|이고|였고|였으며|입니다|이었으며|로\s*표시되고|로\s*적혀\s*있고)\s*[,，]?\s*|[:：,，;；)）\/]\s*)/u, "");
+  const requests = [tail, next].filter(text => !topicBoundary.test(text) && !inactiveReport.test(text));
+  return requests.some(text => {
+    const role = formRequestNamed.exec(text);
+    return Boolean(role && formRequiredPair.test(text.slice(role[0].length)));
+  });
+}
+
 export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
   if (hasReceivedCredentialRequest(text, hasUnverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
   if (hasUnverifiedLink) addReceivedFormFields(text, signals);
@@ -181,6 +228,9 @@ export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
     if (inactiveReport.test(clause)) continue;
     if (hasCurrentReportedRelay(clause)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
     if (!hasUnverifiedLink) continue;
+    if (reportsPairedSubmissionAtAddress(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "")) {
+      signals.add(SIG_DOCUMENT_BUNDLE);
+    }
     const pair = documentPair.exec(clause);
     if (!pair || !requiredCopies.test(clause.slice(pair.index + pair[0].length))) continue;
     const previous = clauses[index - 1] ?? "";
