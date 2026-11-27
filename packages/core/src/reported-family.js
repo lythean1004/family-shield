@@ -180,6 +180,19 @@ const claimantWrittenResponse = /(?:문자|메시지|채팅|글)(?:로|으로)�
 
 const offersIdentityCheckLater = /(?:오늘\s*(?:저녁|오후)|내일|모레|다음\s*(?:날|번)|이따가?|나중에)[^,，.!?\n]{0,12}(?:다시\s*)?(?:전화|통화)(?:를)?\s*(?:하겠|하자|드리겠|하겠습니다)/u;
 const completedIdentityCall = /(?:전화|통화|목소리)(?:로|를\s*통해)?\s*(?:직접\s*)?(?:본인|신원|맞는지)\s*(?:여부를?\s*)?확인(?:했|을\s*마쳤)/u;
+// 거부한 목적어가 음성 본인확인 절차이고, 거부 주체도 같은 가족 발신자인 경우.
+const declinedIdentityCheck = /(?:전화|통화|목소리|음성)(?:로|으로)\s*(?:(?:자기|자신의)\s*)?(?:본인(?:인지|임)?|신원)(?:을|를)?\s*확인(?:하는\s*(?:절차|것|일)|\s*절차)(?:을|를)\s*(?:(?:명시적으로|거듭|끝까지)\s*)?거부(?:했습니다|했어요|했다|했음|하였다|함)(?=[.!。…]|$)/u;
+const claimantSubject = new RegExp(CLAIMED_RELATION + "이?라(?:고|며)\\s*(?:스스로\\s*)?(?:주장한|소개한|밝힌|말한)\\s*(?:사람|쪽|상대(?:방)?|발신자|발신인)(?:가|이|은|는)$", "u");
+const comparedWithOwnClaim = new RegExp(CLAIMED_RELATION + "이?라는\\s*주장과\\s*달리\\s*[,，]?$", "u");
+
+function declinedOwnIdentityCheck(clause, claim) {
+  const refusal = declinedIdentityCheck.exec(clause);
+  if (!refusal || /(?:제가|내가|수신자가|보호자가)\s*[^,，.!?\n]{0,15}(?:이?라고\s*(?:주장|소개|말했)|자처)/u.test(claim)) return false;
+  const before = clause.slice(0, refusal.index).trim();
+  if (!before) return clause !== claim;
+  if (clause === claim) return claimantSubject.test(before) || comparedWithOwnClaim.test(before);
+  return /^(?:(?:그|같은)\s*)?(?:상대(?:방)?|발신자|발신인|보낸\s*사람)(?:이|가|은|는)$/u.test(before);
+}
 const nonClaimantVoiceResponse = /^[,，\s]*(?:제가|내가|저는|나는|수신자(?:는|가)|받은\s*사람(?:은|이)|보호자(?:는|가)|제\s*[삼3]자(?:는|가))\s/u;
 const declinesCall = /(?:전화|통화)(?:는|가|를|도)?\s*(?:(?:할\s*수\s*없|못\s*(?:하겠|한)|하지\s*않겠|하지\s*않는다고))/u;
 export function reportedFamilyVoiceResponse(clause) {
@@ -277,7 +290,10 @@ export function addReportedFamilySignals(text, signals) {
       active.some(clause => hasCurrentRequest(clause, signal, pattern))).map(([signal]) => signal));
     const hasClaimantEvidence = !mentionsKinshipExpression.test(claim);
     if (active.some(clause => PAYMENT_DEADLINE.test(clause) || hasClaimantEvidence && hasDelegatedExpense(clause))) requested.add(SIG_MONEY);
-    const voice = active.some(hasVoiceRefusal) || hasWrittenOnlyResponse(context, hasClaimantEvidence);
+    const voice = active.some(hasVoiceRefusal) || hasWrittenOnlyResponse(context, hasClaimantEvidence) ||
+      (!context.some(clause => temporaryVoiceLimit.test(clause) || laterVoiceOffer.test(clause) ||
+        offersIdentityCheckLater.test(clause) || completedIdentityCall.test(clause)) &&
+        active.some(clause => declinedOwnIdentityCheck(clause, claim)));
     const groupedSecret = active.some(clause => secretPaymentReceipt.test(clause));
     if (groupedSecret) requested.add(SIG_MONEY);
     const secret = groupedSecret || requested.has(SIG_MONEY) && active.some(clause => SECRET.test(clause));
