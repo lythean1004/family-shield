@@ -92,7 +92,7 @@ function fromSameNarrator(neighbor, speaker) {
   return neighbor.body;
 }
 
-export function* currentReceivedRequests(text, identifiesIssuer = () => false, identifiesRequest = () => false) {
+export function* currentReceivedRequests(text, identifiesIssuer = () => false, identifiesRequest = () => false, isStatusNote) {
   const clauses = text.split(endOfClause).map(clause => clause.trim()).filter(Boolean);
   const reportedClauses = clauses.map(clause => {
     const attribution = narrator.exec(clause);
@@ -108,6 +108,17 @@ export function* currentReceivedRequests(text, identifiesIssuer = () => false, i
     const documented = (relevant.test(body) || identifiesRequest(body)) &&
       (attributed.test(body) || attributed.test(previous) || identifiesIssuer(body) || identifiesIssuer(previous));
     if (!documented && !isReceivedContinuation(body) && !isReceivedMessage(body) && !isReceivedMessage(previous)) continue;
-    yield { body, previous, next };
+    const frame = { body, previous, next };
+    if (next && isStatusNote?.(next)) {
+      const statusNotes = [];
+      const noteSpeaker = speaker ?? reportedClauses[i + 1].speaker;
+      for (let j = i + 2; j < reportedClauses.length; j++) {
+        const note = reportedClauses[j];
+        if ((note.speaker && note.speaker !== noteSpeaker) || !isStatusNote(note.body)) break;
+        statusNotes.push(note.body);
+      }
+      frame.statusNotes = statusNotes;
+    }
+    yield frame;
   }
 }

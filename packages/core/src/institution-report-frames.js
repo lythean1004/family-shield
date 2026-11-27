@@ -459,13 +459,51 @@ const recipientRepayment = /(?:갚을|갚아야\s*할|갚기로\s*한)\s*(?:몫|
 const reportsPickupPlan = /(?:수령|수거|회수)하겠(?:다고|다는)|(?:받아|가져)\s*가겠(?:다고|다는)|(?:받아|가져)\s*간(?:다고|다는)/u;
 const asksAboutCollection = /(?:수거|수령|받아\s*가|가지러\s*오|방문)(?:하는지|할지|할\s*수\s*있는지|하는\s*건지)|(?:방문|수거|수령)\s*여부/u;
 
-const pickupCancellation = /^(?:(?<sender>(?:발신자|발신인|상대(?:방)?|보낸\s*사람)(?:가|이|는|은))\s*)?(?:그|이|해당|같은)\s*(?:현금\s*)?(?:수거|회수|방문)(?:\s*(?:계획|일정|요청|절차))?(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:취소|철회|중단)/u;
+const pickupStatusSubject = /^(?:(?<sender>(?:발신자|발신인|상대(?:방)?|보낸\s*사람)(?:가|이|는|은))\s*)?(?:그|이|해당|같은)\s*(?:현금\s*)?(?<event>수거|회수|방문)(?:\s*(?:계획|일정|요청|절차))?(?:은|는|이|가|을|를)?\s*/u;
+const pickupCancellation = new RegExp(pickupStatusSubject.source + "(?:이미\\s*)?(?:취소|철회|중단)", "u");
 function hasClosedCashPickupPlan(clause) {
   const cancellation = pickupCancellation.exec(clause);
   if (!cancellation) return false;
   if (!cancellation.groups.sender) return true;
   return /^(?:\s*처리)?(?:(?:했|하였|됐|되었)(?:습니다|어요|다|음)|함|한다)[.!。]?$/u.test(clause.slice(cancellation[0].length).trim());
 }
+
+const pickupCancellationVerb = /^(?:취소|철회|중단)\s*/u;
+const finalCancellation = /^(?:(?:처리\s*)?(?:(?:했|하였|됐|되었)(?:습니다|어요|다|음)|함|됨)|완료(?:됐습니다|되었습니다|됐다|되었다|됨)?|된\s*것으로\s*확인(?:됐습니다|되었습니다|됐다|되었다|됨))[.!。]?$/u;
+const pendingCancellation = /^(?:(?:되지|하지)\s*않았(?:다|습니다|음)|(?:를|을|여부를)?\s*검토\s*중(?:이다|입니다|임)|될\s*수(?:도)?\s*있(?:다|습니다|음))[.!。]?$/u;
+const resumedPickup = /^(?:재개(?:(?:됐|되었|했|하였)(?:다|습니다|음)|됨|함)|유효(?:하다|합니다|함|한\s*상태(?:다|이다|입니다|임|로\s*확인(?:됐다|되었다|했다)))|진행\s*중(?:이다|입니다|임))[.!。]?$/u;
+
+const pickupStatusPreface = /^(?:(?:이후|재차|최종적으로)\s*){0,2}/u;
+const startsPickupStatus = text => pickupStatusSubject.test(text.replace(pickupStatusPreface, ""));
+
+function reportedPickupPlanStatus(clause, statusNotes = []) {
+  const fallback = hasClosedCashPickupPlan(clause) ? "unresolved" : "active";
+  let status;
+  let initialEvent;
+  for (const [index, note] of [clause, ...statusNotes].join(",").split(/[,，]/u).entries()) {
+    const statement = note.trim().replace(pickupStatusPreface, "");
+    const subject = pickupStatusSubject.exec(statement);
+    if (!subject) break;
+    const event = subject.groups.event === "방문" ? "visit" : "collection";
+    initialEvent ??= event;
+    if (event !== initialEvent) break;
+    const predicate = statement.slice(subject[0].length).replace(/^(?:(?:다시|현재|이미)\s*){0,2}/u, "");
+    const verb = pickupCancellationVerb.exec(predicate);
+    if (verb) {
+      const outcome = predicate.slice(verb[0].length);
+      if (finalCancellation.test(outcome) || subject.groups.sender && /^한다[.!。]?$/u.test(outcome)) status = "closed";
+      else if (index === 0 && pendingCancellation.test(outcome)) status = "active";
+    } else if (status && resumedPickup.test(predicate)) {
+      status = "active";
+    } else if (!/^(?:재개|유효|진행)/u.test(predicate)) {
+      break;
+    }
+    // 앞에 귀속할 상태가 없거나 기록의 주제가 바뀌면 이후의 지시어를 연결하지 않는다.
+    if (!status) break;
+  }
+  return status ?? fallback;
+}
+
 const preparesRepaymentInCash = /(?:현금|현찰)(?:으로|로)\s*(?:준비|마련)(?:해\s*(?:두면|놓으면)|하면|해\s*놓을\s*경우)\s*[,，]?\s*/u;
 const issuerVisitsAfterPreparation = /^(?:(?:자기|자신|본인)(?:이|가)\s+)?(?:직접\s+)?(?:(?:집|댁|자택|거주지)(?:에|로|으로)\s+)?(?:방문(?:해(?:서)?|하여(?:서)?)|찾아(?:와서|가서|온\s*뒤|간\s*뒤))\s+/u;
 
@@ -495,14 +533,15 @@ function* currentCashReports(text, extraRequest = () => false, extraIssuer = () 
   // 이 단계에서는 현금 요구 후보만 찾는다. 지급자와 인수자는 발신자 소개를 뺀 본문에서 확인한다.
   const request = clause => extraRequest(clause) || cashMedium.test(clause) && (directedHandover.test(clause) || reportsPickupPlan.test(clause));
   for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
-    for (const { body, previous, next } of currentReceivedRequests(record, issuer, request)) {
+    for (const { body, previous, next, statusNotes } of currentReceivedRequests(record, issuer, request, startsPickupStatus)) {
       if (!openDirectedReport(body) || asksAboutCollection.test(body) || closedRemainder.test(next)) continue;
       const speakerHere = issuer(body);
       const speaker = speakerHere || ((receivedArtifactHere.test(previous) || receivedRoleNotice.test(previous) || extraIssuer(previous)) && issuer(previous));
       if (!speaker) continue;
       const { role, unit } = speaker.groups;
       const action = speakerHere ? body.slice(speaker.index + speaker[0].length) : body;
-      yield { role, unit, action, source: speakerHere ? body : previous, speakerHere: Boolean(speakerHere), previous, next };
+      yield { role, unit, action, source: speakerHere ? body : previous, speakerHere: Boolean(speakerHere),
+        previous, next, pickupStatus: reportedPickupPlanStatus(next, statusNotes) };
     }
   }
 }
@@ -529,12 +568,13 @@ function hasInvestigationDutyHandoff(action) {
 }
 
 function* reportedCashTransfers(text) {
-  for (const { role, unit, action, source, speakerHere, next } of
+  for (const { role, unit, action, source, speakerHere, pickupStatus } of
     currentCashReports(text, undefined, clause => statedInvestigationDuty.exec(clause))) {
     if (investigator.test(role) && requiresCashAtMeeting(action) ||
         speakerHere && statedInvestigationDuty.test(source) && hasInvestigationDutyHandoff(action)) yield SIG_CASH_HANDOVER;
-    if ((financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "") &&
-        requiresLoanPickup(action, source, speakerHere && !hasClosedCashPickupPlan(next))) yield SIG_LOAN_CASH_PICKUP;
+    if ((financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "")) {
+      if (pickupStatus !== "closed" && requiresLoanPickup(action, source, speakerHere && pickupStatus === "active")) yield SIG_LOAN_CASH_PICKUP;
+    }
   }
 }
 
@@ -606,8 +646,8 @@ function* cashRecordFacts(blocks) {
 const unperformedPickupNote = /[,，]\s*(?:(?:다만|그리고)\s*)?(?:(?:예정된|실제(?:로)?)\s*){0,2}(?:방문|수거|회수|수령)(?:은|는|이|가|을|를)?\s*아직\s*(?:실제로\s*)?(?:하지|이행되지|이뤄지지)\s*않았(?:다|습니다|음|다고\s*(?:기록했|기록됐|확인했|확인됐)다|다는\s*(?:상태\s*)?(?:기록|메모)(?:이|가)?\s*(?:남았다|있었다|기록됐다))\s*[.!。]?\s*$/u;
 
 export function* cashEventSignals(text, blocks = structuredRecordBlocks(text)) {
-  for (const { role, unit, action, source, speakerHere, previous, next } of currentCashReports(text, couldDescribeCashTransaction, alternateCashSource)) {
-    if (!openDirectedReport(action) || hasClosedCashPickupPlan(next)) continue;
+  for (const { role, unit, action, source, speakerHere, previous, next, pickupStatus } of currentCashReports(text, couldDescribeCashTransaction, alternateCashSource)) {
+    if (!openDirectedReport(action)) continue;
     const branchPickup = speakerHere ? pendingBranchPickup(action, source, previous, next) : "";
     const investigative = investigator.test(role);
     const financialStaff = Boolean(branchPickup) || (financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? "");
@@ -618,8 +658,8 @@ export function* cashEventSignals(text, blocks = structuredRecordBlocks(text)) {
       loanFromSource: loanRoleContext.test(source),
       sourceInClause: speakerHere,
     });
-    if (evidence === "investigative_handover") yield SIG_CASH_HANDOVER;
-    if (evidence === "staff_loan_pickup") yield SIG_LOAN_CASH_PICKUP;
+    if (evidence === "investigative_handover" && !hasClosedCashPickupPlan(next)) yield SIG_CASH_HANDOVER;
+    if (evidence === "staff_loan_pickup" && pickupStatus === "active") yield SIG_LOAN_CASH_PICKUP;
   }
   const records = [...structuredFrames(blocks)].map(({ issuer, sender, heading, fields, cashOnly, cashClosed }) => ({
     source: issuer, sender, heading, cashOnly, cashClosed, fields: fields.map(({label, value}) => ({key: label, value})),
