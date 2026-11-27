@@ -262,6 +262,73 @@ function reportsPairedSubmissionAtAddress(clause, previous, next) {
   });
 }
 
+const submissionAddressRole = /(?:(?:서류|자료)(?:를|을)\s*(?:제출|첨부)하는\s*(?:주소|링크|곳)|(?:신청|접수|제출|첨부)\s*(?:주소|링크|양식|서식|폼))(?:은|는|이|가)?\s*[:：]?\s*$/u;
+const applicationDocumentNotice = /(?:신청\s*)?(?:서류|첨부|제출)\s*(?:안내|알림)(?:에는|에서|에|는)/u;
+const applicationAddressParticle = /^(?:에서|으로|에|로)(?=\s)/u;
+const theSameSubmissionForm = /(?:그|해당|같은|이)\s*(?:(?:신청|제출|접수)\s*)?(?:양식|서식|폼|주소|링크)(?:에서|으로|에|로)(?=\s|[,.!?]|$)/u;
+const digitalIdentityMaterial = "(?:" + identityPhoto + "|(?:신분증|주민등록증|운전면허증|여권)(?:\\s*자료)?)";
+const jointSubmissionPair = new RegExp("(?:" + digitalIdentityMaterial + together + bankMaterial + "|" +
+  bankMaterial + together + digitalIdentityMaterial + ")(?=$|[\\s.,!?]|(?:은|는|이|가|을|를|이라고|라고))", "u");
+const requiredDocumentField = /(?:필수\s*(?:제출|첨부)|제출\s*요구)\s*(?:항목|서류|자료)(?:은|는|이|가|[:：])?\s*$/u;
+const submitsThePair = /^(?:을|를)?\s*(?:(?:함께|같이|둘\s*다|모두|한꺼번에|동시에)\s*)?(?:제출|첨부)\s*(?:해야|하라(?:고|는|며)|해\s*달라|하는\s*(?:항목|자료|서류)(?:이|가)?\s*(?:들어|있|적혀|표시|포함))/u;
+const documentFieldStatement = /^(?:이?라고\s*(?:적혀|표시|써|기록)|입니다|(?:이|가)\s*(?:필수|요구))/u;
+const closedSubmission = /^(?:그|해당|같은|이)\s*(?:서류\s*)?(?:요구|요청|지시)(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:철회|취소)/u;
+
+function specifiesJointSubmission(text) {
+  const pair = jointSubmissionPair.exec(text);
+  if (!pair) return false;
+  const before = text.slice(0, pair.index);
+  const after = text.slice(pair.index + pair[0].length).replace(theSameSubmissionForm, " ").trimStart();
+  return submitsThePair.test(after) ||
+    requiredDocumentField.test(before) && documentFieldStatement.test(after);
+}
+
+function immediatelyPrecedesDestination(text) {
+  const pair = jointSubmissionPair.exec(text);
+  return Boolean(pair && /^(?:을|를)?\s*(?:(?:함께|같이|둘\s*다|모두|한꺼번에|동시에)\s*)?$/u
+    .test(text.slice(pair.index + pair[0].length)));
+}
+
+function startsWithSubmissionObjects(text) {
+  const pair = jointSubmissionPair.exec(text);
+  return Boolean(pair && (pair.index === 0 || requiredDocumentField.test(text.slice(0, pair.index))));
+}
+
+function submitsToTheSameForm(text) {
+  const destination = theSameSubmissionForm.exec(text);
+  if (!destination || inspectLinkCandidates(text).candidates.length) return false;
+  const before = text.slice(0, destination.index);
+  const after = text.slice(destination.index + destination[0].length).trimStart();
+  return immediatelyPrecedesDestination(before) && specifiesJointSubmission(before + " " + after) ||
+    !before.trim() && startsWithSubmissionObjects(after) && specifiesJointSubmission(after);
+}
+
+function reportsJointSubmissionInApplication(clause, previous, next, afterNext) {
+  const context = previous + " " + clause;
+  if (!aidOrWork.test(context) || formNotInUse.test(context) || inactiveReport.test(context) ||
+      mereFormReference.test(context) || closedSubmission.test(next)) return false;
+  const parsed = inspectLinkCandidates(clause);
+  if (!externalOnly(parsed) || parsed.candidates.length !== 1) return false;
+  const link = parsed.candidates[0];
+  const position = clause.indexOf(link.raw);
+  if (position < 0) return false;
+  const before = clause.slice(0, position);
+  const tail = clause.slice(position + link.raw.length).trimStart();
+  const labelledAddress = submissionAddressRole.test(before);
+  const directAddress = applicationAddressParticle.exec(tail);
+  if (directAddress) {
+    const after = tail.slice(directAddress[0].length).trimStart();
+    // URL에 붙은 조사가 같은 제출 동사의 목적지를 나타내는 경우만 본다.
+    if (immediatelyPrecedesDestination(before) && specifiesJointSubmission(before + " " + after)) return true;
+    if ((labelledAddress || applicationDocumentNotice.test(before)) &&
+        startsWithSubmissionObjects(after) && specifiesJointSubmission(after)) return true;
+  }
+
+  return labelledAddress && !formBoundary.test(next) && !inactiveReport.test(next) &&
+    !mereFormReference.test(next) && !closedSubmission.test(afterNext) &&
+    submitsToTheSameForm(next);
+}
+
 export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
   if (hasReceivedCredentialRequest(text, hasUnverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
   if (hasUnverifiedLink) addReceivedFormFields(text, signals);
@@ -270,7 +337,8 @@ export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
     if (inactiveReport.test(clause)) continue;
     if (hasCurrentReportedRelay(clause)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
     if (!hasUnverifiedLink) continue;
-    if (reportsPairedSubmissionAtAddress(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "")) {
+    if (reportsPairedSubmissionAtAddress(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "") ||
+        reportsJointSubmissionInApplication(clause, clauses[index - 1] ?? "", clauses[index + 1] ?? "", clauses[index + 2] ?? "")) {
       signals.add(SIG_DOCUMENT_BUNDLE);
     }
     const pair = documentPair.exec(clause);
