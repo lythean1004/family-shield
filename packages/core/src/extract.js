@@ -29,6 +29,7 @@ import { hasCardServiceRequest } from "./card-sender.js";
 import { classifyCallback } from "./callback-number.js";
 import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
 import { INVESTIGATIVE, hasInvestigativeCashHandover } from "./cash-handover.js";
+import { requestedPayments } from "./payment-request.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
 /** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
@@ -232,6 +233,9 @@ export function extractCodeSignals(text, options = {}) {
   }
 
   const callback = classifyCallback(input, PATTERNS[SIG_CALL_THIS_NUMBER]);
+  const payments = requestedPayments(input);
+  if (payments.money) signals.add(SIG_MONEY);
+  if (payments.gift) signals.add(SIG_GIFTCARD);
   if (hasInvestigativeCashHandover(input)) signals.add(SIG_CASH_HANDOVER);
   if (callback.signal) signals.add(SIG_CALL_THIS_NUMBER);
   const disclosure = personalDisclosure(input);
