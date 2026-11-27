@@ -11,6 +11,28 @@ const run = (text) => {
   return { signals: s, ...decide({ signals_final: s, signals_code: s }) };
 };
 
+describe("D50 계좌 표기가 끼어 있는 문법 표본", () => {
+  const field = "XXX-XXXX-XXXX-XX";
+  const line = (role, phrase) => `분류표｜기관 항목=${role}｜문구 항목=${phrase}`;
+  for (const phrase of [
+    `보호계좌 (${field} 예금주 견본)로 이체하시기 바랍니다.`,
+    `안전 계좌 (계좌번호: ${field})로 금일 중 송금하십시오.`,
+    `보호계좌 ${field}로 옮겨 주세요.`,
+  ]) it(phrase, () => {
+    const result = run(line("수사관", phrase));
+    assert.ok(result.signals.includes(SIG_THIRD_PARTY_ACCOUNT));
+    assert.ok(result.fired_rules.includes("R9"));
+  });
+
+  for (const [role, phrase] of [
+    ["수사관", `보호계좌 (${field} 예금주 견본)로 이체하지 마세요.`],
+    ["수사관", `‘보호계좌 (${field} 예금주 견본)로 이체하시기 바랍니다’라는 요구를 주의하세요.`],
+    ["수사관", `보호계좌 (${field} 예금주 견본)의 폐지 기록. 별도 항목은 이체하시기 바랍니다.`],
+    ["수사관", "보호계좌 (이 칸은 계좌번호가 아닌 설명을 적는 칸입니다)로 송금하십시오."],
+    ["세무서", `보호계좌 (${field} 예금주 견본)로 이체하시기 바랍니다.`],
+  ]) it(phrase + role, () => assert.ok(!run(line(role, phrase)).signals.includes(SIG_THIRD_PARTY_ACCOUNT)));
+});
+
 describe("D50 수사기관 + 안전계좌 이체 요구 → 위험", () => {
   for (const text of [
     "[서울중앙지검] 귀하 명의 계좌가 범죄에 연루되어 동결 예정입니다. 예금 보호를 위해 안전계좌로 이체하세요",
