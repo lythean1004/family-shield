@@ -12,7 +12,7 @@ import ResultView from '../components/ResultView.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
 import TokenExpiredView from '../components/TokenExpiredView.jsx'
 import {
-  fetchResultByToken, loadCurrentResult, saveCurrentResult, saveCurrentRequestId,
+  beginCurrentResult, bindCurrentRequest, fetchResultByToken, getCurrentRequest, loadCurrentResult,
 } from '../data/session.js'
 import { confirmStore } from '../data/confirm.js'
 import { loadFamilyConsent } from '../data/consent.js'
@@ -29,10 +29,16 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
     token ? { status: 'loading' } : loadCurrentResult() || fallbackResult
       ? { status: 'ok', result: loadCurrentResult() ?? fallbackResult } : {status:'empty'},
   )
-  const fetched = useRef(false)
+  const fetched = useRef(null)
+  const mounted = useRef(false)
   const [error,setError] = useState('')
   const [needsProcessingConsent,setNeedsProcessingConsent] = useState(false)
   const [sending,setSending] = useState(false)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   // 동의 상태 로드
   useEffect(() => {
@@ -41,31 +47,47 @@ export default function ResultScreen({ fallbackResult, familyName, hasFamilyCons
   }, [consentProp])
 
   useEffect(() => {
-    if (!token || fetched.current) return // StrictMode 이중 실행에서 1회용 토큰을 두 번 쓰지 않도록
-    fetched.current = true
-    fetchResultByToken(token).then((r) => {
+    if (!token) { fetched.current = null; return }
+    // A one-time token is redeemed once even when React repeats the effect.
+    if (fetched.current?.token !== token) {
+      fetched.current = { token, pending: fetchResultByToken(token) }
+    }
+    let active = true
+    setState({ status: 'loading' })
+    setNeedsProcessingConsent(false)
+    setError('')
+    fetched.current.pending.then((r) => {
+      if (!active) return
       if (r.ok) {
-        saveCurrentResult(r.result)
+        beginCurrentResult(r.result)
         setState({ status: 'ok', result: r.result })
       } else {
         setState({ status: 'gone', reason: r.reason })
       }
       setParams({}, { replace: true }) // 주소창·방문 기록에 토큰을 남기지 않는다
     })
+    return () => { active = false }
   }, [token, setParams])
 
   const askFamily = async (processingConsent = false) => {
     if(sending) return
     setSending(true);setError('')
-    saveCurrentResult(state.result)
     // F5-3: 가족 사칭이면 IMPERSONATION, 그 외(링크·일반)는 LINK_CHECK
     const requestType = state.result?.impersonation_type === 'family'
       ? REQUEST_TYPES.IMPERSONATION
       : REQUEST_TYPES.LINK_CHECK
     try {
+      const active = await getCurrentRequest(null)
+      if (!mounted.current || fetched.current || state.result.receipt !== loadCurrentResult()?.receipt) return
+      if (active?.state === 'pending' || active?.state === 'responded') {
+        const screen = active.state === 'responded' ? '/check/answer' : '/check/wait'
+        navigate(screen, { state: { requestId: active.id } })
+        return
+      }
       const req = await confirmStore.create(state.result, { requestType,processingConsent:processingConsent===true })
-      saveCurrentRequestId(req.id)
-      navigate('/check/wait')
+      if (!fetched.current && bindCurrentRequest(state.result.receipt, req) && mounted.current) {
+        navigate('/check/wait', { state: { requestId: req.id } })
+      }
     } catch(e) {
       if(e.reason==='processing_consent_required')setNeedsProcessingConsent(true)
       else setError(e.message)

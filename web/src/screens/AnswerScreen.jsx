@@ -8,22 +8,21 @@
  * "제가 보냈어요"에도 초록색·체크 표시를 쓰지 않는다(U6).
  */
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import VerdictBanner from '../components/VerdictBanner.jsx'
 import ActionButton from '../components/ActionButton.jsx'
-import CallButton from '../components/CallButton.jsx'
 import Warning112 from '../components/Warning112.jsx'
 import LimitNotice from '../components/LimitNotice.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { ANSWERS, ANSWERS_LINK, applyFamilyAnswer, confirmStore, DEV_FAMILY, REQUEST_TYPES } from '../data/confirm.js'
+import { ANSWERS, ANSWERS_LINK, REQUEST_TYPES } from '../data/confirm.js'
 import { levelKey } from '../data/result.js'
-import { loadCurrentRequestId, loadCurrentResult, saveCurrentResult } from '../data/session.js'
+import { readFamilyAnswer } from '../data/session.js'
 
-export default function AnswerScreen({ fallbackResult }) {
+export default function AnswerScreen() {
   const navigate = useNavigate()
-  const id = loadCurrentRequestId()
-  const [req, setReq] = useState(undefined)
-  const base = loadCurrentResult() ?? fallbackResult
+  const id = useLocation().state?.requestId
+  const [answer, setAnswer] = useState(undefined)
+  const req = answer?.request
   const who = req?.guardianName || '가족'
   const lastCode=who.charCodeAt(who.length-1)
   const whoSubject=who+(lastCode>=0xac00&&lastCode<=0xd7a3&&(lastCode-0xac00)%28!==0?'이':'가')
@@ -31,31 +30,32 @@ export default function AnswerScreen({ fallbackResult }) {
 
   // 초기 로드
   useEffect(() => {
-    if (!id) {setReq(null);return}
-    confirmStore.get(id).then(setReq).catch(e=>{setError(e.message);setReq(null)})
+    let active = true
+    setAnswer(undefined)
+    setError('')
+    readFamilyAnswer(id).then(view => { if (active) setAnswer(view) }).catch(e => {
+      if (active) { setError(e.message); setAnswer(null) }
+    })
+    return () => { active = false }
   }, [id])
 
-  if(req===undefined) return <main id="main" className="mode-parent"><p role="status" className="screen-body">가족의 답을 확인하고 있어요.</p></main>
+  if(answer===undefined) return <main id="main" className="mode-parent"><p role="status" className="screen-body">가족의 답을 확인하고 있어요.</p></main>
   if (!req || req.state !== 'responded') {
     return (
       <main id="main" className="mode-parent">
-        <h1 className="screen-title">아직 가족 답이 없어요.</h1>
+        <h1 className="screen-title">{error ? '가족의 답을 확인하기 어려워요.' : '아직 가족 답이 없어요.'}</h1>
         {error && <p role="alert" className="screen-body">{error}</p>}
         <div className="screen-actions">
-          <ActionButton variant="primary" onClick={() => navigate('/check/wait')}>기다리는 화면으로</ActionButton>
+          <ActionButton variant="primary" onClick={() => navigate('/check/wait', { state: { requestId: id } })}>기다리는 화면으로</ActionButton>
         </div>
         <NoLinkFooter />
       </main>
     )
   }
 
-  const result = applyFamilyAnswer(base, req.answer)
-  const key = levelKey(result.level)
+  const key = levelKey(answer.result.level)
   const isLinkCheck = req.requestType === REQUEST_TYPES.LINK_CHECK
-  const done = () => {
-    saveCurrentResult(result)
-    navigate('/')
-  }
+  const done = () => navigate('/')
 
   return (
     <main id="main" className="mode-parent">
@@ -112,7 +112,10 @@ export default function AnswerScreen({ fallbackResult }) {
             그래도 위험한 부탁이 있어요. <strong>목소리로 통화하기 전에는</strong> 돈이나 결제를 하지 마세요.
           </p>
           <div className="screen-actions">
-            <p className="screen-body">휴대폰 연락처에서 원래 알던 가족 번호로 전화해 주세요.</p>
+            {req.deviceSuspect
+              ? <ActionButton variant="primary" onClick={() => navigate('/help')}>다른 기기로 도움받기</ActionButton>
+              : <><p className="screen-body">휴대폰 연락처에서 원래 알던 가족 번호로 전화해 주세요.</p>
+                <ActionButton variant="secondary" onClick={() => navigate('/check/callresult', { state: { requestId: req.id } })}>원래 번호로 통화한 결과</ActionButton></>}
             <ActionButton variant="secondary" onClick={done}>확인했어요</ActionButton>
           </div>
         </>

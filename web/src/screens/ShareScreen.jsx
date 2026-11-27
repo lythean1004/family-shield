@@ -6,10 +6,11 @@
  * manifest.json의 share_target.action이 이 경로를 가리킨다.
  */
 import { useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 
 export default function ShareScreen() {
   const navigate = useNavigate()
+  const { setText } = useOutletContext()
   const [params] = useSearchParams()
 
   useEffect(() => {
@@ -20,9 +21,9 @@ export default function ShareScreen() {
       .join('\n')
       .trim()
 
-    // InputScreen이 location.state.sharedText를 읽어 초기값으로 쓴다.
-    navigate('/check/input', { replace: true, state: { sharedText: text } })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    setText(text)
+    navigate('/check/input', { replace: true })
+  }, [navigate, params, setText])
 
   return null
 }

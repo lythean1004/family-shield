@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { loadCurrentResult, saveCurrentResult, updateResultContext } from '../data/session.js'
+import { commitResultUpdate, loadCurrentResult, updateResultContext } from '../data/session.js'
 
 const RELATIONS = ['아들', '딸', '남편', '아내', '엄마', '아빠', '형', '오빠', '누나', '언니', '동생']
 
@@ -20,7 +20,10 @@ export default function WhoScreen({ fallbackResult }) {
 
   const pick = async (relation) => {
     const current = loadCurrentResult() ?? fallbackResult
-    try{saveCurrentResult(await updateResultContext(current,{relation}));navigate('/check/result')}
+    try {
+      const result = await updateResultContext(current, { relation })
+      if (commitResultUpdate(current.receipt, result)) navigate('/check/result')
+    }
     catch(e){setError(e.message)}
   }
 

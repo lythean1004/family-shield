@@ -2,36 +2,43 @@
  * P2. 전화 받았는지 /check/call
  * "이 문자 받기 전에 전화가 왔나요?"
  *   ① 지금 통화 중이에요 → P2-a (R1, 가장 급한 길이라 맨 위·danger)
- *   ② 전화 받았어요 → called_before=true로 규칙 엔진 재실행(R2) → P4
- *   ③ 전화 없었어요 → P4 그대로
- * 판정은 올라가기만 한다. 되돌리기 버튼 없음(원칙 2).
+ *   ② 전화 받았어요 → 최초 분석에 called_before=true 전달(R2) → P4
+ *   ③ 전화 없었어요 → 최초 분석에 called_before=false 전달 → P4
  */
-import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { Navigate, useNavigate, useOutletContext } from 'react-router-dom'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
-import { loadCurrentResult, saveCurrentResult, updateResultContext } from '../data/session.js'
+import { canAnalyzeText } from '../data/analyze.js'
+import useAnalyzeSubmission from './useAnalyzeSubmission.js'
 
-export default function CallScreen({ fallbackResult }) {
+export default function CallScreen() {
   const navigate = useNavigate()
-  const [error,setError]=useState('')
+  const { text } = useOutletContext()
+  const title = useRef(null)
+  const { submit, loading, error } = useAnalyzeSubmission(text)
+  useEffect(() => { title.current?.focus() }, [])
 
-  const answered = async (calledBefore) => {
-    const current = loadCurrentResult() ?? fallbackResult
-    try{saveCurrentResult(await updateResultContext(current,{calledBefore}));navigate('/check/result')}
-    catch(e){setError(e.message)}
+  if (!canAnalyzeText(text)) {
+    return <Navigate to="/check/input" replace state={{ textRequiredForCall: true }} />
   }
 
   return (
     <main id="main" className="mode-parent">
-      <h1 className="screen-title">이 문자 받기 전에 전화가 왔나요?</h1>
-      {error&&<p role="alert" className="screen-body">{error}</p>}
+      <h1 className="screen-title" ref={title} tabIndex={-1}>이 문자 받기 전에 전화가 왔나요?</h1>
+      <p className="screen-body">‘전화 받았어요’는 상대가 먼저 걸어 온 전화를 받았을 때 골라 주세요.</p>
+      {loading && <p className="screen-body" role="status">판별 중이에요.</p>}
+      {error && <p className="screen-body" role="alert">{error}</p>}
       <div className="screen-actions">
-        <ActionButton variant="danger" onClick={() => navigate('/check/hangup')}>
+        <ActionButton
+          variant="danger"
+          onClick={() => navigate('/check/hangup', { replace: true, state: { callInProgress: true } })}
+          disabled={loading}
+        >
           지금 통화 중이에요
         </ActionButton>
-        <ActionButton variant="secondary" onClick={() => answered(true)}>전화 받았어요</ActionButton>
-        <ActionButton variant="secondary" onClick={() => answered(false)}>전화 없었어요</ActionButton>
+        <ActionButton variant="secondary" onClick={() => submit('earlier')} disabled={loading}>전화 받았어요</ActionButton>
+        <ActionButton variant="secondary" onClick={() => submit('none')} disabled={loading}>전화 없었어요</ActionButton>
       </div>
       <NoLinkFooter />
     </main>

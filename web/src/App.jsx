@@ -1,6 +1,7 @@
 // 라우팅 뼈대 (docs/frontend-structure.md 2장: 앱 하나, 화면은 역할별)
 // 화면은 디자인 토큰 + React 컴포넌트로 직접 구현한다(코드가 디자인 산출물, D31).
-import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom'
+import { useState } from 'react'
+import { BrowserRouter, Routes, Route, Link, Navigate, Outlet } from 'react-router-dom'
 import './App.css'
 
 import HomeScreen       from './screens/HomeScreen.jsx'
@@ -42,6 +43,12 @@ function ResultRequired({children}) {
   return loadCurrentResult() ? children : <Navigate to="/check/input" replace />
 }
 
+function AnalyzeDraft() {
+  // 붙여넣기부터 통화 질문까지 이 화면 묶음의 React 메모리에만 둔다.
+  const [text, setText] = useState('')
+  return <Outlet context={{ text, setText }} />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -58,13 +65,16 @@ export default function App() {
         <Route path="/setup"          element={<SetupScreen />} />
 
         {/* 부모님 판별 흐름. 결과는 ?t= 1회용 토큰(D34) 또는 이 탭 sessionStorage. 없으면 입력 안내 */}
-        <Route path="/check/hangup"      element={<HangupScreen />} />
+        <Route element={<AnalyzeDraft />}>
+          <Route path="/check/input"    element={<InputScreen />} />
+          <Route path="/check/call"     element={<CallScreen />} />
+          <Route path="/check/hangup"   element={<HangupScreen />} />
+          <Route path="/share"          element={<ShareScreen />} />
+        </Route>
         {/* 가족 확인 버튼은 동의 ①②가 있을 때만(F5-9). 서버가 최신 동의를 다시 확인한다. */}
         <Route path="/check/result"      element={<ResultScreen />} />
-        <Route path="/check/call"        element={<ResultRequired><CallScreen /></ResultRequired>} />
         <Route path="/check/wait"        element={<WaitScreen />} />
         <Route path="/check/answer"      element={<ResultRequired><AnswerScreen /></ResultRequired>} />
-        <Route path="/check/input"       element={<InputScreen />} />
         <Route path="/check/who"         element={<ResultRequired><WhoScreen /></ResultRequired>} />
         <Route path="/check/callresult"  element={<ResultRequired><CallResultScreen /></ResultRequired>} />
 
@@ -73,8 +83,6 @@ export default function App() {
         {/* 보호자 화면 C2·C3. 서버가 쿠키 세션·요청 대상·RLS를 매번 확인 */}
         <Route path="/family/*"       element={<FamilyScreen />} />
 
-        {/* F4-2: 안드로이드 공유 수신 */}
-        <Route path="/share"          element={<ShareScreen />} />
         {/* F7: 연습 모드 퀴즈 */}
         <Route path="/quiz"           element={<QuizScreen />} />
 

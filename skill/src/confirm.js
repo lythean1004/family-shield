@@ -1,17 +1,21 @@
 import { fail, hashToken } from './auth.js'
-import { insertCheck, LEVEL_FROM_DB } from './results.js'
-import { applyParentContext, decide } from '../../packages/core/src/rule-engine.js'
+import { insertCheck, LEVEL_FROM_DB, rowResult } from './results.js'
+import { applyParentContext } from '../../packages/core/src/rule-engine.js'
 import { ALLOWED_RELATIONS } from '../../packages/core/src/signals.js'
 
 export const PROCESSING_VERSION='confirm-processing-2026-10-28-v1'
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const TYPES={impersonation:'family_check',link_check:'official_check'}
 const ANSWERS={family_check:['not_sent','will_call','sent'],official_check:['dont_press','will_call','wait']}
-const SELECT=`select cr.*,ch.circle_id,ch.level,ch.signals_final,ch.impersonated_relation,ch.sender_last4,
+const SELECT=`select cr.*,ch.circle_id,ch.created_by,ch.receipt_hash,ch.level,ch.fired_rules,ch.signals_final,
+  ch.impersonation_type,ch.impersonated_relation,ch.sender_last4,ch.fallback_used,
   m.name_for_parent as guardian_name from public.confirm_requests cr
   join public.checks ch on ch.id=cr.check_id
   join public.circle_members m on m.circle_id=ch.circle_id and m.user_id=cr.target_member_id
   where ch.purge_at>now() and m.status='active'`
+function confirmedNotSent(row) {
+  return row.kind==='family_check'&&row.state==='responded'&&row.response?.answer==='not_sent'
+}
 function requestView(row,userId) {
   if(!row) return null
   return {
@@ -19,7 +23,7 @@ function requestView(row,userId) {
     sentAt:new Date(row.created_at).getTime(),respondedAt:row.responded_at?new Date(row.responded_at).getTime():null,
     requestType:row.kind==='family_check'?'impersonation':'link_check',answer:row.response?.answer||null,
     deviceSuspect:row.device_suspect,guardianName:row.guardian_name||'가족',canRespond:row.target_member_id===userId,
-    summary:{level:row.response?.answer==='not_sent'?'위험':LEVEL_FROM_DB[row.level],signals_final:row.signals_final||[],impersonated_relation:row.impersonated_relation,sender_last4:row.sender_last4},
+    summary:{level:confirmedNotSent(row)?'위험':LEVEL_FROM_DB[row.level],signals_final:row.signals_final||[],impersonated_relation:row.impersonated_relation,sender_last4:row.sender_last4},
   }
 }
 export function createConfirmService(db,receipts) {
@@ -72,7 +76,17 @@ export function createConfirmService(db,receipts) {
   }
   async function get(userId,id) {
     if(!UUID.test(id)) return null
-    return db.user(userId,async tx=>requestView((await tx.query(`${SELECT} and cr.id=$1`,[id])).rows[0],userId))
+    return db.user(userId,async tx=>{
+      const {rows:[row]}=await tx.query(`${SELECT} and cr.id=$1`,[id])
+      const view=requestView(row,userId)
+      if(!row||row.created_by!==userId) return view
+      view.sourceReceiptHash=row.receipt_hash
+      if(confirmedNotSent(row)) {
+        const result=applyParentContext(rowResult(row),{family_denied:true})
+        view.confirmedResult={...result,receipt:receipts.issue(result,userId)}
+      }
+      return view
+    })
   }
   async function list(userId) {
     return db.user(userId,async tx=>(await tx.query(`${SELECT} order by cr.created_at desc limit 100`)).rows.map(row=>requestView(row,userId)))
@@ -87,11 +101,8 @@ export function createConfirmService(db,receipts) {
       const {rows:[changed]}=await tx.query(`update public.confirm_requests set state='responded',response=jsonb_build_object('answer',$2::text),responded_at=now()
         where id=$1 and target_member_id=$3 and state='pending' and deadline_at>now() returning id`,[id,answer,userId])
       if(!changed) fail(409,'already_answered')
-      // The parent's result is raised by the rules on their next read; it is never lowered.
       const {rows:[updated]}=await tx.query(`${SELECT} and cr.id=$1`,[id])
-      const view=requestView(updated,userId)
-      if(answer==='not_sent') view.summary.level=decide({family_denied:true}).level
-      return view
+      return requestView(updated,userId)
     })
   }
   async function suspect(userId,id) {
