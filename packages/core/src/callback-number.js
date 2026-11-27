@@ -111,7 +111,7 @@ const summaryNumberAssignment = /^(?:이|가|은|는)?\s*(?:(?:(?:그|같은|해
 const summaryStepClosed = /^(?:(?:그|이|해당|같은)\s*)?(?:취소|접수)\s*(?:요청|안내|절차|접수|지시)(?:을|를|은|는|이|가)?\s*(?:(?:발신자(?:가|는)|이미)\s*){0,2}(?:거절|철회|종료|완료|중단|취소)/u;
 
 const receivedForeignMark = /(?:국외|해외|국제)(?:에서)?\s*(?:발신|발송|전송)(?:으로|이?라고|(?:됐|되었)다고)\s*(?:표시된|적힌|기재된|표기된)\s*(?:알림|안내|글|문자|메시지|통지)(?:를|을|가|이)?\s*(?:받았|확인했|도착했|왔|수신했)/u;
-const reportedPayment = /(?:결제|거래)(?:가|이)?\s*(?:승인|완료)(?:됐|되었)(?:고|으며|다고\s*(?:(?:적혀|기재돼|표시돼)\s*있(?:었|음)|안내(?:됐|되었)))/u;
+const reportedPayment = /(?:결제|거래)(?:가|이)?\s*(?:승인|완료)(?:됐|되었)(?:고|으며|다고\s*(?:(?:적혀|쓰여|기재돼|표시돼)\s*있(?:었|음)|안내(?:됐|되었)))/u;
 const disownedPayment = new RegExp("(?:" + notMine + "|(?:(?:제|내|본인(?:의)?|수신자(?:의)?)\\s*|" +
   "(?:제가|내가|본인이|수신자가)\\s*한\\s*)(?:결제|거래|승인)(?:가|이)?\\s*(?:아니라면|아니면|아닐\\s*(?:때|경우|시)|아닌\\s*경우))", "u");
 const sourceAssignedContact = /^(?:(?:(?:평소|기존)\s*)?(?:고객\s*센터|상담\s*창구|대표\s*번호)\s*(?:대신|말고)\s*)?(?:(?:상대(?:방)?|발신자|보낸\s*(?:사람|쪽))(?:가|이)\s*(?:따로\s*)?(?:적은|지정한|알려\s*준|정한)|(?:문자|메시지|본문|알림)(?:에|에서)\s*(?:적힌|실린|지정된|표시된))\s*/u;
@@ -119,9 +119,10 @@ const requiredCancellationCall = /^\s*(?:으로|로|에)(?:만)?\s*(?:(?:직접|
 const revokedContactRequest = /(?:발신자|상대(?:방)?)(?:가|이|는)\s*(?:(?:그|해당|같은)\s*)?(?:(?:취소|회신)\s*)?(?:요구|요청|지시)(?:을|를)?\s*(?:이미\s*)?(?:철회|취소)/u;
 const unrelatedReceipt = /(?:별개|별건|별도(?:의)?\s*(?:문자|메시지|거래)|다른\s*(?:곳|사람|거래|문자|메시지)|승인\s*(?:대기|예정|취소)|취소(?:됐|되었)다)/u;
 
-const callThenCancel = /^\s*(?:으로|로|에)(?:만)?\s*(?:전화|연락)(?:를|을)?\s*(?:해서|하여|한\s*(?:뒤|다음))\s*(?:(?:거래|결제|승인)\s*)?취소(?:를)?\s*(?:접수|신청)(?:을|를)?\s*(?:하라(?:는|고)|하도록|해야\s*한다(?:는|고))/u;
+const callThenCancel = /^\s*(?:으로|로|에)(?:만)?\s*(?:전화|연락)(?:를|을)?\s*(?:해서|하여|한\s*(?:뒤|다음))\s*(?:(?:거래|결제|승인)(?:를|을)?\s*)?취소(?:를)?\s*(?:(?:접수|신청)(?:을|를)?\s*)?(?:하라(?:는|고)|하도록|해야\s*한다(?:는|고))/u;
 const deniesCallPurpose = /(?:하라는|하라고|하도록|해야\s*한다는)\s*(?:(?:뜻|말|의미|요구|지시|사실)(?:은|는|이|가)?\s*(?:아니|없)|한\s*적(?:은|이)?\s*없)/u;
 const markedAbroad = /(?:알림|안내|문자|통지|메시지)(?:이|가|은|는)\s*(?:국외|해외|국제)\s*발신(?:이었(?:고|으며|습니다|어요|다)|으로\s*표시(?:됐|되었)(?:고|으며|습니다|어요|다))/u;
+const noticeWithForeignMark = /(?:국외|해외|국제)\s*발신\s*(?:표시|표기)(?:가\s*(?:붙은|있는)|를\s*(?:단|달고\s*온))\s*(?:알림|안내|문자|통지|메시지)(?:에는|에서|에)\s+/u;
 const completedCharge = /(?:결제|거래)(?:가|이)?\s*(?:이미\s*)?(?:(?:승인|완료)(?:됐|되었)|끝났)다는\s*(?:내용|통지|안내|내역)(?:이었|였)(?:습니다|어요|다|음)/u;
 
 function reportsDirectedCancellation(prefix, afterNumber) {
@@ -137,11 +138,23 @@ function reportsDirectedCancellation(prefix, afterNumber) {
   if (!(byPhone && !description) && !(sender && summaryCancelRole.test(description))) return false;
 
   // 번호 바로 앞의 조건과 취소 창구를 결속하고, 같은 연락의 발신 표시와 승인 사실을 대조한다.
-  const context = [...prefix.slice(-3, -1), route.slice(0, condition.index)].join(" ");
+  const report = [...prefix.slice(-3, -1), route.slice(0, condition.index)];
+  const context = report.join(" ");
+  if (unrelatedReceipt.test(context)) return false;
   const origin = receivedForeignMark.exec(context) ?? markedAbroad.exec(context);
-  if (!origin || unrelatedReceipt.test(context)) return false;
-  const charge = context.slice(origin.index + origin[0].length);
-  return reportedPayment.test(charge) || completedCharge.test(charge);
+  if (origin) {
+    const charge = context.slice(origin.index + origin[0].length);
+    return reportedPayment.test(charge) || completedCharge.test(charge);
+  }
+
+  // 발신 표시가 붙었다고 적은 문자 자체에 승인 사실과 번호의 출처가 있어야 한다.
+  if (!sender) return false;
+  return report.some(statement => {
+    const mark = noticeWithForeignMark.exec(statement);
+    if (!mark) return false;
+    const charge = statement.slice(mark.index + mark[0].length);
+    return reportedPayment.test(charge) || completedCharge.test(charge);
+  });
 }
 
 const compactReceiptHeader = /^(?:수신\s*(?:경위|기록|내역|문자|알림)|받은\s*(?:문자|알림|안내|연락))(?:에서)?\s*(?:발췌|요약|메모|기록)(?:\s*[:：]\s*|$)/u;
