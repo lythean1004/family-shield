@@ -41,6 +41,7 @@ export function receivedFieldLines(text) {
     for (; index < lines.length; index++) {
       const row = tableRow.exec(lines[index]);
       if (!row || !row.groups.field.trim() || !row.groups.value.trim()) break;
+      if (tableDivider.test(lines[index + 1] ?? "")) break;
       fields.push(row.groups.field + ": " + row.groups.value);
     }
     fields.push("");

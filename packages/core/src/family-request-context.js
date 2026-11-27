@@ -4,6 +4,7 @@ import {
   SIG_PREPAYMENT, SIG_SECRECY, SIG_THIRD_PARTY_ACCOUNT, SIG_URGENCY,
 } from "./signals.js";
 import { hasAmountObjectAsk } from "./payment-request.js";
+import { receivedFieldLines } from "./received-message.js";
 
 const relation = "(?:(?:큰|작은|맏|막내|첫째|둘째|친|외|사촌|여|남)\\s*)?" +
   "(?:아들|딸|손자|손녀|손주|엄마|어머니|아빠|아버지|할머니|할아버지|할매|할배|동생|언니|오빠|형님|형|누나|누님|배우자|남편|아내|삼촌|숙모|이모|고모|조카|사촌|친척|자매|형제|막내)";
@@ -122,9 +123,14 @@ const labeledSenderBoundary = new RegExp("^" + source + "(?:의)?\\s*(?:자기\\
 const contactChangeField = /(?:연락처|(?:전화|발신)\s*번호|^번호)(?:가|는|를)?\s*[:：]?\s*(?:(?:이전|기존|원래)(?:과|와)?\s*)?(?:전환|교체|변경|바뀜|바뀐|달라|다름|미등록|미저장)|(?:바꾼|교체한|전환한)\s*(?:발신\s*|전화\s*)?(?:번호|연락처)/u;
 const unchangedContactField = /(?:번호|연락처)[^,.!?\n]{0,10}(?:전환|교체|변경|바뀐)(?:이|는|은|가)?\s*(?:없|아니|않)/u;
 
+const pretendedFamilySource = new RegExp(
+  "^(?:(?:제|내|우리|저희)\\s*)?" + role + "(?:인\\s*(?:척|양|듯)|인\\s*것처럼|(?:의)?\\s*(?:흉내|행세|사칭))", "u",
+);
+
 function hasFramedFamilySource(clause, previous) {
   if (recipientField.test(clause) || closed.test(clause)) return false;
-  if (familyMessageClaim.test(clause) && newContact.test(clause) && !/(?:아닌|아니라고|가족이\s*아니)/u.test(clause)) return true;
+  if ((familyMessageClaim.test(clause) || pretendedFamilySource.test(clause)) &&
+      newContact.test(clause) && !/(?:아닌|아니라고|가족이\s*아니)/u.test(clause)) return true;
   const label = framedRoleLabel.exec(clause);
   if (!label) return false;
   const head = clause.slice(0, label.index);
@@ -188,6 +194,32 @@ function hasActiveGiftObject(value, pattern) {
     !absentObject.test(value.slice(item.index + item[0].length)));
 }
 
+const directedInstallation = new RegExp(
+  deviceApp + objectEnding + modifier +
+  "(?:설치하|다운로드하|깔|내려받)(?:도록|게(?:끔)?)\\s*(?:지시|요청|요구|명령|유도|시키|시켰|했|하)", "u",
+);
+const installationAuthor = /^(?:발신(?:자|인)|상대(?:방)?|보낸\s*(?:사람|이)|그\s*사람)(?:가|이|는|은)\s*/u;
+const reporter = "(?:수신자|받(?:은|는)\\s*(?:이|사람)|저|나)";
+const phoneOrDevice = "(?:휴대전화|휴대폰|전화기|단말기|기기|폰)";
+const installationRecipient = new RegExp(
+  "(?:^|\\s)(?:" + reporter + "(?:에게|한테|를)\\s+|" +
+  "(?:(?:수신자|받(?:은|는)\\s*(?:이|사람))(?:의)?\\s*|(?:제|내)\\s+)" +
+  phoneOrDevice + "(?:에(?:다(?:가)?)?|으로)\\s+)", "gu",
+);
+const otherInstallationTarget = new RegExp(
+  "(?:에게|한테)(?=\\s|$)|" + phoneOrDevice + "(?:에(?:다(?:가)?)?|으로)(?=\\s|$)", "u",
+);
+const installationNotDirected = /(?:지시|요청|요구|명령|유도|시키)(?:하지\s*않|한\s*적(?:은|이)?\s*없)|(?:않|아니)하도록|(?:했|했는지)(?:는|도)?\s*(?:불확실|확인되지\s*않)/u;
+
+function hasBoundInstallation(clause) {
+  const action = directedInstallation.exec(clause);
+  if (!action || installationNotDirected.test(clause)) return false;
+  const prefix = clause.slice(0, action.index);
+  const [receiver] = prefix.matchAll(installationRecipient);
+  return Boolean(receiver && (receiver.index === 0 || installationAuthor.test(prefix)) &&
+    !otherInstallationTarget.test(prefix.replace(installationRecipient, " ")));
+}
+
 function requestsIn(context, fieldContext, numberMismatch, framed = false) {
   const found = new Set();
   for (const clause of context) {
@@ -197,6 +229,7 @@ function requestsIn(context, fieldContext, numberMismatch, framed = false) {
     if (framed && hasPositiveAction) {
       const slot = reportedFieldSignal(clause);
       if (slot) found.add(slot);
+      if (hasBoundInstallation(clause)) found.add(SIG_APP_INSTALL);
       if (framedMoneyOnObject.test(clause) || hasAmountObjectAsk(clause)) {
         found.add(SIG_MONEY);
       }
@@ -218,8 +251,81 @@ function requestsIn(context, fieldContext, numberMismatch, framed = false) {
   return found;
 }
 
+const normalizedField = /^(?<key>[^:：|]{1,30}):\s*(?<value>.+)$/u;
+const tableSender = /^(?:발신(?:자|인|처)|보낸\s*(?:이|사람)|자칭)(?:의)?\s*(?:소개|주장|신분|관계|역할|표시|표기)?$|^(?:(?:발신\s*)?(?:관계|역할|신분)\s*(?:주장|표시|표기|소개)|(?:주장|표시|표기)(?:된|한)?\s*(?:관계|역할|신분))$/u;
+const tableContact = /^(?:발신\s*)?(?:연락\s*(?:처|경로|수단)|(?:전화\s*)?번호)(?:의)?\s*(?:상태|변경|정보|상황|설명)?$|^발신\s*(?:경로|채널|번호|연락처)(?:\s*정보)?$/u;
+const tableAction = /^(?:현재\s*)?(?:요구|요청|부탁|지시|회신\s*요청)(?:한)?\s*(?:한\s*일|사항|항목|내용|행위|행동)?$/u;
+const structuredKinClaim = new RegExp(
+  "(?:본인|자기|자신)(?:을|를|이|은)?\\s*[^,，.!?\\n]{0,12}" + role + "이?라(?:고|며|는)", "u",
+);
+const tablePersonalRequest = new RegExp(
+  "(?:" + privateInfo + "|(?:신분|신상|신원)\\s*(?:확인\\s*)?(?:자료|정보|서류|사진|사본))" +
+  "(?<modifiers>[^,，.!?\\n]{0,20}?)" +
+  "(?:(?:전달|전송|제출|첨부|입력|회신|공유|보내|올리|넘기|제시|쓰|적으|전하|내)(?:하|해)?\\s*)" +
+  "(?:[으이]?라(?:고|는|며)|달(?:라|라고|라는)|요청|지시|요구)", "u",
+);
+const privateRecordRequest = new RegExp(
+  privateInfo + "(?:\\s*(?:사본|사진))?(?:가|이|는)?\\s*" +
+  "(?:적힌|기재된|쓰인|담긴|포함된)\\s*(?:자료|정보|서류)(?:을|를)?\\s*달(?:라고|라는|라며|랬)", "u",
+);
+const tableInactive = /(?:기존|예전|이전|종료|보관)\s*(?:요청|안내|통지|기록)|(?:지시|요구|요청)(?:를|을)?\s*(?:철회|종료)|(?:할|낼)\s*필요\s*없|(?:날짜|일정|여부|유무|이력)만/u;
+
+function tableBindsPrivateRequest(rows, heading) {
+  if (illustrative.test(heading) || closed.test(heading) || tableInactive.test(heading) || rows.some(({ value }) =>
+    illustrative.test(value) || closed.test(value) || verified.test(value))) return false;
+  const actors = rows.filter(({ key }) => tableSender.test(key));
+  const contacts = rows.filter(({ key }) => tableContact.test(key));
+  const actions = rows.filter(({ key }) => tableAction.test(key));
+  if (actors.length !== 1 || contacts.length !== 1 || actions.length !== 1) return false;
+  const [actor] = actors;
+  const [contactField] = contacts;
+  const [action] = actions;
+  const privateRequest = tablePersonalRequest.exec(action.value);
+  const disclosure = Boolean(privateRequest && !privateDocumentStatus.test(privateRequest.groups.modifiers)) ||
+    privateRecordRequest.test(action.value);
+  return structuredKinClaim.test(actor.value) &&
+    (newContact.test(contactField.value) || contactChangeField.test(contactField.value)) &&
+    !sameContact.test(contactField.value) && !unchangedContactField.test(contactField.value) &&
+    disclosure &&
+    !tableInactive.test(action.value) && !isOtherSource(action.value) &&
+    !recipientAsks.test(action.value) && !actionNegation.test(action.value);
+}
+
+function addTableFamilyDisclosure(text, signals) {
+  if (!text.includes("|")) return;
+  let heading = "";
+  let previous = "";
+  const lines = text.split(/\r?\n/u);
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    if (!line.startsWith("|")) {
+      previous = heading;
+      heading = line;
+      continue;
+    }
+    const start = index;
+    while (lines[index + 1]?.trimStart().startsWith("|")) index++;
+    // 연속한 표 줄만 공통 파서에 넘겨 평문 필드가 표의 데이터와 섞이지 않게 한다.
+    const rows = [];
+    for (const field of receivedFieldLines(lines.slice(start, index + 1).join("\n"))) {
+      const parsed = normalizedField.exec(field);
+      if (parsed) rows.push(parsed.groups);
+      if (field) continue;
+      if (tableBindsPrivateRequest(rows, previous + " " + heading)) {
+        signals.add(SIG_FAMILY_IMPERSONATION);
+        signals.add(SIG_NEW_NUMBER);
+        signals.add(SIG_PERSONAL_INFO);
+        return;
+      }
+      rows.length = 0;
+    }
+  }
+}
+
 /** 발신자를 표시한 명사구·간접인용과 같은 연락의 현재 요구만 결합한다. */
 export function addFamilyRequestContextSignals(text, signals, { numberMismatch = false } = {}) {
+  addTableFamilyDisclosure(text, signals);
   const clauses = text.split(/\.(?=\s|$)|[!?。…\r\n]+/u).map(clause => clause.trim()).filter(Boolean);
   for (const [index, start] of clauses.entries()) {
     const previous = clauses[index - 1] ?? "";
