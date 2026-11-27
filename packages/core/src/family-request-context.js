@@ -3,9 +3,10 @@ import {
   SIG_GIFTCARD, SIG_ISOLATION, SIG_MONEY, SIG_NEW_NUMBER, SIG_PERSONAL_INFO,
   SIG_PREPAYMENT, SIG_SECRECY, SIG_THIRD_PARTY_ACCOUNT, SIG_URGENCY,
 } from "./signals.js";
+import { findLinks } from "./links.js";
 import { hasAmountObjectAsk } from "./payment-request.js";
 import { receivedFieldLines } from "./received-message.js";
-import { reportedFamilyVoiceResponse } from "./reported-family.js";
+import { identifiesReportedThirdPerson, reportedFamilyVoiceResponse } from "./reported-family.js";
 
 const relation = "(?:(?:큰|작은|맏|막내|첫째|둘째|친|외|사촌|여|남)\\s*)?" +
   "(?:아들|딸|손자|손녀|손주|엄마|어머니|아빠|아버지|할머니|할아버지|할매|할배|동생|언니|오빠|형님|형|누나|누님|배우자|남편|아내|삼촌|숙모|이모|고모|조카|사촌|친척|자매|형제|막내)";
@@ -361,6 +362,84 @@ function addTableFamilyDisclosure(text, signals) {
   }
 }
 
+// 주체, 관계를 붙이는 인용, 요청 목적물을 따로 읽어 접수 보고의 어순에 의존하지 않는다.
+const reportSender = "(?:(?:(?:문자|메시지|쪽지|글)(?:을|를)?\\s*)?보낸\\s*(?:사람|이)|" +
+  "(?:문자\\s*|쪽지\\s*)?발신(?:자|인)|(?:(?:대화|채팅)\\s*)?상대(?:방)?)";
+const roleQuoted = "(?:(?:제|내|우리|저희)\\s*)?" + relation + "이?라(?:고|며|는)";
+const reflexiveObject = "(?:자기|자신|본인|스스로)(?:을|를|이|가|은|는)?\\s*";
+const claimPredicate = "(?:소개(?:했|하|한)|밝(?:혔|히|힌)|주장(?:했|하|한)|말(?:했|하|한)|(?:했|하|한))";
+const receiptPossessor = "(?:(?:받은|수신한)\\s*" + message + "(?:의)?\\s*)?";
+const senderThenRole = new RegExp(
+  "^" + receiptPossessor + reportSender + "(?:이|가|은|는)\\s*(?:" + reflexiveObject + ")?" +
+  roleQuoted + "\\s*(?:" + reflexiveObject + ")?" + claimPredicate, "u",
+);
+const roleThenSender = new RegExp(
+  "^(?:" + reflexiveObject + ")?" + roleQuoted + "\\s*(?:" + reflexiveObject + ")?" +
+  "(?:소개한|밝힌|주장한|말한|했던|한)\\s*" + reportSender + "(?:가|이|은|는)\\s*", "u",
+);
+const conditionalOrQuotedRole = /^(?:다고|다는|다며|는지|냐고|느냐고|고\s*(?:가정|상상)|면|는\s*(?:경우|예시)|던\s*(?:기록|예시))/u;
+const shiftedReport = /(?:^|[,，;]\s*)(?:한편|별도(?:로|의)?|그와\s*별개로|(?:다른|또\s*다른)\s*(?:발신자|번호|연락|사람|문자|기관)|(?:이전|예전|지난번|지난\s*(?:달|해|주))\s*(?:종료|완료|정리|보관|사건|기록|상담))/u;
+const documentaryPast = /(?:지난(?:번|달|해|주)|이전|예전|보관)[^.!?\n]{0,12}(?:완료|종료|종결|폐기|백업|보관)|(?:가정|상상)(?:했|하)|(?:접수|발신|요청)한\s*적(?:은|이)?\s*없/u;
+const payer = "(?:(?:제가|내가|저더러|나더러|수신자(?:가|에게|더러))\\s*)?";
+const statedFee = "(?:등록|예약|수강|학원|교육|이용|대관|수리|진료|통신|교통|숙박|수업)(?:비|료)|수수료|요금|대금|비용|경비";
+const askedToPay = new RegExp(
+  "(?<![\\p{L}\\p{N}_])(?:" + statedFee + ")" + objectEnding + payer +
+  "(?:(?:대신|먼저)\\s*)?(?:내|치러|납부해|결제해|지급해|부쳐|보내)\\s*(?:줄\\s*)?" +
+  "수\\s*(?:있|없)(?:는지|을지|(?:겠)?느?냐고)\\s*[^,，.!?\\n]{0,14}(?:묻|물었|문의|질문)", "u",
+);
+const askerIsReporter = /(?:^|[,，;]\s*)(?:제가|내가|저는|나는|수신자(?:가|는))\s*[^.!?\n]{0,45}(?:물었|문의했|질문했|요청했)|(?:제가|내가|저는|나는|수신자(?:가|는))\s*(?:(?:따로|직접)\s*)?(?:(?:다른|별도의)\s*)?(?:사람|친구|회사|기관|담당자|창구|상대)(?:에게|에|한테)\s*(?:묻|물었|문의|질문|요청)/u;
+
+const chatRoute = "(?:채팅|대화|메신저|연락)\\s*(?:주소|경로|계정|아이디)";
+const announcedChatRoute = new RegExp(
+  "(?:새(?:로운)?|바뀐|이전과\\s*다른|새로\\s*(?:쓰는|옮긴|만든))\\s*" + chatRoute +
+  "[^,，.!?\\n]{0,44}(?:알려|적어|적었|표시|사용|쓴다|남겼|안내|옮겼|바꿨)|" +
+  chatRoute + "(?:가|는|를)?\\s*(?:바꿨|바뀌|옮겼|변경했|전환했|교체했)", "u",
+);
+const incidentalChannel = /(?:기관|업체|학교|단체|상담|교육기관|행사)(?:의|에|에서|용|\s*자료)|(?:발신|연락|대화)\s*(?:경로|주소|계정)(?:의|은|는|이|가)?\s*(?:그대로|같아|바뀌지\s*않|변경(?:은|이)?\s*없)/u;
+const recipientPrivateNeed = new RegExp(
+  "(?:^|[\\s,，;])(?:제|내|수신자(?:의)?|받은\\s*사람의)\\s*" + privateInfo +
+  "(?:\\s*(?:사본|사진|원본))?(?:이|가|을|를)?\\s*필요하(?:다는|다고|다며)\\s*" +
+  "(?:(?:그런|그와\\s*같은)\\s*)?(?:말|요구|요청|했|하|적|밝)", "u",
+);
+const documentForOwnUse = /(?:직접|각자|본인(?:이|은|만)?)\s*(?:지참|보관|사용|확인)|(?:지참|보관|확인)할\s*(?:서류|자료|목록)|(?:사본|번호|사진)(?:을|를)?\s*(?:보내|넘기|알리|제출하|공유하)지\s*(?:않|말)|(?:말|뜻|요구)(?:이|은|는)?\s*아니/u;
+
+function attributedSpeaker(clause) {
+  const actor = senderThenRole.exec(clause) ?? roleThenSender.exec(clause);
+  return actor && !conditionalOrQuotedRole.test(clause.slice(actor[0].length)) ? actor : null;
+}
+
+function mentionsChangedContact(clause) {
+  // 주소 속 마침표는 보고의 절 경계가 아니므로 연락 경로를 읽을 때만 링크를 자리표시자로 바꾼다.
+  const contactText = findLinks(clause).reduce((text, link) => text.replaceAll(link, "[주소]"), clause);
+  return (newContact.test(contactText) || announcedChatRoute.test(contactText)) && !incidentalChannel.test(contactText);
+}
+
+function addAttributedFamilySignals(parts, signals) {
+  const requested = requestsIn(parts, false, false);
+  const changed = parts.some(mentionsChangedContact) &&
+    !parts.some(part => sameContact.test(part) || unchangedContactField.test(part));
+  const payment = requested.has(SIG_MONEY) || parts.some(part =>
+    !actionNegation.test(part) && askedToPay.test(part));
+  const privateRequest = requested.has(SIG_PERSONAL_INFO) || parts.some(part =>
+    !documentForOwnUse.test(part) && recipientPrivateNeed.test(part));
+  const giftRequest = requested.has(SIG_GIFTCARD);
+  const appRequest = requested.has(SIG_APP_INSTALL);
+  const pressure = payment && parts.some(part => urgency.test(part) && urgentRequirement.test(part));
+  const secret = payment && parts.some(part => secrecy.test(part) && secrecyRequirement.test(part));
+  const voice = parts.some(reportedFamilyVoiceResponse);
+  if (!(giftRequest || voice || pressure || secret || changed && (payment || privateRequest || appRequest))) return;
+
+  signals.add(SIG_FAMILY_IMPERSONATION);
+  if (voice) signals.add(SIG_AVOID_VOICE);
+  if (changed) signals.add(SIG_NEW_NUMBER);
+  if (giftRequest) signals.add(SIG_GIFTCARD);
+  if (payment && (changed || pressure || secret || voice)) signals.add(SIG_MONEY);
+  if (privateRequest && changed) signals.add(SIG_PERSONAL_INFO);
+  if (appRequest && changed) signals.add(SIG_APP_INSTALL);
+  if (pressure) signals.add(SIG_URGENCY);
+  if (secret) signals.add(SIG_SECRECY);
+}
+
 /** 발신자를 표시한 명사구·간접인용과 같은 연락의 현재 요구만 결합한다. */
 export function addFamilyRequestContextSignals(text, signals, { numberMismatch = false } = {}) {
   addTableFamilyDisclosure(text, signals);
@@ -369,6 +448,20 @@ export function addFamilyRequestContextSignals(text, signals, { numberMismatch =
   const clauses = segments.map(segment => segment.replace(/\?$/u, "").trim());
   for (const [index, start] of clauses.entries()) {
     const previous = clauses[index - 1] ?? "";
+    if (identifiesReportedThirdPerson(start) || illustrative.test(previous) || exampleReceiptHeading.test(previous)) continue;
+    const actor = attributedSpeaker(start);
+    if (actor && !segments[index].endsWith("?") && !documentaryPast.test(previous)) {
+      const parts = [start.slice(actor[0].length).trimStart()];
+      for (let offset = 1; offset <= 3 && index + offset < clauses.length; offset++) {
+        const clause = clauses[index + offset];
+        if (segments[index + offset].endsWith("?") || shiftedReport.test(clause) || isOtherSource(clause) || isSource(clause) || attributedSpeaker(clause)) break;
+        parts.push(clause);
+      }
+      if (!parts.some(part => closed.test(part) || documentaryPast.test(part) || verified.test(part) ||
+          illustrative.test(part) || shiftedReport.test(part) || isOtherSource(part))) {
+        addAttributedFamilySignals(parts.filter(part => !askerIsReporter.test(part)), signals);
+      }
+    }
     const framed = hasFramedFamilySource(start, previous);
     if ((!isSource(start) && !framed) || isOtherSource(start) || illustrative.test(start)) continue;
     const context = [start];

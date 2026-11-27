@@ -113,8 +113,13 @@ function describesRole(clause, match) {
   return ROLE_SETTING.test(clause.slice(0, start)) && ROLE_ACTOR.test(clause.slice(end));
 }
 
+// 친족 관계를 설명해 준 제삼자는 발신자의 자칭 주체와 다르다.
+export function identifiesReportedThirdPerson(clause) {
+  return /이?라고\s*(?:(?:다른|별개의|제삼의)\s*(?:사람|친척|지인|발신자)|타인)(?:을|를)\s*(?:소개|설명|지칭|가리켰|불렀)/u.test(clause);
+}
+
 function isClaim(clause) {
-  if (DENIAL.test(clause) || HYPOTHETICAL.test(clause) || RECORD_LABEL.test(clause) || clause.endsWith("?")) return false;
+  if (identifiesReportedThirdPerson(clause) || DENIAL.test(clause) || HYPOTHETICAL.test(clause) || RECORD_LABEL.test(clause) || clause.endsWith("?")) return false;
   if (/(?:극본|대본)\s*속(?:의|에서)?\s*(?:발신인|발신자|등장인물)/u.test(clause)) return false;
   if (ATTRIBUTED_CLAIM.test(clause) || SELF_CLAIM.test(clause)) return true;
 
