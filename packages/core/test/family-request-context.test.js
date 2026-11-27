@@ -3,13 +3,21 @@ import { test } from "node:test";
 import { extractCodeSignals } from "../src/extract.js";
 import { decide } from "../src/rule-engine.js";
 import {
-  SIG_APP_INSTALL, SIG_CREDENTIAL_DISCLOSURE, SIG_DELETE_APP,
+  SIG_APP_INSTALL, SIG_AVOID_VOICE, SIG_CREDENTIAL_DISCLOSURE, SIG_DELETE_APP,
   SIG_FAMILY_IMPERSONATION, SIG_GIFTCARD, SIG_ISOLATION, SIG_MONEY,
   SIG_NEW_NUMBER, SIG_PERSONAL_INFO, SIG_PREPAYMENT,
   SIG_SECRECY, SIG_THIRD_PARTY_ACCOUNT, SIG_URGENCY,
 } from "../src/signals.js";
 
 const families = [
+  ["목소리 확인 제안 뒤 발신자가 답변 수단을 글로 제한",
+    "조카라고 소개한 상대에게 통화로 본인 확인을 제안했어요. 상대방은 채팅으로만 답하겠다는 입장이었어요.", [SIG_AVOID_VOICE]],
+  ["본인 확인을 시도한 수신자와 문자만 쓰겠다는 발신자",
+    "언니라고 소개한 사람에게 제 목소리를 듣고 목소리 확인을 해 보자고 했습니다. 발신자는 문자로만 이야기하겠다고 했습니다.", [SIG_AVOID_VOICE]],
+  ["발신자 자기소개와 금전성 물품의 확보 요청",
+    "발신인은 자신을 제 동생이라고 밝혔습니다. 쪽지에 교환권 구입 요청이 적혀 있었습니다.", [SIG_GIFTCARD]],
+  ["요약 속 발신자 주장과 바뀐 연락 경로",
+    "새 번호로 대화를 보낸 사람이 가족의 일원을 자처했어요. 그 연락에는 별도 앱 설치를 요청한 부분이 남아 있어요.", [SIG_NEW_NUMBER, SIG_APP_INSTALL]],
   ["연락처를 수식하는 인용 명사구",
     "누님이란 처음 보는 연락처의 쪽지에는 수신자 부담의 이체 요청이 기록돼 있었다.",
     [SIG_NEW_NUMBER, SIG_MONEY]],
@@ -61,6 +69,10 @@ for (const [name, message, expectedSignals] of families) {
 }
 
 const ordinary = [
+  ["본인이 글로만 연락하기를 원함", "사촌이라고 소개한 사람에게 통화로 본인 확인을 제안했어요. 제가 문자로만 대화하겠다고 했어요."],
+  ["공연 대본의 표기", "역할극 대본 속 발신인은 자신을 제 동생이라고 밝혔습니다. 소품 교환권 구입 요청은 의상팀에 제출하는 설정입니다."],
+  ["가족 구성원 소개 목록", "새 번호로 연락해 온 분이 가족 구성원을 소개한 자료를 보냈습니다. 행사 안내에 앱 설치 요청 항목이 있네요."],
+  ["본인 확인 생략과 일시적인 통화 제약", "사촌이라고 소개한 사람과 통화로 본인 확인 일정을 잡았어요. 상대방은 회의 중이라 문자로만 답할 수 있대요."],
   ["호칭과 안부", "삼촌, 나 조카입니다. 탁자 위 꽃 잘 받았어요."],
   ["친족이 보낸 입금 완료 알림", "고모가 모임 비용을 정산했다고 알려 줬어요. 영수증을 같이 확인했습니다."],
   ["기기 변경 확인", "처음 쓰는 새 번호에서 엄마라더군요. 그래서 원래 연락처로 전화해 실제 가족임을 확인했어요."],

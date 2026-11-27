@@ -42,7 +42,7 @@ const requestField = /^(?:요청|요구|부탁)(?:한)?\s*(?:항목|대상|물�
 const documentaryField = /(?:연락|문자|쪽지|대화|메시지|선물\s*요청)[^.!?\n]{0,13}(?:기록|분류|보관|알림|미리보기|일부|요약)/u;
 const recipientField = /^(?:수신자|받는\s*(?:이|사람)|받은\s*(?:이|사람)|부르는\s*말)(?: *[:：=]\s*|[\t\u3000 ]+)/u;
 
-const requestNoun = "(?:요구|요청|부탁)(?=$|[\\s.,!?…]|하|해|했|받|이|가|을|를|은|는|과|와)";
+const requestNoun = "(?:요구|요청|부탁)(?=$|[\\s.,!?…]|하|한|해|했|받|이|가|을|를|은|는|과|와)";
 const indirect = "(?:[으이]?라(?:고|는|며|네)|달(?:라고|라는|라며|라네|라대|래|랬))";
 const objectEnding = "(?:을|를|은|는|이|가|만|도)?\\s*";
 const recipient = "(?:(?:자기|자신|본인|발신자|그\\s*사람)(?:에게|한테)\\s*)?";
@@ -58,10 +58,10 @@ const credential = "(?:(?:본인\\s*)?(?:인증|로그인|일회용)\\s*(?:번�
 const privateInfo = `(?:주민\\s*(?:등록\\s*)?번호|신분증|(?:신분|신원)\\s*(?:확인|증명)\\s*(?:자료|서류|사진)|비공개\\s*(?:계정|로그인)\\s*정보|${credential})`;
 const deviceApp = "(?:앱|어플(?:리케이션)?|프로그램)";
 const paymentAsk = directed(money, "보내|옮겨|부쳐|빌려|마련해|보태|내|(?:납부|대납|지급|송금|입금|이체)(?:하|할|해)?");
-const giftAsk = directed(gift, "보내|내놓|넘겨|사|(?:구매|전달)(?:하|할|해)?", "gu");
+const giftAsk = directed(gift, "보내|내놓|넘겨|사|(?:구매|구입|확보|전달)(?:하|할|해)?", "gu");
 const privateAsk = directed(privateInfo, "보내|알려|읽어|(?:공유|제시|제출|전달)(?:하|할|해)?");
 const installAsk = new RegExp(
-  `${deviceApp}${objectEnding}${modifier}(?:설치(?:하|할|해)?|깔아|내려받아|다운로드(?:하|할|해)?)\\s*${actionEnding}`, "u",
+  `${deviceApp}${objectEnding}${modifier}(?:설치(?:하|할|해|를)?|깔아|내려받아|다운로드(?:하|할|해|를)?)\\s*${actionEnding}`, "u",
 );
 const familySupport = "(?:다른\\s*)?(?:가족|식구|친척|친구|지인|주변\\s*사람)";
 const supportContact = `${familySupport}${gap(12)}(?:연락|상의|대화|의논)(?:을|를|까지|도)?\\s*(?:(?:다|모두)\\s*)?`;
@@ -93,8 +93,14 @@ const giftObject = new RegExp(gift, "gu");
 const absentObject = /^\s*(?:은|는|이|가)?\s*(?:해당\s*)?(?:없|미기재|불필요|제외)/u;
 const displayProp = /(?:공연|연극|무대|전시|촬영)\s*소품(?:인|으로\s*쓰는)?\s*(?:모형|종이|인쇄(?:한|된))?\s*$|(?:모형|가짜|연습용)\s*$/u;
 
+const familyClaim = /(?:가족|식구)(?:의)?\s*(?:구성원|일원)(?:을|임을)?\s*(?:자처|사칭)/u;
+const speaker = /(?:발신자|발신인|연락처|번호|연락.{0,8}사람|대화.{0,8}사람)/u;
+const reflexive = new RegExp(source + "(?:는|은|이|가)\\s*(?:자신|자기|본인)(?:을|이)?\\s*(?:(?:제|내|우리)\\s*)?" +
+  relation + "이?라고\\s*(?:밝|했|소개|말)", "u");
+
 function isSource(clause) {
-  return claim.test(clause) || display.test(clause) || senderField.test(clause) || caption.test(clause);
+  return claim.test(clause) || display.test(clause) || senderField.test(clause) || caption.test(clause) ||
+    reflexive.test(clause) || (speaker.test(clause) && familyClaim.test(clause));
 }
 
 function isOtherSource(clause) {
