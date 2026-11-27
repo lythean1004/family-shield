@@ -54,7 +54,7 @@ function hasCurrentReportedRelay(clause) {
   return false;
 }
 
-const bankAuthentication = /(?:금융\s*비밀(?:값|정보|자료)?|금융\s*인증\s*정보)(?:을|를|의)?\s*(?=입력)|(?:계좌|통장)\s*(?:비밀번호|비번|암호)|(?:복구|시드)\s*(?:문구|구문)|보안\s*카드\s*(?:번호\s*)?(?:전체|전부)/u;
+const bankAuthentication = /(?:금융\s*비밀(?:값|정보|자료)?|금융\s*인증\s*정보)(?:을|를|의)?\s*(?=입력)|(?:계좌|통장|은행)\s*(?:비밀번호|비번|암호)|(?:(?:지갑|계정)(?:의)?\s*)?(?:복구|시드)\s*(?:문구|구문)|보안\s*카드\s*(?:번호\s*)?(?:전체|전부)/u;
 const remoteEntry = /(?:발신처|보낸\s*(?:사람|곳)|상대(?:방)?|상담(?:원|직원|자)|담당자)(?:가|이)\s*(?:지정한|보낸|준|운영하는|관리하는)\s*(?:별도\s*)?(?:확인\s*)?(?:입력\s*(?:칸|란|창)|접수\s*(?:창|란|양식)|양식|서식|폼)(?:에|으로)/u;
 const reportedEntry = /입력(?:을\s*요구|해야|하라고|하라는|해\s*달라)/u;
 const entryValue = "(?:" + bankAuthentication.source + ")(?:\\s*(?:값|전체|전부))?\\s*(?:을|를)?\\s*";
@@ -269,8 +269,10 @@ function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
 const namedFinancialForm = /(?:(?:입력|확인|접수)\s*(?:양식|서식|폼|창)|(?:양식|서식|폼|입력창))(?:은|는|이|가|의)?\s*[:：]?\s*$/u;
 const linkedFinancialForm = /^(?:(?:이며|이고|인데|였고|이었고)\s*[,，]?\s*)?(?:(?:에서|으로|에|로)\s+(?:(?:연결된|열린|열리는|제시된)\s+)?)?(?:(?:입력|확인|접수|외부|출처가|미확인|확인되지\s*않은)\s+)*(?:양식|서식|폼|입력\s*창)(?:에서|에는|이|가|은|는|의|에)?(?=\s|[.,!?]|$)/u;
 const sameFinancialForm = /(?:그|해당|이|같은)\s*(?:입력\s*)?(?:양식|서식|폼|창|칸)(?:에|으로|에서)(?=\s|$)/u;
+const sameFinancialAddress = /(?:그|해당|이|같은)\s*(?:(?:웹|접수|입력)\s*)?(?:주소|링크|화면)(?:에서|으로|에|로)(?=\s|$)/u;
+const recordedAddressLabel = /(?:주소|링크)(?:은|는|이|가)?\s*[:：]?\s*$/u;
 const financialFieldHeading = /^(?:필수\s*(?:(?:입력|기입)(?:\s*(?:항목|정보|값))?|항목|정보|값)|요구(?:한|하는)?\s*(?:입력\s*)?(?:항목|정보|값))(?:으로는|로는|에는|에서|으로|로|에|은|는|이|가)?\s*[:：]?\s*/u;
-const financialFieldValue = new RegExp("^(?:" + bankAuthentication.source + "|(?:지갑|계정)(?:의)?\\s*복구\\s*(?:문구|구문))" +
+const financialFieldValue = new RegExp("^(?:" + bankAuthentication.source + ")" +
   "(?:(?:이었|였)(?:다|습니다)|(?:이?라고\\s*(?:적혀|써|표시)(?:\\s*있(?:었다|었습니다))?)|입니다|임|" +
   "(?:이|가)?\\s*(?:(?:포함|기재)(?:됐(?:다|습니다)|되었(?:다|습니다)|됨)|(?:들어\\s*)?있(?:음|다|습니다|었다|었습니다)))[.!?\\s]*$", "u");
 const recordedFinancialRequest = /(?:받은|수신한|도착한|발신(?:자|처|인)|보낸\s*(?:사람|곳|쪽)|(?:안내|메시지|문자|알림|연락)(?:에|에는|의|에서)|(?:접수|신청|확인)\s*(?:절차|단계))/u;
@@ -283,10 +285,11 @@ function fieldRequiresFinancialValue(text) {
 const formInputDirective = /^(?:입력|기입|작성)(?:하라(?:고|는|며)|해야|해\s*달라|을\s*요구)/u;
 const valueWithFormInputDirective = new RegExp("^" + entryValue + "(?:직접\\s*)?" + formInputDirective.source.slice(1), "u");
 
-function asksForValueInSameForm(text) {
-  const reference = sameFinancialForm.exec(text);
+function asksForValueInSameForm(text, addressOnly = false) {
+  const reference = (addressOnly ? sameFinancialAddress : sameFinancialForm).exec(text);
   if (!reference || inspectLinkCandidates(text).candidates.length) return false;
   const prior = text.slice(0, reference.index);
+  if (addressOnly && reference[0].includes("화면") && (!/^(?:입력|기입|작성)/u.test(prior) || /(?:다른|별도|새로)\s*(?:화면|앱|주소|링크)/u.test(prior))) return false;
   const following = text.slice(reference.index + reference[0].length).trimStart();
   return valueBeforeForm.test(prior) && formInputDirective.test(following) ||
     valueWithFormInputDirective.test(following);
@@ -312,14 +315,17 @@ function reportsSecretInLinkedForm(text) {
     const linked = linkedFinancialForm.exec(after);
     const labelled = namedFinancialForm.test(before);
     const particle = applicationAddressParticle.exec(after);
-    if (ancillaryFormAddress.test(before) || (!linked && !labelled) ||
-        !recordedFinancialRequest.test(context + " " + next)) continue;
+    const labelledAddress = recordedAddressLabel.test(before);
+    if (ancillaryFormAddress.test(before) ||
+        (!linked && !labelled && !labelledAddress)) continue;
+    const documentedForm = recordedFinancialRequest.test(context + " " + next);
 
     const requirement = after.slice(linked?.[0].length ?? particle?.[0].length ?? 0).trimStart();
-    if ((linked || labelled && particle) && fieldRequiresFinancialValue(requirement)) return true;
+    if (documentedForm && (linked || labelled && particle) && fieldRequiresFinancialValue(requirement)) return true;
     if (formBoundary.test(next) || inactiveReport.test(next) || localEntry.test(next) ||
         mereFormReference.test(next) || closedSubmission.test(clauses[index + 2] ?? "")) continue;
-    if (asksForValueInSameForm(next)) return true;
+    if (documentedForm && (linked || labelled) && asksForValueInSameForm(next) ||
+        labelledAddress && asksForValueInSameForm(next, true)) return true;
   }
   return false;
 }
