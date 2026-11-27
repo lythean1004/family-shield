@@ -85,9 +85,54 @@ function requiresOfferDeposit(text) {
   });
 }
 
+const receiptBoundary = /(?<=[.!?。…])\s+|[\r\n]+/u;
+const admittedLoan = /(?:대출|융자)(?:이|가|은|는)?\s*(?:심사\s*)?승인(?:됐|되었|됨|이\s*완료|\s*사실(?:을|이)?\s*(?:알렸|통보|기재|기록|확인됐))/u;
+const awardedBenefit = /(?:경품|상품|상금)(?:에|이)?\s*(?:뽑혔|선정되었|선정됐|당첨됐|당첨되었)|(?:경품|상품)\s*당첨\s*사실/u;
+const preservesBenefitSource = /(?:통지|연락|안내|알림|메시지|문자)(?:를|을)?\s*(?:받았|받은|왔|도착)|(?:선정|당첨|뽑혔)[^.!?\n]{0,20}(?:수신|통지|안내|연락)/u;
+const claimsDelayedBenefit = /(?:상품|경품|물건|물품|상금|혜택|대출(?:금)?|융자금)(?:을|를)?\s*(?:받|수령하|지급받)으?려면|(?:대금|자금|대출(?:금)?|융자금)(?:을|를)?\s*(?:받|수령하|진행하|실행하)으?려면/u;
+const requiredExtraFee = /(?:(?:처리|심사|진행|지급)\s*(?:수수료|비용)|(?:별도(?:의)?|추가(?:의)?)\s*(?:돈|비용|수수료|금액)|보증금)/u;
+const quantifiedFee = /^(?:(?:의)?\s*(?:\d[\d,.]*\s*(?:천|만|억)?\s*원|[한두세네]\s*(?:천|만)\s*원))?/u;
+const priorityBeforeFee = /(?:먼저|미리|우선)\s*$/u;
+const priorityAfterFee = /^(?:먼저|미리|우선)\s*/u;
+const mandatoryFeePayment = /^(?:입금|송금|이체|납부|지불)하(?:셔?야|라고|라는|도록)|^(?:입금|송금|이체|납부|지불)해(?:야|\s*(?:주세요|주십시오|달라))|^(?:내|보내)(?:야|라고|라는|\s*(?:주세요|주십시오|달라))/u;
+const benefitDisclaimer = /(?:별도|다른)\s*(?:거래|연락|문자|행사|대출)|(?:별개|별건|한편)|(?:대출금|융자금)(?:은|는|이|가)?\s*(?:이미\s*)?(?:입금|지급|실행)\s*(?:완료|됐|되었)|(?:무료|수수료가\s*없|납부할\s*필요가\s*없|내지\s*않아도|자동\s*차감|별도\s*납부\s*없)/u;
+const feeWithdrawal = /(?:(?:이|그|해당|같은)\s*)?(?:(?:수수료|납부|입금|송금|지불)\s*)?(?:요청|요구|조건|지시)(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:취소|철회|없어졌|없었)/u;
+const inactiveBenefit = /(?:승인|선정|당첨)(?:은|는|이|가)?\s*(?:이미\s*)?(?:취소|철회|보류|예정|아니)/u;
+const deniesFee = /(?:필요|요구|요청|사실|적)(?:은|는|이|가)?\s*(?:없|아니)|(?:해야|하는|할)\s*(?:하는지|하느냐|지)\s*(?:묻|문의|질문)|(?:하는지|해야\s*하는지|했는지|(?:라는\s*(?:뜻|건|것)인지|라고\s*한\s*(?:것|건)인지))\s*(?:제가|내가|수신자가)?\s*(?:물었|물어봤|문의|확인)|(?:내지|보내지|납부하지|송금하지|입금하지)\s*(?:말|마|않아도)/u;
+
+function demandsFeeForPromisedBenefit(text) {
+  for (const notice of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    const clauses = notice.split(receiptBoundary).map(clause => clause.trim()).filter(Boolean);
+    for (const [i, clause] of clauses.entries()) {
+      const cost = requiredExtraFee.exec(clause);
+      if (!cost) continue;
+      const previous = clauses[i - 1] ?? "";
+      const next = clauses[i + 1] ?? "";
+      const report = previous + " " + clause;
+      if (preventionNotice.test(report) || benefitDisclaimer.test(report) || inactiveBenefit.test(report) ||
+          clause.endsWith("?") || deniesFee.test(clause) || feeWithdrawal.test(next)) continue;
+
+      const before = clause.slice(0, cost.index);
+      const offer = previous + " " + before;
+      const explicitGate = claimsDelayedBenefit.test(before);
+      if (!admittedLoan.test(offer) && !(awardedBenefit.test(offer) && preservesBenefitSource.test(offer) && explicitGate)) continue;
+
+      const atCost = clause.slice(cost.index + cost[0].length);
+      const amount = quantifiedFee.exec(atCost)[0];
+      const afterAmount = atCost.slice(amount.length).trimStart();
+      const payment = afterAmount.replace(/^(?:을|를|부터)?\s*/u, "");
+      const priority = priorityAfterFee.exec(payment);
+      const feeFirst = priority || /^부터(?=\s|$)/u.test(afterAmount) || priorityBeforeFee.test(before);
+      if (!feeFirst && !explicitGate) continue;
+      if (mandatoryFeePayment.test(payment.slice(priority?.[0].length ?? 0))) return true;
+    }
+  }
+  return false;
+}
+
 // 금융위·금감원 피해예방 10계명의 대출 전 보증금 요구 유형. https://www.fsc.go.kr/no010101/86250
 export function requiresAdvancePayment(text) {
-  if (requiresOfferDeposit(text)) return true;
+  if (requiresOfferDeposit(text) || demandsFeeForPromisedBenefit(text)) return true;
   for (const match of text.matchAll(/[^.!?\n]+/g)) {
     const clause = match[0];
     if (reported.test(clause) || /사기(?:입니다|예방)|(?:라는|이라는)\s*(?:말|문구)|(?:피해|예방)\s*사례/.test(clause)) continue;
