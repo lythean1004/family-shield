@@ -135,6 +135,27 @@ function explicitlyReassignedAccount(clause, next, context) {
   return !SWITCH.test(next) && !EXAMPLE.test(next) && !CLOSED_REQUEST.test(next) &&
     !NO_PAYMENT.test(next) && inconsistentTradeHolder.test(next);
 }
+const assigningParty = /(?:일감|일거리|일|작업|업무|과업|용역)(?:을|를)?\s*(?:(?:맡긴|맡기는|맡긴다는|맡기겠다는|맡긴다고\s*한|맡기려는|의뢰한|발주한|배정한|배정하겠다는)\s*(?:쪽|곳|사람|측|업체|회사|발신자|상대|의뢰인|발주처))|(?:발주처|발주자|발주사|외주\s*업체|고용주)(?:가|에서|가\s*보낸|의|쪽)?/u;
+const gateBeforeWork = /(?:작업|업무|일감|일거리|일을?|과업|용역|근무)(?:이|가|을|를)?\s*(?:(?:시작|착수|진행|개시|배정|할당)(?:되기|받기|하기|할|되는\s*일|되기|하기|이)?\s*(?:전|이전|에\s*앞서)|(?:받기|맡기|배정받기|할당받기)\s*(?:전|이전))/u;
+const explicitWorker = /(?:제가|내가|저는|저에게|제게|수신자(?:가|에게|는)?|작업자(?:인|가|는|에게)|수행자(?:인|가|는|에게)|일을\s*맡는\s*(?:사람|쪽)(?:이|가|은|는)?|일(?:을)?\s*받는\s*(?:사람|쪽)(?:이|가|은|는)?)/u;
+const workerSubject = /(?:제가|내가|저는|작업자(?:가|는)|수행자(?:가|는)|수신자(?:가|는))\s*$/u;
+const fromAssigningParty = /(?:쪽|곳|사람|업체|회사|상대|발신자|발주처|발주자|의뢰인)(?:에서|로부터|에게서|이\s*보낸|가\s*보낸|에게\s*받은|이\s*제시한|의\s*(?:안내|답신|연락|문자))/u;
+const workerFee = /(?:돈|비용|수수료|보증금|등록비|처리비|착수비|예치금|신청비|참가비|금액)(?:를|을|은|는|부터|까지)?\s*(?:(?:제가|내가|저는|작업자가|수행자가)\s*)?(?:(?:먼저|따로|미리|별도로|부담해|직접)\s*){0,3}(?:내야|(?:입금|납부|송금|이체|지불|결제)해야|(?:입금|납부|송금|이체|지불|결제)하라는|(?:내|납부해|보내|송금해)\s*달라)/u;
+const evidenceOfWorkerPayment = /(?:(?:제가|내가|저는)\s*)?(?:(?:실제로|아직|일단|그대로)\s*)?(?:내지\s*않았|납부하지\s*않았|입금하지\s*않았|안\s*냈|냈는지|낸\s*적|냈다고|냈는데|냈|내진\s*않았)/u;
+const paysWorker = /(?:발주(?:자|처|사)|업체|의뢰인|가게|회사)(?:가|에서|는|은)[^.!?\n]{0,35}(?:작업자|수행자|제게|저한테|저에게|내게)[^.!?\n]{0,22}(?:돈|선금|착수금|보수|대금|재료비|지원금|급여|건네|주기로|지급|송금)|(?:제게|저에게|작업자에게|수행자에게)\s*(?:선금|착수금|재료비|지원금|보수)(?:을|를)?\s*(?:보내|주|건네|지급)/u;
+const ownPreparation = /(?:스스로|자체|자비로|제가\s*직접|각자)\s*(?:구매|구입|준비)|(?:장비|재료|부품|소모품)(?:을|를)?\s*(?:직접|제가|스스로|자비로)?\s*(?:구매|구입)|(?:수강료|교재비|정규\s*수업)/u;
+
+function workerPaysBeforeAssignment(clause, context) {
+  if (!currentlyReported(context) || NO_PAYMENT.test(context) || paysWorker.test(context) ||
+      ownPreparation.test(context) || !assigningParty.test(context) || !gateBeforeWork.test(clause)) return false;
+  const before = gateBeforeWork.exec(clause);
+  const following = clause.slice(before.index + before[0].length);
+  if (!workerFee.test(following)) return false;
+  // 일을 맡긴 쪽이 발신자이고 수신자가 지불 주체라고 본문에서 알 수 있는 경우만 결합한다.
+  return explicitWorker.test(following) || workerSubject.test(clause.slice(0, before.index)) ||
+    fromAssigningParty.test(context) && /(?:문자|안내|연락|답장|답신|통보|메시지)/u.test(context) &&
+      evidenceOfWorkerPayment.test(following);
+}
 export function addReportedTransactionConditions(text, signals) {
   const clauses = text.split(SENTENCES).map(value => value.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
@@ -144,7 +165,8 @@ export function addReportedTransactionConditions(text, signals) {
     const context = !SWITCH.test(clause) && !CLOSED_REQUEST.test(prior) ? prior + " " + clause : clause;
     if (EXAMPLE.test(context) || EXAMPLE.test(next) && !SWITCH.test(next)) continue;
     if (paymentBeforeOutcome(clause) || paymentBeforeOutcome(context)) signals.add(SIG_PREPAYMENT);
-    if (reportedUpfrontGate(context) || demandsPaymentBeforeVerification(clause) || paymentBeforeBasicInformation(clause, context)) {
+    if (reportedUpfrontGate(context) || demandsPaymentBeforeVerification(clause) || paymentBeforeBasicInformation(clause, context) ||
+        workerPaysBeforeAssignment(clause, context)) {
       signals.add(SIG_PREPAYMENT);
     }
     if (routedToOtherParty(clause) || mismatchInContinuation(prior, clause, context) || explicitlyReassignedAccount(clause, next, context) || currentlyReported(context) && !NO_PAYMENT.test(context) && !REVERSE_OR_AUTHORIZED.test(context) &&
