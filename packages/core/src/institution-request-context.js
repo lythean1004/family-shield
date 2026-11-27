@@ -1,4 +1,5 @@
 import { currentReceivedRequests, isReceivedContinuation } from "./received-message.js";
+import { currentPickupRequests } from "./reported-pickup-status.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { isCardCallbackNumber, isCardSenderName, isCardSenderService } from "./card-sender.js";
 import { CALLBACK_NUMBER_SOURCE, normalizePhoneNumber } from "./phone-number.js";
@@ -308,14 +309,23 @@ function addReceivedInstitutionRequests(text, signals) {
       signals.add(SIG_AGENCY_IMPERSONATION);
       signals.add(SIG_PERSONAL_INFO);
     }
+    if (investigator.test(name) && !removedTransfer.test(body) && reportsCashFromRecipient(body)) {
+      signals.add(SIG_CASH_HANDOVER);
+    }
+  }
+  for (const { body, previous, pickupStatus } of currentPickupRequests(text, clause => explicitServiceActor.test(clause),
+      hasReportedPrivateDelivery)) {
+    if (pickupStatus === "closed") continue;
+    const serviceReply = reportReplyChannel.test(body) && hasReportedPrivateDelivery(body);
+    const source = clause => declaredSender.exec(clause) ??
+      (serviceReply ? explicitServiceActor.exec(clause) : null) ?? roleInReport.exec(clause);
+    const attribution = source(body) ?? source(previous);
+    const name = attribution?.groups.role ?? attribution?.groups.named;
     const fromCustomer = /수신자|제게서|저한테서|제\s*자택/.test(body);
-    if (/은행|금융\s*(?:기관|회사)/.test(name) && /직원|담당/.test(attribution[0] + " " + previous) &&
+    if (name && /은행|금융\s*(?:기관|회사)/.test(name) && /직원|담당/.test(attribution[0] + " " + previous) &&
         relativeRepayment.test(body) && mobileCollector.test(body) && activeCash.test(body) &&
         fromCustomer && !endedOrDeniedVisit.test(body) && !removedTransfer.test(body)) {
       signals.add(SIG_LOAN_CASH_PICKUP);
-    }
-    if (investigator.test(name) && !removedTransfer.test(body) && reportsCashFromRecipient(body)) {
-      signals.add(SIG_CASH_HANDOVER);
     }
   }
 }
