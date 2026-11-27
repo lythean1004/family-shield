@@ -53,13 +53,26 @@ const ifNoWin = /(?:미당첨|낙첨)(?:\s*(?:시|이면))?|당첨(?:이)?\s*(?:
 const refundPromise = /(?:환불|반환)(?:\s*보장|합니다|해\s*드(?:립니다|려요))?(?=[.!]|$)/;
 const preventionNotice = /(?:피해|사기|피싱)\s*(?:예방|사례)|예방\s*(?:안내|교육)|[‘’“”"'「」]|(?:라는|다는)\s*(?:문구|문자|요구)/;
 const depositAccountField = new RegExp("^(?:입금\\s*)?계좌(?:\\s*번호)?\\s*[:：]?\\s*" + ACCOUNT_NUMBER + "(?=\\s|$)");
+const investmentMarket = /(?:거래소|가상\s*자산|암호\s*화폐|코인|주식)/;
+const promisedYield = /수익(?:률)?\s*\d+(?:\.\d+)?\s*(?:%|배|퍼센트|프로)(?:\s*이상)?(?:을|를)?\s*보장(?:합니다|한대|이래|된대|$)(?![가-힣])/;
+const firstDeposit = /(?:처음(?:엔|에는|에)?|먼저|우선|일단)\s*\d[\d,]*\s*(?:천|만)?\s*원(?:을|만)?\s*(?:넣어\s*봐(?:요)?|(?:입금|송금)해\s*(?:주세요|봐요?|줘))(?![가-힣])/;
+const simulatedEntry = /(?:계산기|연습장|모의\s*계좌|입력란|시뮬레이터|연습용\s*잔액)/;
 
 // 무료 혜택·예측 번호를 미끼로 먼저 돈을 받고 돌려준다고 하는 유형. 일반 예약금과 분리한다.
 // 한국소비자원 복권 예측서비스 피해 안내 https://www.kca.go.kr/kca/sub.do?menukey=5293&mode=view&no=1003787711
-function refundableOffer(text) {
+function requiresOfferDeposit(text) {
   if (preventionNotice.test(text)) return false;
-  const clauses = text.split(/[.!?\n]+/).map(c => c.trim()).filter(Boolean);
+  // 숫자의 소수점이나 안내 중간 주소의 점에서 약속과 조건을 나누지 않는다.
+  const clauses = text.split(/\.(?=\s|[가-힣]|$)|[!?\n]+/).map(c => c.trim()).filter(Boolean);
   return clauses.some((clause, i) => {
+    // 가상자산 등의 정량 수익 보장을 내세워 첫 돈을 넣으라고 한 경우. 금융위 https://www.fsc.go.kr/po010101/87916
+    const promise = promisedYield.exec(clause);
+    if (promise && investmentMarket.test((clauses[i - 1] ?? "") + " " + clause)) {
+      const rest = clause.slice(promise.index + promise[0].length).trim();
+      const request = /^[\s\p{P}\p{S}\uFE0F]*$/u.test(rest) ? clauses[i + 1] ?? "" : rest;
+      if (firstDeposit.test(request) && !simulatedEntry.test(request) &&
+          !/(?:사실이\s*아니|거짓|허위|믿지\s*마|사칭|사기)/.test(rest)) return true;
+    }
     const payment = feeThenDeposit.exec(clause);
     if (!payment) return false;
     const offer = (clauses[i - 1] ?? "") + " " + clause.slice(0, payment.index);
@@ -74,7 +87,7 @@ function refundableOffer(text) {
 
 // 금융위·금감원 피해예방 10계명의 대출 전 보증금 요구 유형. https://www.fsc.go.kr/no010101/86250
 export function requiresAdvancePayment(text) {
-  if (refundableOffer(text)) return true;
+  if (requiresOfferDeposit(text)) return true;
   for (const match of text.matchAll(/[^.!?\n]+/g)) {
     const clause = match[0];
     if (reported.test(clause) || /사기(?:입니다|예방)|(?:라는|이라는)\s*(?:말|문구)|(?:피해|예방)\s*사례/.test(clause)) continue;
