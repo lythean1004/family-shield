@@ -354,7 +354,10 @@ export function extractCodeSignals(text, options = {}) {
   const unverifiedLinks = outside.map(candidate => candidate.raw);
   addReportedNoticeFields(input, signals, { unverifiedLinks });
   addInstitutionRequestContext(input, signals);
-  addInstitutionReportFrames(input, signals, { unverifiedLinks });
+  addInstitutionReportFrames(input, signals, {
+    unverifiedLinks,
+    installFromDirectPatterns: clause => hasSensitiveRequest(clause, PATTERNS[SIG_APP_INSTALL]),
+  });
   return {
     signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }),
     // 수신자가 옮겨 적은 요구는 로컬 판정에만 보탠다. 기존 건강정보 전송 판단에는 직접 검출한 신호를 사용한다.

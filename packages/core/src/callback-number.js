@@ -221,7 +221,9 @@ function hasConstrainedCallback(text, { start, end }) {
   return coerciveConsequence.test(consequence.slice(0, 44)) && !deniedConsequence.test(consequence);
 }
 
-export function classifyCallback(text, legacyPatterns) {
+const requiredReportedCallback = /^\s*(?:으로|로|에)(?:만)?\s*(?:전화|통화|연락|회신)(?:을|를)?\s*(?:하라(?:고|는)|하도록|해야(?!\s*(?:하는지|할지|하는\s*건지|할\s*필요)))/u;
+
+export function classifyCallback(text, legacyPatterns, { includeReportedDirective = false } = {}) {
   const targets = Array.from(text.matchAll(NUMBER), m => {
     const number = digits(m[0]);
     return { start: m.index, end: m.index + m[0].length, known: official.has(number), long: number.length >= 8 };
@@ -234,7 +236,8 @@ export function classifyCallback(text, legacyPatterns) {
     const before = text.slice(Math.max(0, t.start - 48), t.start);
     const after = text.slice(t.end, t.end + 35);
     if (REPORTED_TARGET.test(after)) return false;
-    if (BEFORE_NUMBER.test(before) || AFTER_NUMBER.test(after)) return true;
+    if (BEFORE_NUMBER.test(before) || AFTER_NUMBER.test(after) ||
+        includeReportedDirective && requiredReportedCallback.test(after)) return true;
     if (/[‘“"'「][^’”"'」]*$/.test(before) || /^[^.!?\n]{0,35}[’”"'」]/.test(after)) return false;
     return (desk.test(before) && deskAction.test(after)) || (reportRisk.test(before) && verifyByPhone.test(after)) ||
       hasConstrainedCallback(text, t);

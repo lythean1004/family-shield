@@ -1,3 +1,5 @@
+import { classifyCallback } from "./callback-number.js";
+import { personalDisclosure } from "./personal-disclosure.js";
 import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
@@ -150,7 +152,7 @@ function reportsLoanCollection(fields, sender, heading) {
 }
 
 const reportedRole = "(?:" + authority + "|공공\\s*(?:고지|통지|민원)|통신\\s*(?:사|회사|업체)|보험사|건강\\s*보험(?:공단)?|카드사|택배\\s*(?:사|회사)|공단)";
-const roleTitle = "(?<role>" + reportedRole + ")(?<unit>(?:\\s+(?:가입|관리|고객|민원|업무|수사|조사|사건|통지|지원|상담|대출|상환|금융|담당(?:자|부서)?|부서|직원|팀|소속|창구)){0,5})";
+const roleTitle = "(?<role>" + reportedRole + ")(?<unit>(?:\\s+(?:가입|관리|고객|민원|업무|전산|수사|조사|사건|통지|지원|상담|대출|상환|금융|담당(?:자|부서)?|부서|직원|팀|소속|창구)){0,5})";
 const reportingSender = "(?:발신(?:자|인|처)|보낸\\s*(?:사람|이|쪽)|상대(?:방)?)";
 const roleMarker = "(?:이?라고\\s*(?:소개한|밝힌|말한|주장한)|(?:[을를]\\s*)?(?:자처하(?:는|던)|자처한|자칭하(?:는|던)|자칭한))";
 const introducedSender = new RegExp("(?<![\\p{L}\\p{N}])" + roleTitle + "\\s*" + roleMarker + "\\s*" + reportingSender + "(?:이|가|은|는)?(?=[\\s,，]|$)", "u");
@@ -585,7 +587,57 @@ function* reportedRouteChanges(text, unverifiedLinks) {
   }
 }
 
-export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [] } = {}) {
+const directRoleReceipt = new RegExp("^" + roleTitle +
+  "\\s*(?:이?라는\\s*(?:사람|상대(?:방)?|쪽)(?:이|가|은|는|에서)?|이?라며|" +
+  "이?라고\\s*(?:소개한|밝힌|설명한|한)\\s*(?:사람|발신(?:자|인)|상대(?:방)?|쪽)(?:이|가|은|는|에서)?|" +
+  "(?:[을를]\\s*)?자처한\\s*(?:문자|메시지|연락|통지|안내)(?:에는|에서|에|의)?)(?=[\\s,，]|$)", "u");
+const arrivalContext = /(?:받았|받은|수신|보냈|보낸|발송|도착|연락(?:이\s*왔|했|해\s*왔)|(?:문자|메시지|통지|안내)(?:에\s*관한|로\s*답|였|라고|에\s*적힌))/u;
+const sameDocumentReference = /^(?:(?:그|이|해당|같은|받은|수신한)\s*)?(?:문자|메시지|본문|통지|안내문?|답장|회신)(?:에|에서|의|에는)(?:\s|$)/u;
+const continuedDemand = /(?:요구|요청|지시)(?:를|을|가|이|는|은)(?:\s*(?:받았|있었|적혔|담겼|기재|포함|들어))|(?:라고|라는|다는)\s*(?:요구|요청|지시|내용|조건)/u;
+const otherEventActor = /^(?:(?:이웃|지인|친구|동료|가족|배우자)(?:이|가|은|는)(?=\s)|(?:제가|내가|저는|수신자가|기록자가)\s*(?:먼저|직접)\s*[^.!?\n]{0,22}(?:요청|문의|부탁|제안))/u;
+const questionedDemand = /(?:해야|하라|달라|하도록)\s*(?:하는지|할지|하는\s*건지)|(?:할\s*필요가\s*있는지|해야\s*하는지를)\s*(?:물|문의)/u;
+
+function issuerOfReceivedEvent(clause) {
+  if (!openDirectedReport(clause) || !roleBelongsToReportedSource(clause) || !arrivalContext.test(clause)) return false;
+  return Boolean(directRoleReceipt.test(clause) || issuerForCurrentReport(clause) || claimedIssuer(clause));
+}
+
+const asksAboutSendingLink = /(?:보냈|전달했|기재했|첨부했|받았)을까요|(?:보냈는지|전달했는지|받았는지)\s*(?:물|문의)/u;
+const linkFromReporter = /(?:제가|내가|수신자가|기록자가)\s*[^.!?\n]{0,26}(?:주소|링크|양식)[^.!?\n]{0,34}(?:보냈|전달했|붙였|추가했)/u;
+function localUnverifiedLink(action, unverifiedLinks) {
+  if (!unverifiedLinks.length || ORDINARY_LOOKUP.test(action) || informationalAddress.test(action) ||
+      asksAboutSendingLink.test(action) || linkFromReporter.test(action)) return false;
+  const { candidates, complete } = inspectLinkCandidates(action);
+  return complete && candidates.some(({ raw, protocol }) =>
+    (protocol === "http:" || protocol === "https:") && unverifiedLinks.includes(raw));
+}
+
+// 기관 역할과 각 행동은 같은 수신 문장의 현재 범위에서 확인한다.
+function* sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPatterns) {
+  const hasAction = clause => localUnverifiedLink(clause, unverifiedLinks) ||
+    installFromDirectPatterns(clause) || personalDisclosure(clause, { recordedReply: true }).reply ||
+    classifyCallback(clause, [], { includeReportedDirective: true }).directed;
+  const requiresRecipientApp = clause => !staffInstallation.test(clause) && !noInstallation.test(clause) &&
+    !questionedDemand.test(clause) && (requiresRecipientInstallation(clause) || installFromDirectPatterns(clause));
+
+  for (const report of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    for (const { body, previous, next } of currentReceivedRequests(report, issuerOfReceivedEvent, hasAction)) {
+      const action = body.split(quoteBoundary, 1)[0];
+      if (!openDirectedReport(action) || !roleBelongsToReportedSource(action) || closedRemainder.test(next) ||
+          questionedDemand.test(action)) continue;
+      const sameEvent = issuerOfReceivedEvent(action) || issuerOfReceivedEvent(previous) && !otherEventActor.test(action) &&
+        (sameDocumentReference.test(action) || continuedDemand.test(action));
+      if (!sameEvent) continue;
+
+      if (localUnverifiedLink(action, unverifiedLinks)) yield SIG_LINK;
+      if (personalDisclosure(action, { recordedReply: true }).reply) yield SIG_PERSONAL_INFO;
+      if (classifyCallback(action, [], { includeReportedDirective: true }).directed) yield SIG_CALL_THIS_NUMBER;
+      if (hasOpenInstallationReport(action, next, requiresRecipientApp)) yield SIG_APP_INSTALL;
+    }
+  }
+}
+
+export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [], installFromDirectPatterns } = {}) {
   const addAgencyAction = signal => {
     signals.add(SIG_AGENCY_IMPERSONATION);
     signals.add(signal);
@@ -605,6 +657,9 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     else signals.add(signal);
   }
   for (const signal of reportedRouteChanges(text, unverifiedLinks)) addAgencyAction(signal);
+  if (installFromDirectPatterns) {
+    for (const signal of sameInstitutionEventActions(text, unverifiedLinks, installFromDirectPatterns)) addAgencyAction(signal);
+  }
   for (const signal of institutionTransactionReports(text, unverifiedLinks)) {
     if (signal === SIG_LINK || signal === SIG_CALL_THIS_NUMBER || signal === SIG_PERSONAL_INFO) addAgencyAction(signal);
     else signals.add(signal);
