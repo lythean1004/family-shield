@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { extractCodeSignals } from "../src/extract.js";
-import { SIG_DELETE_APP, SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "../src/signals.js";
+import { analyze } from "../src/pipeline.js";
+import { SIG_APP_INSTALL, SIG_DELETE_APP, SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "../src/signals.js";
 
 function checkSignal(signal, expected, samples) {
   for (const text of samples) it(text, () => {
@@ -74,4 +75,29 @@ describe("처리를 계속하려면 정상 보호 프로그램을 지우라는 �
     "접수를 위해 백신 프로그램을 지울 필요는 없다는 답변이 왔어요.",
     "보호 앱을 지워야 점검을 받는다는 말은 사실이 아니래요.",
   ]);
+});
+
+describe("직접 받은 설치 요청과 설명·가정", () => {
+  checkSignal(SIG_APP_INSTALL, true, [
+    "일정 앱을 설치하라는 문자를 받았어요.",
+    "별도 프로그램을 깔아 달라는 쪽지가 제게 왔어요.",
+    "제게 온 연락은 새 앱을 설치해 달라는 부탁이었어요.",
+  ]);
+  checkSignal(SIG_APP_INSTALL, false, [
+    "새 앱을 설치하라는 문자를 받은 피해 사례를 강의에서 읽었어요.",
+    "제가 신청해서 프로그램 설치 설명서를 받았어요.",
+    "새 앱을 설치하라는 문자가 오면 신고하라는 교육이에요.",
+    "앱을 설치하라는 문자를 받은 적이 없어요.",
+    "앱을 설치하라는 쪽지를 받았지만 이미 거절했어요.",
+  ]);
+  it("통화 뒤에 받은 설치 요구는 건강 내용을 로컬에 둔 채 R2로 판정한다", async () => {
+    let calls = 0;
+    const result = await analyze({
+      text: "검진 일정 앱을 설치하라는 문자를 받았어요.",
+      parentInputs: { called_before: true },
+      ai: { model: "offline", apiKey: "dummy", fetchImpl: async () => { calls++; throw Error("offline"); } },
+    });
+    assert.deepEqual([result.level, result.ai_skipped, calls], ["위험", "health", 0]);
+    assert.ok(result.fired_rules.includes("R2"));
+  });
 });

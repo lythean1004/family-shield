@@ -75,7 +75,7 @@ export async function analyze({
   let aiSkipped = null;
   if (!ai || !ai.model) {
     fallbackReason = "AI 꺼짐";
-  } else if (shouldSkipAiForHealth(input, code.signals, code.localHealthClaim)) {
+  } else if (shouldSkipAiForHealth(input, code.healthRoutingSignals ?? code.signals, code.localHealthClaim)) {
     // 작업 ⑦: 진짜 병원·약국·검진 안내로 보이면 건강정보를 해외 AI로 보내지 않는다(판정은 규칙이 그대로 정함)
     fallbackReason = "건강정보";
     aiSkipped = "health";

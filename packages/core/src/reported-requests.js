@@ -1,4 +1,4 @@
-import { SIG_DELETE_APP, SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "./signals.js";
+import { SIG_APP_INSTALL, SIG_DELETE_APP, SIG_ISOLATION, SIG_PREPAYMENT, SIG_THIRD_PARTY_ACCOUNT } from "./signals.js";
 
 // 수신자가 현재 요구를 옮겨 적은 경우도 원래의 신호로 읽는다.
 // 피해 사례를 가르치거나 거절·철회한 요구를 설명하는 문맥에는 이 경로를 쓰지 않는다.
@@ -20,11 +20,14 @@ const requirement = /조건|필수|전제|요건|동의해야|(?:상담|점검|�
 const noObligation = /(?:필요|의무)(?:가|는)?\s*없|(?:조건|필수|요건)(?:은|이|가)?\s*아니/;
 const protectionApp = /(?:보호|보안|안전|백신)\s*(?:앱|어플|프로그램)(?:을|를|부터)?\s*(?:먼저\s*)?(?:삭제(?:를\s*)?해야|지워야|(?:삭제하|지우)는\s*(?:게|것이))/;
 const harmfulApp = /(?:사칭|가짜|악성|감염된|위조된)\s*(?:보호|안전|보안|백신)|(?:보호|안전|보안|백신)\s*(?:앱|프로그램)(?:을|를)?\s*사칭/;
+const installMessage = /(?:앱|어플|프로그램)(?:을|를)?\s*설치하라는\s*(?:문자|메시지|쪽지|연락|요청)(?:을|를|이|가)?\s*(?:(?:제가|제게|저한테)\s*)?(?:받았|받은|왔)/;
+const notReceived = /받은\s*(?:적|기억)(?:이|은)?\s*없|(?:이미|바로)\s*거절|거절했|보낸\s*적(?:이)?\s*없/;
 
 function addConditions(passage, signals) {
   const clauses = passage.split(/\.(?=\s|$)|[!?\n]+|(?:끝났|완료됐|완료했|마쳤|처리됐)(?:고|지만|는데)\s+/u);
   for (const clause of clauses) {
     if (negatedRequest.test(clause)) continue;
+    if (installMessage.test(clause) && !notReceived.test(clause)) signals.add(SIG_APP_INSTALL);
     if (proceeds.test(clause) && advance.test(clause) && !negatedFee.test(clause)) {
       signals.add(SIG_PREPAYMENT);
     }

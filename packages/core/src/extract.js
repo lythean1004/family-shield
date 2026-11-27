@@ -216,7 +216,7 @@ const PATTERNS = {
 /**
  * @param {string} text
  * @param {{ senderLast4?: string, registeredLast4?: string, inputComplete?: boolean, shortUrlKeys?: Set<string> }} [options]
- * @returns {{ signals: string[], domains: string[], localHealthClaim?: boolean }}
+ * @returns {{ signals: string[], domains: string[], localHealthClaim?: boolean, healthRoutingSignals?: string[] }}
  */
 export function extractCodeSignals(text, options = {}) {
   const signals = new Set();
@@ -290,6 +290,11 @@ export function extractCodeSignals(text, options = {}) {
     signals.add(SIG_NEW_NUMBER);
   }
 
+  const directSignals = [...signals];
   for (const signal of reportedRequestSignals(input)) signals.add(signal);
-  return { signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }) };
+  return {
+    signals: [...signals], domains: [...domains], ...(localHealthClaim && { localHealthClaim }),
+    // 수신자가 옮겨 적은 요구는 로컬 판정에만 보탠다. 기존 건강정보 전송 판단에는 직접 검출한 신호를 사용한다.
+    ...(directSignals.length !== signals.size && { healthRoutingSignals: directSignals }),
+  };
 }
