@@ -111,9 +111,9 @@ export async function analyze({
     signals_final: signalsFinal,
     signals_code: signalsCode,
     unlinkedAgencyActions: code.unlinkedAgencyActions,
-    call_in_progress: Boolean(parentInputs.call_in_progress),
-    called_before: Boolean(parentInputs.called_before),
-    family_denied: Boolean(parentInputs.family_denied),
+    call_in_progress: parentInputs.call_in_progress,
+    called_before: parentInputs.called_before,
+    family_denied: parentInputs.family_denied,
   });
 
   const relation = aiData?.impersonated_relation ?? null;

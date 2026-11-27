@@ -15,6 +15,7 @@
  * 테스트에서는 handleRequest()를 직접 가져다 쓴다.
  */
 import { MAX_INPUT_CHARS } from "../../packages/core/src/pipeline.js";
+import { isAffirmativeParentAnswer } from "../../packages/core/src/rule-engine.js";
 import { analyzeCounted, createSignalMetrics } from './signal-metrics.js';
 import { createMemoryResultStore, redactToken, toResultView } from "../../packages/core/src/result-token.js";
 import { createSafeBrowsingChecker } from "../../packages/core/src/url-reputation.js";
@@ -163,7 +164,7 @@ export async function handleRequest(params, cfg) {
   }
 
   // R1 빠른 경로: 통화 중이면 AI 없이 즉시 반환
-  if (parentInputs.call_in_progress) {
+  if (isAffirmativeParentAnswer(parentInputs.call_in_progress)) {
     cfg.signalMetrics?.record({ rules: ['R1'], status: 'fast_path', elapsedMs: 0 });
     return {
       status: 200,

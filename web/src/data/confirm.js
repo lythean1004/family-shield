@@ -61,7 +61,7 @@ export function applyFamilyAnswer(result, answer) {
  * 기존 판정에 전화 응답이 충족한 R2만 더한다.
  */
 export function applyCallContext(result, { calledBefore }) {
-  return applyParentContext(result, { called_before: Boolean(calledBefore) })
+  return applyParentContext(result, { called_before: calledBefore })
 }
 
 /** "오후 3:12" */

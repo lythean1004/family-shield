@@ -5,6 +5,12 @@ import { ANSWERS, applyCallContext, applyFamilyAnswer } from '../data/confirm.js
 
 const agency = '검찰청 수사관을 자처한 사람에게 연락을 받았습니다.'
 
+test('문자열로 전달된 전화 응답 중 예만 R2에 반영한다', () => {
+  const result = { level: '주의', fired_rules: ['R7'], signals_final: ['SIG_LINK'] }
+  assert.equal(applyCallContext(result, { calledBefore: 'false' }), result)
+  assert.deepEqual(applyCallContext(result, { calledBefore: 'true' }).fired_rules, ['R7', 'R2'])
+})
+
 test('웹의 전화·가족 확인 응답은 별도 발신자의 개인정보 요구를 R6에 다시 넣지 않는다', async () => {
   const result = await analyze({
     text: agency + ' 다른 발신자가 제 신분증 사본을 제출하라고 요구했다는 수신 보고입니다.',

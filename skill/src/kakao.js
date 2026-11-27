@@ -7,6 +7,8 @@
  * 규칙: 말풍선 최대 3개, 글 1,000자, 버튼 최대 3개. 넘으면 잘라서 보낸다.
  */
 
+import { isAffirmativeParentAnswer } from "../../packages/core/src/rule-engine.js";
+
 export const MAX_TEXT_CHARS = 1000;
 export const MAX_OUTPUTS = 3;
 export const MAX_QUICK_REPLIES = 3;
@@ -18,23 +20,21 @@ export function readRequest(payload) {
   const text = typeof userRequest.utterance === "string" ? userRequest.utterance : "";
   const botUserKey = userRequest.user?.properties?.botUserKey ?? userRequest.user?.id ?? null;
 
-  // 카카오 블록 파라미터(이전 화면 입력값).
-  // 오픈빌더 v2: userRequest.params 또는 detail_params["param"].value
+  // 이 서비스가 이전 화면의 응답을 전달받는 경로. 발화에서 추출한 엔티티는 읽지 않는다.
   const raw = userRequest.params ?? {};
   const get = (key) => {
     const v = raw[key];
     if (v == null) return undefined;
-    // detail_params 형태 { value: "true" } 또는 평탄 "true"
-    const str = typeof v === "object" ? (v.value ?? "") : String(v);
-    return str;
+    // 이전 화면은 평탄한 값과 { value } 형식을 쓴다.
+    return typeof v === "object" ? (v.value ?? "") : String(v);
   };
   const parentInputs = {};
   const cip = get("call_in_progress");
-  if (cip != null) parentInputs.call_in_progress = cip === "true";
+  if (cip != null) parentInputs.call_in_progress = isAffirmativeParentAnswer(cip);
   const cb = get("called_before");
-  if (cb != null) parentInputs.called_before = cb === "true";
+  if (cb != null) parentInputs.called_before = isAffirmativeParentAnswer(cb);
   const fd = get("family_denied");
-  if (fd != null) parentInputs.family_denied = fd === "true";
+  if (fd != null) parentInputs.family_denied = isAffirmativeParentAnswer(fd);
   const sl4 = get("sender_last4");
   if (sl4 != null) parentInputs.sender_last4 = sl4 || null;
 

@@ -625,7 +625,7 @@ VM API에서 매번 현재 가족 권한을 검사한다(D36).
   - `packages/core/src/pipeline.js`의 `analyze()`가 F4-5 순서를 한 함수로 묶는다. 스킬 서버와 평가 실행기(`eval/run.mjs`)가 같은 함수를 쓰고, 채널마다 모델·시간 제한만 다르다. 반환값에 원문·마스킹 문장을 담지 않는다.
   - `skill/src/`: 판별 진입점 외 `database.js`(요청별 역할), `auth.js`(세션·동의), `confirm.js`(요청·응답), `results.js`(서명된 결과·DB 토큰), `push.js`(알림). 외부 의존성은 승인된 `pg`, `web-push`.
   - 통화 중(`call_in_progress`)이면 AI를 부르지 않고 끊기 안내와 한계 문구를 바로 보낸다(F4-4, F4-8).
-  - 화면 입력값(`call_in_progress`, `called_before`, `family_denied`, `sender_last4`)은 오픈빌더 블록 파라미터(`userRequest.params`)로 받는다. 블록 구성은 도메인 연결 후 실제 채널에서 확인한다.
+  - 스킬은 이전 화면의 선택값(`call_in_progress`, `called_before`, `family_denied`, `sender_last4`)을 `userRequest.params`에서 읽는다. 참·거짓 선택은 평탄한 값과 `{value}` 형식을 지원한다. 카카오 명세의 `action.params`·`action.detailParams`에는 사용자 발화에서 추출한 값도 들어간다. 부모의 확인 응답은 화면에서 직접 선택한 경로로 전달해야 한다. 실제 채널의 블록 연결은 별도 확인 사항이다. [카카오 스킬 요청 명세](https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide/answer_json_format)
   - 로그에는 메서드·경로·상태 코드·경과 시간만 남긴다.
 - **설정 키(`/etc/family-shield/skill.env`, 600, 예시는 `skill/.env.example`):**
 

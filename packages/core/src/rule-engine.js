@@ -26,10 +26,15 @@ import { AGENCY_ACTION_SIGNALS } from "./agency-request-scope.js";
 
 const LEVELS = { 확인필요: 0, 주의: 1, 위험: 2 };
 
+/** 부모 화면의 확인값은 불리언이나 그 직렬화 값으로 들어온다. */
+export function isAffirmativeParentAnswer(value) {
+  return value === true || value === "true";
+}
+
 function confirmationRules(signals, { called_before, family_denied }) {
   const rules = [];
-  if (called_before && (signals.has(SIG_LINK) || signals.has(SIG_APP_INSTALL))) rules.push("R2");
-  if (family_denied) rules.push("R5");
+  if (isAffirmativeParentAnswer(called_before) && (signals.has(SIG_LINK) || signals.has(SIG_APP_INSTALL))) rules.push("R2");
+  if (isAffirmativeParentAnswer(family_denied)) rules.push("R5");
   return rules;
 }
 
@@ -70,7 +75,7 @@ export function decide(context) {
   }
 
   // R1: 지금 통화 중
-  if (call_in_progress) fire("R1", "위험");
+  if (isAffirmativeParentAnswer(call_in_progress)) fire("R1", "위험");
 
   // R2: 전화를 받은 뒤 + (링크 or 앱 설치 요구)
   if (confirmed.includes("R2")) fire("R2", "위험");
