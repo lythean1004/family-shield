@@ -12,8 +12,10 @@ const REPORTED_CLAIM = new RegExp(
   `(?:[‘’“”"'」』]\\s*)?\\s*(?:스스로\\s*)?` +
   `(?:소개|주장|자처|밝|말|했|해|적|썼|쓴|보내|하더|하는|하네|하며|하면서|합니다|하고|한\\s*(?:뒤|다음|발신|사람)|연락|문자|메시지|발신|쪽지|사람)|` +
   `(?:이?래(?:요|서)|이?라(?:면서|며)(?=\\s)|을?\\s*자처|인\\s*척|\\s*행세))`,
-  "u",
+  "gu",
 );
+const ROLE_SETTING = /(?:낭독극|연극|역할극|대본|극본|시나리오)(?:에서(?:는)?|\s*속(?:에서|의)?)[^,，.!?\n]{0,20}$/u;
+const ROLE_ACTOR = /^(?:하(?:는|며|고|면서)|되는|한|된)?\s*(?:배역|등장인물|인물|주인공|역할)(?:[이가은는을를의도](?=\s|$)|[\s.!?]|$)/u;
 const ATTRIBUTED_CLAIM = new RegExp(
   `${CLAIMED_RELATION}(?:이|가)\\s*(?:썼|적었|보냈|남겼|전했)(?:다는|다고\\s*한)[^.!?\\n]{0,12}?(?:쪽지|연락|메시지|문자|답장)|` +
   `${CLAIMED_RELATION}이?라고[^.!?\\n]{0,12}(?:새(?:로운)?|낯선|모르는|다른)\\s*(?:번호|연락처)[^.!?\\n]{0,10}(?:에서|발신|문자|연락)`,
@@ -39,6 +41,8 @@ const OTHER_ACTOR = new RegExp(
   `(?:이웃|지인|동료|친구)(?:에게|한테)\\s*(?:왔|도착|발생|접근|보냈)|(?:실제|진짜|이미\\s*확인한)\\s*${RELATION}(?:이|가|은|는)\\s)`,
   "u",
 );
+const INSTITUTION_NOTICE = /^[\p{L}\p{N}·-]{0,18}(?:관|센터|실|장|점|원|팀|부서|학교|회사|기관)에서\s*(?:보낸|발송한|게시한|올린)\s*(?:공지|안내|문자|메시지|쪽지|답장)/u;
+const DEVICE_NOTICE = /^(?:[\p{L}\p{N}·-]{1,18}\s*)?(?:단말기|키오스크|안내판|게시판)(?:에는|에서는|에|에서)\s*[^.!?\n]{0,80}(?:표시(?:됐|되|한|해)|게시(?:됐|되|한|해)|적혀)/u;
 const DENIAL = /(?:한|했다는)\s*(?:적|일)(?:은|이|도)?\s*(?:없|아니)|(?:라|다)고\s*(?:한|했다는|요구한|요청한|부탁한)\s*(?:적(?:은|이)?\s*없|건\s*아니)|(?:라|다)는\s*(?:뜻|내용|요구|말)(?:이|은|는)?\s*아니|(?:요구|요청|부탁)(?:하지|한\s*적(?:이|은)?)\s*(?:않|없)|(?:할|해|했을)\s*필요(?:가|는)?\s*없/u;
 const NEGATED_CONTACT = /(?:번호|연락처)(?:는|가)?\s*(?:그대로|같|바뀌지\s*않|바뀐\s*게\s*아니)|(?:바꾸|교체하)지\s*않/u;
 const NEW_CONTACT = /(?:처음\s*(?:보는|쓰는)|낯선|모르는|새(?:로운|로\s*받은)?|임시|바뀐|다른|저장(?:되지\s*않은|한\s*적\s*없는))\s*(?:발신\s*|전화\s*)?(?:번호|연락처)|(?:번호|연락처)(?:가|를|는|도)?\s*(?:낯설|처음|바뀌|바꿨|바꿔서|변경했|변경됐|달라졌|저장되지\s*않)|(?:^|[/·|])\s*(?:발신\s*)?(?:번호|연락처)\s*변경(?=\s*[/·|:]|$)|(?:빌린|남의)\s*(?:휴대폰|핸드폰|기기|폰)/u;
@@ -50,10 +54,15 @@ const SECRET = /(?:비밀로\s*(?:해|하|남겨|두)|(?:알리지|말하지|얘
 const PRESSURE = /재촉(?:해|하|했|하며|한다|도)|(?:반복|거듭)\s*(?:독촉|재촉)|기다(?:려|릴)\s*(?:주지\s*않|수\s*없)/u;
 
 const PROHIBITED_ACTION = /(?:(?:보내|부치|빌리|사|받|내|깔|넘기|주|공유하|제출하|작성하|전달하|결제하|구매하|송금하|입금하|이체하|설치하)지|(?:송금|입금|이체|결제|구매|설치|제출|공유)(?:은|는|을|를)?\s*하지)\s*(?:말|않)/u;
+const RECIPIENT_REQUEST = /(?:^|[\s,，])(?:제가|내가|수신자가)\s*(?:(?!(?:발신자|그\s*사람|요구|요청|부탁|받(?:은|았|고)|보낸|읽은|전한))[^,，.!?\n]){0,26}(?:요구|요청|부탁)(?:하[가-힣]{0,3}|해[가-힣]{0,2}|했|합)$/u;
 const REQUEST = "(?:요구|요청|부탁)(?:하(?:고|여|면서|는|며|더|니|네요|는데|기)|해(?:요|서|도)?|했|합|이|도|을|은|만|\\s*(?:내|문|메|쪽|부|했|있|뿐|사|이|담|적)|(?=[.!?\\s]|$))";
 const ASK_ENDING = "(?:[으이]?라(?:고|는|며)|달(?:라(?:고|는|며)?|랬)|줘야\\s*(?:한|한다며))";
 const PAYMENT = "(?:송금|입금|이체|결제|돈|금전|현금|비용|금액)";
-const GIFT = "(?:상품권|기프트\\s*카드|기프티콘|교환권|충전\\s*카드)(?:(?:의)?\\s*(?:번호|코드|핀))?";
+const GIFT_ITEM = "(?:상품권|기프트\\s*카드|기프티콘|교환권|충전\\s*카드)";
+const GIFT_CODE = "(?:의)?\\s*(?:번호|코드|핀)";
+const GIFT = GIFT_ITEM + "(?:" + GIFT_CODE + ")?";
+const GIFT_WITH_CODE = new RegExp("^" + GIFT_ITEM + GIFT_CODE, "u");
+const PROP_GIFT = /(?:무대|연극|공연|촬영|연습|전시)\s*소품(?:인|으로\s*쓰는)?\s*(?:종이|모형|인쇄(?:한|된))?\s*$/u;
 const PRIVATE = "(?:비공개\\s*(?:계정|로그인)\\s*(?:정보|자료)|민감\\s*정보|개인(?:의)?\\s*(?:정보|신분)|신상\\s*정보|신분증|신분(?:을|를)?\\s*(?:정보|자료|사진|증명|확인)|가족\\s*관계\\s*증명서|가족의\\s*(?:[가-힣]{1,8}\\s+){0,2}(?:서류|증명서)|(?:신원|신분|가족\\s*관계)(?:을|를|의)?\\s*(?:관련|확인|증명|입증)(?:용|을|를|할|하는)?\\s*(?:수\\s*있는\\s*)?서류|주민\\s*(?:등록\\s*)?(?:증|번호)|인증\\s*(?:코드|번호)|일회용\\s*(?:코드|비밀번호)|(?:카드|계좌)\\s*번호|비밀\\s*번호|OTP)";
 const APPLICATION = "(?:앱|어플(?:리케이션)?|(?:원격|보안)\\s*프로그램)";
 const INSTALL = "(?:설치|다운로드|내려받기)";
@@ -71,17 +80,39 @@ const REQUESTS = [
 function requestPattern(subject, verb, { reported = REQUEST, allowBare = true } = {}) {
   const bareRequest = "(?:을|를|이|가|은|는)?\\s*(?:(?:자기|자신|본인|그)(?:에게|한테)\\s*)?(?:(?:좀|먼저|바로|잠깐|대신|지금|당장|별도로)\\s*)?달(?:라고|라는|라며|랬)";
   const directedRequest = `${subject}[^.!?\\n]{0,22}?(?:${reported}|${verb}\\s*${ASK_ENDING})`;
-  return new RegExp(allowBare ? `${directedRequest}|${subject}${bareRequest}` : directedRequest, "iu");
+  return new RegExp(allowBare ? `${directedRequest}|${subject}${bareRequest}` : directedRequest, "giu");
+}
+
+function describesRole(clause, match) {
+  const start = match.index;
+  const end = start + match[0].length;
+  return ROLE_SETTING.test(clause.slice(0, start)) && ROLE_ACTOR.test(clause.slice(end));
 }
 
 function isClaim(clause) {
-  return !DENIAL.test(clause) && !RECORD_LABEL.test(clause) && !clause.endsWith("?") &&
-    (REPORTED_CLAIM.test(clause) || ATTRIBUTED_CLAIM.test(clause) || SELF_CLAIM.test(clause));
+  if (DENIAL.test(clause) || RECORD_LABEL.test(clause) || clause.endsWith("?")) return false;
+  if (ATTRIBUTED_CLAIM.test(clause) || SELF_CLAIM.test(clause)) return true;
+
+  for (const match of clause.matchAll(REPORTED_CLAIM)) {
+    if (!describesRole(clause, match)) return true;
+  }
+  return false;
 }
 
-function hasCurrentRequest(clause, pattern) {
-  const match = pattern.exec(clause);
-  return Boolean(match) && !PROHIBITED_ACTION.test(match[0]);
+function hasOtherSource(clause) {
+  if (OTHER_ACTOR.test(clause) || INSTITUTION_NOTICE.test(clause) || DEVICE_NOTICE.test(clause)) return true;
+  return [...clause.matchAll(REPORTED_CLAIM)].some(match => describesRole(clause, match));
+}
+
+function hasCurrentRequest(clause, signal, pattern) {
+  for (const match of clause.matchAll(pattern)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (PROHIBITED_ACTION.test(match[0]) || RECIPIENT_REQUEST.test(clause.slice(0, end))) continue;
+    if (signal === SIG_GIFTCARD && !GIFT_WITH_CODE.test(match[0]) && PROP_GIFT.test(clause.slice(0, start))) continue;
+    return true;
+  }
+  return false;
 }
 
 function hasVoiceRefusal(clause) {
@@ -100,10 +131,10 @@ export function addReportedFamilySignals(text, signals) {
     // 직전 문장은 그 연락의 전화번호·연락처를 설명할 때만 포함한다.
     const preceding = clauses[i - 1] ?? "";
     const context = [claim];
-    if (NEW_CONTACT.test(preceding) && !isClaim(preceding) && !OTHER_ACTOR.test(preceding) &&
-        !REQUESTS.some(([, pattern]) => hasCurrentRequest(preceding, pattern))) context.unshift(preceding);
+    if (NEW_CONTACT.test(preceding) && !isClaim(preceding) && !hasOtherSource(preceding) &&
+        !REQUESTS.some(([signal, pattern]) => hasCurrentRequest(preceding, signal, pattern))) context.unshift(preceding);
     for (const next of clauses.slice(i + 1, i + 4)) {
-      if (OTHER_ACTOR.test(next) || isClaim(next)) break;
+      if (hasOtherSource(next) || isClaim(next)) break;
       context.push(next);
     }
     if (context.some(clause => VERIFIED_FAMILY.test(clause) || (CLOSED_REQUEST.test(clause) && !hasVoiceRefusal(clause)))) continue;
@@ -111,8 +142,8 @@ export function addReportedFamilySignals(text, signals) {
     const active = context.filter(clause => !DENIAL.test(clause) && !clause.endsWith("?"));
     const newContact = active.some(clause => NEW_CONTACT.test(clause)) &&
       !active.some(clause => NEGATED_CONTACT.test(clause));
-    const requested = new Set(REQUESTS.filter(([, pattern]) =>
-      active.some(clause => hasCurrentRequest(clause, pattern))).map(([signal]) => signal));
+    const requested = new Set(REQUESTS.filter(([signal, pattern]) =>
+      active.some(clause => hasCurrentRequest(clause, signal, pattern))).map(([signal]) => signal));
     if (active.some(clause => PAYMENT_DEADLINE.test(clause))) requested.add(SIG_MONEY);
     const voice = active.some(hasVoiceRefusal);
     const secret = requested.has(SIG_MONEY) && active.some(clause => SECRET.test(clause));

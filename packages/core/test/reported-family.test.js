@@ -171,3 +171,39 @@ for (const [name, text] of negatives) {
     assert.deepEqual([...signals], [SIG_LINK]);
   });
 }
+
+const independentSources = [
+  ["극 중 배역의 행동", "낭독극에서 삼촌이라고 소개하는 배역이 음성 확인을 거절하는 장면입니다.", "확인필요"],
+  ["일정 연락과 별개인 연극 배역", "동생이라고 소개한 연락은 전시장 안내였습니다. 낭독극에서 삼촌이라고 소개하는 배역이 음성 확인을 거절하는 장면입니다.", "확인필요"],
+  ["극 중 등장인물과 종이 소품", "연극 대본에서 동생이라고 소개하는 인물이 무대 소품인 종이 상품권을 요청해요.", "확인필요"],
+  ["상품권을 요청한 수신자", "외삼촌이라고 소개한 연락이 왔어요. 상품권은 제가 행사 경품으로 요청했어요.", "확인필요"],
+  ["경품을 모집하는 다른 기관", "동생이라고 소개한 연락은 전시장 안내였습니다. 체험관에서 보낸 공지는 경품용 상품권을 요청합니다.", "확인필요"],
+  ["할인이나 교환에 쓰이지 않는 소품", "이모라고 밝힌 가족 행사 진행자는 공연 준비 중입니다. 공연 소품 교환권을 요청하네요.", "확인필요"],
+  ["별도 단말기의 본인 기기 확인", "사촌이라고 밝힌 사람이 처음 보는 연락처로 예약 시간을 알려 줬습니다. 체험관 단말기에는 본인 기기에 인증번호를 입력해 달라는 문구가 표시됐어요.", "주의"],
+];
+
+for (const [name, text, level] of independentSources) {
+  test(name, async () => {
+    const result = await analyze({ text });
+    assert.equal(result.level, level);
+    assert.ok(!result.signals_code.includes(SIG_FAMILY_IMPERSONATION));
+  });
+}
+
+const currentSources = [
+  ["배역 설명 뒤 별도의 발신 요청", "대본에서 누나라고 소개하는 배역 설명을 읽었습니다. 같은 날 형이라고 소개한 발신자의 답장에 상품권 코드를 요청하는 항목이 있었다고 기록했습니다.", SIG_GIFTCARD],
+  ["공연 일을 언급한 발신자가 실제 상품권 코드를 요구", "누나라고 밝힌 발신자는 공연 소품 일정을 전했습니다. 같은 메시지에 상품권 코드를 요구하는 별도 항목이 있었습니다.", SIG_GIFTCARD],
+  ["가치 있는 코드가 명시된 요구", "누나라고 밝힌 발신자의 답장에는 공연 소품 교환권 코드를 요청하는 항목이 기록돼 있습니다.", SIG_GIFTCARD],
+  ["받은 사람이 일인칭으로 요청을 옮겨 적음", "조카라고 소개한 연락이 왔어요. 제가 받은 답장에는 상품권 코드를 요청하는 부분이 있었습니다.", SIG_GIFTCARD],
+  ["같은 발신자가 별도 기관의 업무를 언급", "사촌이라고 소개한 사람이 박물관 일정도 알려 줬어요. 그 발신자가 보낸 쪽지에 상품권 코드를 요청하는 부분이 있습니다.", SIG_GIFTCARD],
+  ["본인 기기를 언급한 동일 발신자의 정보 요구", "처음 보는 번호에서 동생이라고 소개한 발신자의 연락입니다. 같은 메시지에 본인 기기의 인증번호를 전달해 달라는 항목이 적혀 있습니다.", SIG_PERSONAL_INFO],
+];
+
+for (const [name, text, expected] of currentSources) {
+  test(name, () => {
+    const signals = new Set();
+    addReportedFamilySignals(text, signals);
+    assert.ok(signals.has(SIG_FAMILY_IMPERSONATION));
+    assert.ok(signals.has(expected), expected);
+  });
+}
