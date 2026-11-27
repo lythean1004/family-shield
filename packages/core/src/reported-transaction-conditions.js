@@ -62,6 +62,20 @@ const AHEAD_OF_CONFIRMATION = /(?:(?:확인|문의|열람|검토)(?:을|를)?\s*
 const UPFRONT_DEMAND = /(?:선입금|선납|선결제|사전\s*(?:결제|입금|지불|납부))[^.!?\n]{0,12}(?:요구|요청|조건|지시|필수|강요|없으면|있어야)|(?:요구|요청|조건|지시|필수|강요)[^.!?\n]{0,12}(?:선입금|선납|선결제)/u;
 const HARD_STATUS = /(?:예약|거래|자리|물건|배정|자격|접수|계약|참여|선정|이용|대여)(?:를|을|이|가|의)?\s*(?:가능|가능한지|여부|그\s*여부|유무|되는지|성사|확정|하기\s*전)/u;
 const ordinaryInvoice = /(?:정해진|이미\s*(?:확정|안내|선택)|선택한|완료된|완료\s*후)\s*(?:거래|결제|납부|예약|상품)|(?:영수증|세금계산서|결제\s*내역|예약\s*확인서)(?:만|를|을)?\s*(?:확인|조회|열람)/u;
+const verificationAfterPayment = /(?:입금|납부|송금|이체|지불)(?:을|를)?\s*(?:한\s*(?:뒤|후|다음)|하고\s*(?:나서|난\s*뒤)|이후|후에|뒤에)(?:에|만|에만|에야)?\s*[^,，;；.!?\n]{0,10}(?:신원|본인|진위|유효성|실재\s*여부|정식\s*여부)[^,，;；.!?\n]{0,8}(?:확인|검증)/u;
+const switchedFee = /(?:그와는?|이와는?)?\s*별개로|별도로\s*(?:온|받은|알린)|한편|다른\s*(?:거래|업무|행사|신청|계약|예약)/u;
+const completedVerification = /^\s*(?:을|를|은|는|이|가)?\s*(?:이미\s*)?(?:완료했|끝냈|마쳤|됐|되었|했습니다|했어요|한\s*뒤)/u;
+const noAdvanceDemand = /(?:요구|요청|조건|안내)(?:을|를|은|는|이|가)?\s*(?:한\s*(?:적|사실)(?:이|은)?\s*)?(?:실제로\s*)?(?:없|아니|진행되지\s*않)/u;
+const closedAdvanceDemand = /^(?:[이가은는])?\s*(?:(?:적혀|실려|기재돼|기록돼)\s*)?(?:있었|했)(?:지만|는데|고)\s*[,，]?\s*(?:(?:지금|현재)(?:은|는)?\s*)?(?:(?:그|이|해당)\s*)?(?:안내|요청|요구|절차|접수)(?:을|를|은|는|이|가)?\s*(?:이미\s*)?(?:종료|종결|철회|취소|중단|완료)(?:했|하였|됐|되었)/u;
+function demandsPaymentBeforeVerification(clause) {
+  const gate = verificationAfterPayment.exec(clause);
+  if (!gate || NO_PAYMENT.test(clause) || CLOSED_REQUEST.test(clause) ||
+      ordinaryInvoice.test(clause) || CONFIRMATION_FIRST.test(clause) || UP_TO_USER.test(clause)) return false;
+  const after = clause.slice(gate.index + gate[0].length);
+  const demand = UPFRONT_DEMAND.exec(after);
+  if (!demand || completedVerification.test(after) || switchedFee.test(after) || noAdvanceDemand.test(after)) return false;
+  return !closedAdvanceDemand.test(after.slice(demand.index + demand[0].length));
+}
 function reportedUpfrontGate(text) {
   return currentlyReported(text) && !NO_PAYMENT.test(text) && !CONFIRMATION_FIRST.test(text) && !ordinaryInvoice.test(text) &&
     UPFRONT_DEMAND.test(text) && AHEAD_OF_CONFIRMATION.test(text) && HARD_STATUS.test(text);
@@ -89,7 +103,7 @@ export function addReportedTransactionConditions(text, signals) {
     const context = !SWITCH.test(clause) && !CLOSED_REQUEST.test(prior) ? prior + " " + clause : clause;
     if (EXAMPLE.test(context) || EXAMPLE.test(next) && !SWITCH.test(next)) continue;
     if (paymentBeforeOutcome(clause) || paymentBeforeOutcome(context)) signals.add(SIG_PREPAYMENT);
-    if (reportedUpfrontGate(context)) signals.add(SIG_PREPAYMENT);
+    if (reportedUpfrontGate(context) || demandsPaymentBeforeVerification(clause)) signals.add(SIG_PREPAYMENT);
     if (routedToOtherParty(clause) || currentlyReported(context) && !NO_PAYMENT.test(context) && !REVERSE_OR_AUTHORIZED.test(context) &&
         ORIGINAL_RECIPIENT.test(prior) && MISMATCH.test(prior) && INDIVIDUAL_DESTINATION.test(clause)) {
       signals.add(SIG_THIRD_PARTY_ACCOUNT);

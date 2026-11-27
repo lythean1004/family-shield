@@ -14,13 +14,14 @@ const isReceivedMessage = text => received.test(text) && !inactive.test(text);
 const isInactiveRequest = text => inactive.test(text) || notDirected.test(text);
 const isSeparateRequest = text => unrelated.test(text);
 
-export function* currentReceivedRequests(text) {
+export function* currentReceivedRequests(text, identifiesIssuer = () => false) {
   const clauses = text.split(endOfClause).map(clause => clause.trim()).filter(Boolean);
   for (const [i, body] of clauses.entries()) {
     const previous = clauses[i - 1] ?? "";
     const next = clauses[i + 1] ?? "";
     if (isInactiveRequest(body) || isInactiveRequest(previous) || isSeparateRequest(body) || sameRequestClosed.test(next)) continue;
-    const documented = relevant.test(body) && (attributed.test(body) || attributed.test(previous));
+    const documented = relevant.test(body) &&
+      (attributed.test(body) || attributed.test(previous) || identifiesIssuer(body) || identifiesIssuer(previous));
     if (!documented && !isReceivedMessage(body) && !isReceivedMessage(previous)) continue;
     yield { body, previous, next };
   }

@@ -136,6 +136,13 @@ const roleInReport = new RegExp(
   "(?<role>" + senderRole + ")(?:\\s*(?:쪽|직원|사람|담당자|민원\\s*창구|업무\\s*담당))?" +
     "(?:에서\\s*(?:보낸|보냈|연락|문자)|(?:이|가)\\s*(?:보낸|보냈)|(?:이?라고|라는|으로|로|이?라며)\\s*(?:적힌|표시|쓰[인였]|기재|밝힌|(?:자기(?:를)?\\s*)?소개))|" +
     "(?:발신처|발신자|보낸\\s*(?:곳|이))[^,.!?\\n]{0,18}(?<named>" + senderRole + ")", "u");
+const levyOfficer = /(?<role>(?:과태료|범칙금|과징금)(?:\s*(?:부과|납부|징수|처리))?\s*담당(?:자|부서|팀|관)?)\s*(?:(?:[을를]\s*)?(?:자처|사칭)|이?라(?:면서|며|고)(?=$|\s|요|했|하|해))/u;
+const levyReceiver = /(?:제게|저에게|저한테|내게|나에게|나한테|수신자(?:에게|한테)|받은\s*사람(?:에게|한테))/u;
+const requestedLevyInstall = /(?:앱|어플(?:리케이션)?|프로그램|소프트웨어)(?:을|를|이|가)?\s*(?:(?:따로|먼저|별도(?:로)?|추가(?:로)?|새로)\s*)?설치(?:하(?:라(?:고|는)?|래|도록|여야)|해야|해\s*달라|\s*(?:요구|요청|지시))/gu;
+const beforeInstallationRecipient = /(?:^|[\s,，])(?<party>받(?:은|는)\s*사람|받은\s*이|[\p{L}\p{N}]{1,16})(?:에게|한테)(?:만|는|도)?\s*$/u;
+const afterInstallationRecipient = /^\s*(?:지시|요구|요청|부탁|안내)(?:을|를|은|는|이|가|도)?\s*(?:[\p{L}\p{N}]{1,12}\s+){0,2}(?<party>받(?:은|는)\s*사람|받은\s*이|[\p{L}\p{N}]{1,16})(?:에게|한테)(?:만|는|도)?(?=$|\s)/u;
+const levyReportRecipient = /^(?:저|나|수신자|받(?:은|는)\s*사람|받은\s*이)$/u;
+
 // 수신자가 옮겨 적은 자칭 기관·담당자와 동일 연락의 행동을 연결한다.
 const declaredSender = new RegExp(
   "(?<role>" + senderRole + ")(?:\\s*(?:팀|직원|담당자|창구|사람|부서))?\\s*(?:[을를]\\s*자처|(?:이?라고|라는|이라며)[^,.!?\\n]{0,26}(?:발신(?:자|처)|보낸\\s*사람))", "u");
@@ -179,6 +186,29 @@ const endedOrDeniedVisit = /(?:수거|징수|회수|방문|인계)(?:는|은|을
 const relativeRepayment = /(?:대출(?:금)?\s*)?상환(?:금|액|을|은|하는|할|과|\s*(?:받|수거|회수))|(?:대출|금융)\s*상담[^,.!?\n]{0,16}(?:갚|상환)/u;
 const removedTransfer = /(?:분실물|습득물|유실물|돌려받|반환|보관함|연습|보증금|예치금|영수증|기록만)/u;
 
+const hasLevyIssuer = clause => levyReceiver.test(clause) && levyOfficer.test(clause);
+
+function directsInstallationToLevyRecipient(notice) {
+  if (staffApp.test(notice) || startsOtherOrganizer(notice)) return false;
+  for (const action of notice.matchAll(requestedLevyInstall)) {
+    const before = notice.slice(0, action.index);
+    const after = notice.slice(action.index + action[0].length);
+    const recipient = beforeInstallationRecipient.exec(before) ?? afterInstallationRecipient.exec(after);
+    if (!recipient || levyReportRecipient.test(recipient.groups.party)) return true;
+  }
+  return false;
+}
+
+function addLevyInstallation(text, signals) {
+  for (const { body, previous, next } of currentReceivedRequests(text, hasLevyIssuer)) {
+    if (!hasLevyIssuer(body) && (!hasLevyIssuer(previous) || declaredSender.test(body) || roleInReport.test(body))) continue;
+    const installation = hasOpenInstallationReport(body, next, directsInstallationToLevyRecipient);
+    if (!installation) continue;
+    signals.add(SIG_AGENCY_IMPERSONATION);
+    signals.add(SIG_APP_INSTALL);
+  }
+}
+
 function addReceivedInstitutionRequests(text, signals) {
   for (const { body, previous, next } of currentReceivedRequests(text)) {
     const localSender = declaredSender.exec(body) ?? roleInReport.exec(body);
@@ -215,6 +245,7 @@ function addReceivedInstitutionRequests(text, signals) {
 
 export function addInstitutionRequestContext(text, signals) {
   addReceivedInstitutionRequests(text, signals);
+  addLevyInstallation(text, signals);
   if (teachingOrWithdrawn.test(text)) return;
   const clauses = text.split(/[.!?。]+(?=\s|$)|[\r\n;]+|[,，]\s*(?=(?:한편|다른|별개|이와\s*별개))/u)
     .map(clause => clause.trim()).filter(Boolean);
