@@ -11,6 +11,20 @@ const ASK = "(?:요청|부탁(?:드립니다)?|바랍니다|하세요|하십시�
 const REQUEST = new RegExp(FIELD + DETAILS + "(?:(?:(?<reply>회신|답장)|전달|전송|제출)(?:을|를)?[ \\t]*" +
   ASK + "|(?:알려|보내|불러|적어)[ \\t]*" + TELL_ME + ")(?=[.!?…\\s]|$)", "gi");
 
+// 일부 기존 표현은 '찍어', '깔아'처럼 어간에서 끝난다. 반드시 같은 일치의 뒤를 본다.
+const NEGATED = /^\s*(?:서\s*)?(?:(?:보내|전달|전송|제출|알려)\s*)?(?:해\s*)?(?:주|하)?지\s*(?:마|말|않)/;
+const CITED = /^\s*(?:해\s*)?(?:줘|주세요|하십시오|하세요|바랍니다|부탁)?[.!?\s]*[’”"'」]\s*(?:라는|라고|같은|처럼)/;
+
+export function hasSensitiveRequest(text, patterns) {
+  return patterns.some(pattern => {
+    for (const match of text.matchAll(new RegExp(pattern.source, pattern.flags + "g"))) {
+      const tail = text.slice(match.index + match[0].length, match.index + match[0].length + 42);
+      if (!NEGATED.test(tail) && !CITED.test(tail)) return true;
+    }
+    return false;
+  });
+}
+
 export function personalDisclosure(text) {
   let requested = false;
   for (const match of text.matchAll(REQUEST)) {

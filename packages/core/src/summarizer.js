@@ -7,6 +7,7 @@
  */
 
 const SIGNAL_PHRASE = {
+  SIG_CASH_HANDOVER:         "수사기관이라며 현금을 직접 건네라는 요구",
   SIG_NEW_NUMBER:           "새 번호로 연락",
   SIG_LINK:                 "링크 포함",
   SIG_GIFTCARD:             "상품권 결제 부탁",

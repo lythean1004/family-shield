@@ -143,6 +143,12 @@ describe("핸들러 - 기본", () => {
     assert.ok(text.includes("확인 필요") || text.includes("주의") || text.includes("위험"));
   });
 
+  it("현금 직접 인계가 위험 이유이면 AI 설명과 함께 코드가 찾은 이유를 읽어 준다", async () => {
+    const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway([]) } };
+    const r = await handleRequest({ utterance: "[경찰청] 분류표 항목 / 현금을 대리인에게 건네 주세요." }, c);
+    assert.match(r.body.template.outputs[0].simpleText.text, /위험 이유: .*현금/);
+  });
+
   it("링크 규칙(R11)으로 위험이면 AI 설명이 있어도 이유 문구를 함께 보여 준다(2026-11-11 카카오 시험)", async () => {
     const c = { ...cfg, ai: { ...cfg.ai, fetchImpl: fakeGateway(["SIG_LINK"]) } };
     const r = await handleRequest({ utterance: "[시험] 보험료 환급 안내 nhis-event.or.kr" }, c);

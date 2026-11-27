@@ -20,14 +20,15 @@ import {
   SIG_LINK, SIG_SHORT_URL, SIG_LOOKALIKE_DOMAIN, SIG_APP_INSTALL, SIG_MONEY,
   SIG_GIFTCARD, SIG_PERSONAL_INFO, SIG_NEW_NUMBER, SIG_AGENCY_IMPERSONATION, SIG_CALL_THIS_NUMBER,
   SIG_FAMILY_IMPERSONATION, SIG_AVOID_VOICE, SIG_SECRECY, SIG_ISOLATION, SIG_URGENCY, SIG_THIRD_PARTY_ACCOUNT, SIG_OFFICIAL_LINK,
-  SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL,
+  SIG_DECEPTIVE_URL, SIG_MALICIOUS_URL, SIG_CASH_HANDOVER,
 } from "./signals.js";
 import { findLinks, toDomain, isShortener } from "./links.js";
 import { inspectLinkCandidates, linksForRiskChecks } from "./link-candidates.js";
 import { allLinksOfficial, isOfficialLink } from "./official-links.js";
 import { hasCardServiceRequest } from "./card-sender.js";
 import { classifyCallback } from "./callback-number.js";
-import { personalDisclosure } from "./personal-disclosure.js";
+import { hasSensitiveRequest, personalDisclosure } from "./personal-disclosure.js";
+import { INVESTIGATIVE, hasInvestigativeCashHandover } from "./cash-handover.js";
 import { createShortUrlMatcher, SHORT_URL_KEYS } from "./short-urls.js";
 
 /** 기존 위험 신호 유지용. 공식 여부와 목적지 확인에는 별도의 전체 후보 파서를 쓴다. */
@@ -43,8 +44,6 @@ const gap = (n) => `[^.!?\\n]{0,${n}}`;
 // 요구 어미: 해 줘 / 해주세요 / 하세요 / 해라 / 부탁 / 바랍니다 / 좀
 const ASK = "(?:해\\s*(?:줘|줄래|주세요|주실|주라|줄\\s*수)|하세요|해라|해\\s*달라|부탁|바랍니다|좀\\s*해)";
 const AGENCY = '(?:대검찰청|검찰(?:청)?|경찰(?:청|서)?|지검|금융감독원|금감원|법원|수사관|수사팀|검사|국세청|세무서|관세청|보건소|출입국관리소)';
-// D50: 수사·감독 기관(운영자 결정 2026-11-27). 국세청·보건소 등 납부·안내를 보내는 기관은 넣지 않는다
-const INVESTIGATIVE = '(?:대검찰청|검찰(?:청)?|지검|경찰(?:청|서)?|금융감독원|금감원|법원|수사관|수사팀|검사)';
 const PROTECTED_ACCOUNT = '(?:(?:국가\\s*)?안전(?:한)?\\s*계좌|보호\\s*계좌)';
 const ACCOUNT_DIGITS = '[0-9Xx*○●]';
 const ACCOUNT_NUMBER = '(?:' + ACCOUNT_DIGITS + '{2,6}(?:-' + ACCOUNT_DIGITS + '{2,6}){2,3}|' + ACCOUNT_DIGITS + '{9,16})';
@@ -206,10 +205,13 @@ export function extractCodeSignals(text, options = {}) {
   // 요구 키워드
   for (const [signal, patterns] of Object.entries(PATTERNS)) {
     if (signal === SIG_CALL_THIS_NUMBER) continue;
-    if (patterns.some((re) => re.test(input))) signals.add(signal);
+    const found = signal === SIG_PERSONAL_INFO || signal === SIG_APP_INSTALL
+      ? hasSensitiveRequest(input, patterns) : patterns.some(re => re.test(input));
+    if (found) signals.add(signal);
   }
 
   const callback = classifyCallback(input, PATTERNS[SIG_CALL_THIS_NUMBER]);
+  if (hasInvestigativeCashHandover(input)) signals.add(SIG_CASH_HANDOVER);
   if (callback.signal) signals.add(SIG_CALL_THIS_NUMBER);
   const disclosure = personalDisclosure(input);
   if (disclosure.requested) signals.add(SIG_PERSONAL_INFO);

@@ -57,8 +57,11 @@ const LEVEL_TEXT = {
  * R1(통화 중)은 끊기 안내를 첫 줄에, 나머지 설명을 그 뒤에 붙이고 한계 문구로 닫는다.
  * 확인 필요는 정해 둔 문장, 그 밖에는 explanation이 있으면 붙이고, 없으면 신호 요약을 쓴다.
  */
-/** 링크 규칙과 그 신호: 규칙이 실제로 위험을 냈을 때만 AI 설명과 별개로 이유를 보여 준다 */
-const LINK_RULE_SIGNALS = { R10: ["SIG_MALICIOUS_URL", "SIG_SB_UNSAFE_URL"], R11: ["SIG_LOOKALIKE_DOMAIN", "SIG_DECEPTIVE_URL"], R12: ["SIG_NEW_DOMAIN"] };
+/** 코드 전용 신호가 위험 판정에 기여하면 AI 설명과 함께 표시한다. */
+const CODE_RULE_SIGNALS = {
+  R10: ["SIG_MALICIOUS_URL", "SIG_SB_UNSAFE_URL"], R11: ["SIG_LOOKALIKE_DOMAIN", "SIG_DECEPTIVE_URL"],
+  R12: ["SIG_NEW_DOMAIN"], R15: ["SIG_CASH_HANDOVER"],
+};
 /** Google Safe Browsing 이용 규칙: Google 경고에는 출처 표시와 안내 링크를 붙인다(다른 출처 경고에는 붙이지 않는다) */
 const GOOGLE_ATTRIBUTION = "Advisory provided by Google";
 const GOOGLE_ADVISORY_URL = "https://developers.google.com/safe-browsing/v4/advisory";
@@ -84,8 +87,8 @@ function buildReplyText(result) {
     // 링크 규칙(R10 목록 일치, R11 공식 주소 흉내, R12 새 도메인+요구)은 AI가 모르는 이유라 AI 설명만으로는 위험한 까닭이 안 보인다.
     // 이 경우 정해 둔 신호 문구를 먼저 붙인다(2026-11-11 카카오 시험).
     const present = new Set(result.signals_final ?? []);
-    const linkReasons = summarizePhrases((result.fired_rules ?? []).flatMap((r) => LINK_RULE_SIGNALS[r] ?? []).filter((id) => present.has(id)));
-    if (linkReasons.length) lines.push(`위험 이유: ${linkReasons.join(" · ")}`);
+    const codeReasons = summarizePhrases((result.fired_rules ?? []).flatMap((r) => CODE_RULE_SIGNALS[r] ?? []).filter((id) => present.has(id)));
+    if (codeReasons.length) lines.push(`위험 이유: ${codeReasons.join(" · ")}`);
     lines.push(...result.explanation_for_parent);
   } else if (result.summary) {
     lines.push(`감지된 신호: ${result.summary}`);
