@@ -89,8 +89,63 @@ function hasReceivedCredentialRequest(text, hasUnverifiedLink) {
   return false;
 }
 
+const receivedFormHeader = /(?:받은|수신한|도착한|전달받은)[^.!?\n]{0,42}(?:양식|서식|신청서|신청\s*화면|접수\s*(?:화면|안내|문구))/u;
+const formBoundary = /^(?:다른|별개|이와\s*별개|그와\s*별개|한편|별도의?\s*(?:행사|신청|접수|양식|서식)|-{3})/u;
+const formNotInUse = /(?:예방\s*교육|교육\s*(?:자료|용)|작성\s*예시|빈\s*서식|전시\s*사본|모의\s*(?:양식|신청))|(?:그|이|해당|같은)\s*(?:제출\s*)?(?:요구|요청|접수|신청)(?:[을를은는이가])?\s*(?:이미\s*)?(?:철회|거절|취소|종료|마감)|(?:해당|이|그)\s*(?:양식|서식)(?:[은는을를])?\s*사용하지\s*(?:않|말)/u;
+const submissionField = /^(?:(?:(?:수신(?:한)?|받은)\s*)?(?:문자|안내|원문)(?:에\s*(?:적힌|표시된|있는))\s*)?(?:제출|접수|신청|양식|서식)\s*(?:용\s*)?(?:주소|링크|페이지|화면)(?:[은는이가])?\s*(?:[|:：]\s*|\s+)(.*)$/u;
+const identityMaterial = "(?:" + identityCopy + "|신분\\s*확인(?:용)?\\s*(?:서류|자료))";
+const bankMaterial = "(?:" + bankCopy + "|통장\\s*자료)";
+const formPair = new RegExp("^(?:" + identityMaterial + together + bankMaterial + "|" + bankMaterial + together + identityMaterial + ")", "u");
+const attachmentHeading = /^(?:(?:필수|요구)\s*(?:제출|첨부)?\s*(?:항목|서류|자료)?|함께\s*(?:제출|첨부))\s*[|:：]\s*/u;
+const purposeHeading = /^(?:신청\s*(?:구분|유형|종류|목적)|명목|사업명|모집\s*(?:구분|유형))(?=[\s|:：])/u;
+const requiredAfterPair = /^(?:[을를])?\s*(?:(?:함께|한꺼번에|모두|동시에)\s*)?(?:제출|첨부|전송)(?:하라(?:는|고)|해야|해\s*달라)/u;
+const valueHeading = /^(?:(?:(?:양식|서식|원문|안내)(?:[이가]|에서)\s*)?(?:요구한|요구하는|입력해야\s*할)\s*(?:값|정보|항목)|필수\s*(?:입력|기입)(?:\s*(?:값|정보|항목))?)(?:[은는이가])?\s*(?:[|:：]\s*|\s+)/u;
+const secretFieldValue = /^(?:(?:금융\s*)?(?:계좌|통장)\s*(?:접속\s*)?(?:비밀번호|비번|암호)|(?:복구|시드)\s*(?:문구|구문)|보안\s*카드\s*(?:번호\s*)?(?:전체|전부)|금융\s*비밀값)(?:\s*(?:에\s*해당(?:함|합니다|한다)|입니다|임))?[.\s]*$/u;
+const secretEntryForbidden = /(?:암호|비밀번호|비밀값|복구\s*문구|시드\s*구문|보안\s*카드)[^.!?\n]{0,22}(?:입력|기입)(?:을|은)?\s*(?:금지|하지\s*(?:말|마|않))/u;
+
+function requestsBothDocuments(row) {
+  const heading = attachmentHeading.exec(row);
+  const value = heading ? row.slice(heading[0].length) : row;
+  const pair = formPair.exec(value);
+  if (!pair || inactiveReport.test(row)) return false;
+  const remainder = value.slice(pair[0].length);
+  return heading ? /^[.\s]*$/u.test(remainder) : requiredAfterPair.test(remainder);
+}
+
+function addFormFields(rows, signals) {
+  if (!rows.length || rows.some(row => formNotInUse.test(row))) return;
+  const destinations = rows.map(row => submissionField.exec(row)?.[1]?.trim()).filter(value => value !== undefined);
+  if (new Set(destinations).size !== 1) return;
+  const [address] = destinations;
+  if (!/^https?:\/\/\S+$/iu.test(address) || !externalOnly(inspectLinkCandidates(address))) return;
+
+  const aidApplication = rows.some(row => (receivedFormHeader.test(row) || purposeHeading.test(row)) && aidOrWork.test(row));
+  if (aidApplication && rows.some(requestsBothDocuments)) signals.add(SIG_DOCUMENT_BUNDLE);
+  if (!rows.some(row => secretEntryForbidden.test(row)) && rows.some(row => {
+    const heading = valueHeading.exec(row);
+    return heading && secretFieldValue.test(row.slice(heading[0].length));
+  })) signals.add(SIG_CREDENTIAL_DISCLOSURE);
+}
+
+// 표의 열 순서는 바뀔 수 있다. 한 양식 안의 제출처와 필수 값만 서로 연결한다.
+function addReceivedFormFields(text, signals) {
+  let rows = [];
+  for (const line of text.split(/[\r\n;；]+|(?<=[.!?。])\s+/u)) {
+    const row = line.trim();
+    const header = receivedFormHeader.test(row);
+    if (header || formBoundary.test(row)) {
+      addFormFields(rows, signals);
+      rows = header ? [row] : [];
+    } else if (rows.length && row) {
+      rows.push(row);
+    }
+  }
+  addFormFields(rows, signals);
+}
+
 export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
   if (hasReceivedCredentialRequest(text, hasUnverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
+  if (hasUnverifiedLink) addReceivedFormFields(text, signals);
   const clauses = text.split(clauseBreak).map(clause => clause.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
     if (inactiveReport.test(clause)) continue;
