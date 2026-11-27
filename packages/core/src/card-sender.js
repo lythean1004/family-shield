@@ -37,5 +37,8 @@ export function hasCardServiceRequest(text, { externalLink, unverifiedLink, sens
   }
   if (!card) return false;
   if (unverifiedLink && (RETURN_NOTICE.test(body) || CANCEL_ROUTE.test(body))) return true;
-  return personalReply || (directedCallback && Boolean(card.callback_contact)) || (externalLink && (sensitiveRequest || SERVICE_CHANGE.test(body)));
+  const contact = card.callback_contact;
+  const compactBody = body.replace(/\s+/g, "");
+  const matchesContact = contact && (!contact.topics || contact.topics.some(topic => compactBody.includes(topic)));
+  return personalReply || (directedCallback && Boolean(matchesContact)) || (externalLink && (sensitiveRequest || SERVICE_CHANGE.test(body)));
 }

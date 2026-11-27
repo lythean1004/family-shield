@@ -120,6 +120,7 @@ function addFamilySignals(input, signals) {
 const PATTERNS = {
   [SIG_AGENCY_IMPERSONATION]: [
     // A sender claim, not proof the sender is the real institution.
+    new RegExp("^\\s*(?:\\[Web발신\\]\\s*)?\\[[가-힣]{0,12}" + INVESTIGATIVE + "[ \\t]+[가-힣0-9]{1,16}(?:과|부|팀)\\]", "i"),
     new RegExp(`${AGENCY}${gap(12)}(?:입니다|소속|담당|발신|통보)`),
     new RegExp(`(?:\\[|\\(|【)\\s*[가-힣]{0,12}${AGENCY}\\s*(?:\\]|\\)|】)`),
     // A leading institutional sender + formal notice topic; ordinary mentions are not claims.

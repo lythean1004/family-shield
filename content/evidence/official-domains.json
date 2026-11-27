@@ -122,6 +122,12 @@
     {
       "id": "EV-DOM-NHIS",
       "name": "국민건강보험공단",
+      "callback_contact": {
+        "numbers": ["1577-1000"],
+        "topics": ["환급", "본인확인"],
+        "source_url": "https://www.nhis.or.kr/nhis/index.do",
+        "checked_at": "2026-11-27"
+      },
       "sender_names": ["국민건강보험공단", "국민건강보험"],
       "official_domains": [
         "nhis.or.kr"
@@ -338,6 +344,12 @@
     {
       "id": "EV-DOM-NPS",
       "name": "국민연금공단",
+      "callback_contact": {
+        "numbers": ["1355"],
+        "topics": ["수급계좌", "본인확인", "환급"],
+        "source_url": "https://www.nps.or.kr/html/download/pensionerGuide.pdf",
+        "checked_at": "2026-11-27"
+      },
       "official_domains": [
         "nps.or.kr"
       ],
@@ -480,6 +492,12 @@
     {
       "id": "EV-DOM-SHINHANCARD",
       "name": "신한카드",
+      "callback_contact": {
+        "numbers": ["1544-7000", "1661-7000", "1544-7200"],
+        "topics": ["해외승인", "해외결제", "명의도용", "분실신고", "결제취소"],
+        "source_url": "https://www.shinhancard.com/conts/store/customor_center/ars_gu/cardLost.jsp",
+        "checked_at": "2026-11-27"
+      },
       "official_domains": [
         "shinhancard.com"
       ],
@@ -494,6 +512,12 @@
     {
       "id": "EV-DOM-SAMSUNGCARD",
       "name": "삼성카드",
+      "callback_contact": {
+        "numbers": ["1588-8700", "1588-8900"],
+        "topics": ["해외승인", "해외결제", "명의도용", "분실신고", "결제취소"],
+        "source_url": "https://www.samsungcard.com/personal/customer-service/ars/phone/UHPPCC0224M0.jsp?ctgSeq=17",
+        "checked_at": "2026-11-27"
+      },
       "official_domains": [
         "samsungcard.com"
       ],
