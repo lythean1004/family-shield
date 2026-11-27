@@ -52,17 +52,24 @@ const NOTICE = '(?:민원|전자|고객님|귀하|본인|대표\\s*(?:번호|연
 const FAMILY_GREETING = /^\s*(?:엄마|아빠|어머니|아버지|할머니|할아버지|누나|언니|형|오빠|여보|자기야)(?=[\s,.!~]|$)[\s,.!~]*/;
 const PHONE_DAMAGE = /(?:^\s*|(?:^|\s)(?:나|내|제)\s*)(?:(?:휴대폰|핸드폰|폰)(?:이|가)?\s*(?:액정(?:이)?\s*)?|액정(?:이)?\s*)(?:고장(?:이)?\s*(?:나서|났어|났는데)|깨(?:져서|졌어|졌는데))/;
 const ALTERNATE_CONTACT = /번호(?:를|가)?\s*(?:바꿨어|바뀌었어|바뀌어서)|새\s*번호(?:야|예요|입니다)|(?:새\s*번호|임시\s*(?:번호|폰)|(?:빌린|친구)\s*(?:휴대폰|핸드폰|폰))(?:으로|로)\s*(?:문자|연락|메시지)(?:해|드려|한다)/;
-const REPORTED_PHONE = /[?‘“"'「]|(?:그때|지난번|예전에)|(?:다는|라는)\s*(?:말|문자|연락)|(?:었다|났다|다고)\s*(?:하더라|했)|(?:사칭|피싱)\s*(?:문자|예방|주의)|(?:하|되)?지\s*(?:마|말|않)/;
+const REPORTED_SPEECH = /[?‘“"'「]|(?:그때|지난번|예전에)|(?:다는|라는)\s*(?:말|문자|연락)|라고\s*(?:시작|말|하)|(?:었다|났다|다고)\s*(?:하더라|했)|(?:사칭|피싱)\s*(?:문자|예방|주의)|(?:하|되)?지\s*(?:마|말|않)/;
+const SELF_RELATION = /^(?:(?:나|저)(?:는)?\s*)?(?:(?:큰|작은|막내)?(?:아들|딸)|손자|손녀|손주|동생)(?:인데|이야|야|이에요|예요|입니다)/;
+const FIRST_PERSON = /^(?:나야|저예요|저에요|나|저)(?=[\s.,!~]|$)/;
+const REPLACED_DEVICE = /(?:휴대폰|핸드폰|폰)(?:을)?\s*바꿨어/;
 
-function addFamilyPhoneSignals(input, signals) {
+function addFamilySignals(input, signals) {
   const greeting = FAMILY_GREETING.exec(input);
   if (!greeting) return;
   const opening = input.slice(greeting[0].length, greeting[0].length + 100);
-  const clauses = opening.match(/[^.!?\n]+[.!?]?/g) ?? [];
-  for (const clause of clauses.slice(0, 2)) {
-    if (REPORTED_PHONE.test(clause)) continue;
+  const clauses = (opening.match(/[^.!?\n]+[.!?]?/g) ?? []).slice(0, 2);
+  const first = clauses[0]?.trim() ?? "";
+  if (!REPORTED_SPEECH.test(first) && SELF_RELATION.test(first)) signals.add(SIG_FAMILY_IMPERSONATION);
+  const self = !REPORTED_SPEECH.test(first) && FIRST_PERSON.test(first);
+  for (const clause of clauses) {
+    if (REPORTED_SPEECH.test(clause)) continue;
     const changedContact = ALTERNATE_CONTACT.test(clause);
-    if (changedContact || PHONE_DAMAGE.test(clause)) signals.add(SIG_FAMILY_IMPERSONATION);
+    const selfContact = self && (REPLACED_DEVICE.test(clause) || PATTERNS[SIG_AVOID_VOICE].some(re => re.test(clause)));
+    if (changedContact || PHONE_DAMAGE.test(clause) || selfContact) signals.add(SIG_FAMILY_IMPERSONATION);
     if (changedContact) signals.add(SIG_NEW_NUMBER);
   }
 }
@@ -195,7 +202,7 @@ export function extractCodeSignals(text, options = {}) {
       inspection.candidates.some(c => c.complete && !isShortener(c.host) && !isOfficialLink(c.raw))) {
     signals.add(SIG_AGENCY_IMPERSONATION);
   }
-  addFamilyPhoneSignals(input, signals);
+  addFamilySignals(input, signals);
 
   // 끝 4자리 비교
   const { senderLast4, registeredLast4 } = options;
