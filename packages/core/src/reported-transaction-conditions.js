@@ -132,8 +132,8 @@ const transactionInspection = new RegExp(itemUnderInspection + "(?:보여\\s*주
 const inspectionFirst = /^\s*(?:전(?:에|에는)?|에\s*앞서|전까지)\s*[,，]?\s*/u;
 const inspectionMadeAvailable = new RegExp(itemUnderInspection +
   "(?:보여\\s*(?:준다고|주겠다고|준다는|줄\\s*수\\s*있다고)|(?:확인|검토)할\\s*수\\s*있다고)", "u");
-const sellerImposesPayment = new RegExp("^(?:먼저\\s*)?" + MONEY_OBJECT.source +
-  "(?:을|를)?\\s*(?:먼저\\s*)?(?:입금|납부|송금|이체|지불|결제)(?:하라(?:고|는)|해\\s*달라(?:고|는))" +
+const sellerImposesPayment = new RegExp("^(?:(?:먼저|미리|우선)\\s*)?" + MONEY_OBJECT.source +
+  "(?:을|를)?\\s*(?:(?:먼저|미리|우선)\\s*)?(?:입금|납부|송금|이체|지불|결제)(?:하라(?:고|는)|해\\s*달라(?:고|는))" +
   "\\s*(?:부탁|요청|요구|지시|했|말했|적|기록|설명)", "u");
 const sellerMakesContact = /(?:판매자|매도인|거래\s*상대)(?:(?:이|가|은|는)\s*|(?:와|과|에게서|한테서)\s*(?:[^,，.!?\n]{0,18}?\s*)?(?:채팅|대화|문자|연락|통화|답장))/u;
 const voluntaryDeposit = /(?:제가|내가|수신자가)\s*(?:제안|먼저\s*요청|스스로\s*납부)|(?:선택|자발적)(?:으로|인)|(?:비용|돈|금액|예약금|보증금)(?:이|가|은|는)?\s*(?:선택|선택사항)/u;
@@ -359,7 +359,42 @@ function requiresOrganizerPaymentForFreeBooking(text) {
   return false;
 }
 
+const pendingContract = /(?:거래|계약|구매)(?:가|이|를|을)?\s*(?:성립|성사|체결|확정)(?:(?:하|되)?기|\s*이루어지기)/u;
+const receivedDemand = /(?:요구|요청|지시)(?:를|을)\s*(?:받(?:았|은)|전달받(?:았|은)|접수했|접수한)/u;
+const confirmsDemand = /(?:요구|요청|지시)(?:가|이)\s*(?:있었(?:다|다고|음|습니다|어요)|들어\s*왔(?:다|다고|음|습니다|어요))/u;
+const transactionReport = /(?:거래|계약|구매|판매)[^,.!?\n]{0,26}(?:상담|신고|접수|보고|기록)/u;
+const reportedAdvanceFee = /^(?:선입금|선납|사전\s*(?:납부|지급|송금|입금|결제))\s*/u;
+const inspectedBeforeDemand = /(?:확인|열람|검토|살펴보)(?:를|을)?\s*(?:이미\s*)?(?:마쳤|끝냈|완료했)|(?:이미|사전에)\s*(?:확정|승인|계약)/u;
+const currentDemandWithdrawn = /^(?:(?:그|이|같은|해당)\s*)?(?:납부\s*|입금\s*|송금\s*)?(?:요구|요청|지시)(?:은|는|이|가|을|를)?\s*(?:(?:이미|뒤에|이후에?|나중에)\s*)?(?:없어졌|취소|철회)/u;
+
+function recordedAdvanceBeforeCommitment(text) {
+  for (const block of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    const clauses = block.split(SENTENCES).map(part => part.trim()).filter(Boolean);
+    for (const [index, clause] of clauses.entries()) {
+      const previous = clauses[index - 1] ?? "";
+      const following = clauses[index + 1] ?? "";
+      const context = previous + " " + clause;
+      if (EXAMPLE.test(context) || EXAMPLE.test(following) && !SWITCH.test(following) || SWITCH.test(clause) ||
+          REVERSE_OR_AUTHORIZED.test(context) || CLOSED_REQUEST.test(context) || NO_PAYMENT.test(context) || UP_TO_USER.test(context) ||
+          voluntaryDeposit.test(context) || CONFIRMATION_FIRST.test(context) || ordinaryInvoice.test(context) ||
+          inspectedBeforeDemand.test(context) || samePaymentDemandEnded.test(following) ||
+          withdrewReservationPayment.test(following) || currentDemandWithdrawn.test(following)) continue;
+
+      // 확인할 대상과 선결 의무가 있는 절에서만 실제 요구를 읽는다.
+      const phase = transactionInspection.exec(clause) ?? pendingContract.exec(clause);
+      if (!phase) continue;
+      const before = inspectionFirst.exec(clause.slice(phase.index + phase[0].length));
+      if (!before) continue;
+      const requirement = clause.slice(phase.index + phase[0].length + before[0].length);
+      if (!receivedDemand.test(requirement) && !(confirmsDemand.test(requirement) && transactionReport.test(context))) continue;
+      if (sellerImposesPayment.test(requirement) || reportedAdvanceFee.test(requirement)) return true;
+    }
+  }
+  return false;
+}
+
 export function addReportedTransactionConditions(text, signals) {
+  if (recordedAdvanceBeforeCommitment(text)) signals.add(SIG_PREPAYMENT);
   if (requiresOrganizerPaymentForFreeBooking(text)) {
     signals.add(SIG_PREPAYMENT);
     signals.add(SIG_THIRD_PARTY_ACCOUNT);
