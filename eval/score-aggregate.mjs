@@ -4,18 +4,34 @@ import { createHash } from "node:crypto";
 import { analyze } from "../packages/core/src/pipeline.js";
 
 const levels = new Set(["위험", "주의", "확인필요"]);
+const errorCounts = () => ({ danger: 0, nonDanger: 0, misses: 0, falseAlarms: 0 });
+
+function countPrediction(counts, expected, predicted) {
+  if (expected === "위험") {
+    counts.danger++;
+    if (predicted !== "위험") counts.misses++;
+  } else {
+    counts.nonDanger++;
+    if (predicted === "위험") counts.falseAlarms++;
+  }
+}
+
 try {
   const [file, ...args] = process.argv.slice(2);
+  const includeHuman = args.at(-1) === "--with-human";
+  if (includeHuman) args.pop();
   if (!file || (args.length && (args.length !== 2 || args[0] !== "--sha256" || !/^[0-9a-f]{64}$/.test(args[1])))) throw new Error();
   const bytes = readFileSync(file);
   if (args.length && createHash("sha256").update(bytes).digest("hex") !== args[1]) throw new Error();
   const data = bytes.toString("utf8").replace(/^\uFEFF/, "");
-  const counts = { cases: 0, danger: 0, nonDanger: 0, misses: 0, falseAlarms: 0 };
+  const counts = { cases: 0, ...errorCounts() };
+  if (includeHuman) counts.human = errorCounts();
   for (const line of data.split(/\r?\n/)) {
     if (!line.trim()) continue;
     const item = JSON.parse(line);
     const expected = item.gold?.level_rule;
     if (!levels.has(expected) || typeof item.message_text !== "string") throw new Error();
+    if (includeHuman && !levels.has(item.gold.level_human)) throw new Error();
     const { level } = await analyze({
       text: item.message_text,
       parentInputs: item.parent_inputs ?? {},
@@ -24,13 +40,8 @@ try {
     });
     if (!levels.has(level)) throw new Error();
     counts.cases++;
-    if (expected === "위험") {
-      counts.danger++;
-      if (level !== "위험") counts.misses++;
-    } else {
-      counts.nonDanger++;
-      if (level === "위험") counts.falseAlarms++;
-    }
+    countPrediction(counts, expected, level);
+    if (includeHuman) countPrediction(counts.human, item.gold.level_human, level);
   }
   if (!counts.cases) throw new Error();
   console.log(JSON.stringify(counts));

@@ -46,3 +46,24 @@ it("잘못된 행에서도 원문과 부분 집계를 출력하지 않는다", (
   assert.equal(result.stdout, "");
   assert.equal(result.stderr.trim(), "평가 자료의 전체 집계를 완료하지 못했습니다.");
 });
+
+it("동일한 예측을 규칙 정답과 독립 작성자의 사람 기대 등급에 각각 집계한다", () => {
+  const data = [
+    { parent_inputs: { family_denied: true }, gold: { level_rule: "위험", level_human: "주의" } },
+    { gold: { level_rule: "주의", level_human: "위험" } },
+  ].map(row => JSON.stringify({ ...row, message_text: "합창 수업 안내" })).join("\n");
+  const digest = createHash("sha256").update(data).digest("hex");
+  const result = run(data, ["--sha256", digest, "--with-human"]);
+  assert.equal(result.status, 0);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    cases: 2, danger: 1, nonDanger: 1, misses: 0, falseAlarms: 0,
+    human: { danger: 1, nonDanger: 1, misses: 1, falseAlarms: 1 },
+  });
+});
+
+it("사람 기준도 요청하면 잘못된 사람 등급에서 부분 집계를 쓰지 않는다", () => {
+  const data = JSON.stringify({ message_text: "그림 수업 안내", gold: { level_rule: "주의" } });
+  const result = run(data, ["--with-human"]);
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, "");
+});
