@@ -14,6 +14,11 @@ const NO_REQUEST = /(?:하지\s*(?:말|마|않)|되면\s*안|넣으면\s*안|보
 const EXTERNAL_APP = /(?:별도(?:의|로)?|추가(?:로)?|외부)\s*(?:앱|어플|애플리케이션|프로그램)(?:을|를)?(?:\s*(?:기기|휴대폰|스마트폰|컴퓨터)에)?\s*설치/;
 const INSTALL_FIELD = /(?:필수(?:\s*(?:항목|요건|조건))?\s*(?:에는|은|이|[:：])\s*)$/;
 const INSTALL_REQUIRED = /^\s*(?:해야|하라(?:고|는)|(?:가|하는\s*(?:게|것이)|는|이)?\s*(?:(?:이용|확인|열람|신청|접수|진행)\s*)?(?:요건|선행\s*조건|필수|필요하))/;
+const INSTALL_DISPOSITION = /^(?:(?:설치\s*)?(?:요구|요청|조건|내용|안내|부탁)(?:을|를|은|는|이|가)?\s*(?:(?:제가|내가|저는|이미|어제|앞서|방금|그때|지난\s*(?:번|주|달)(?:에)?)\s*){0,4}(?:거절(?:했|하였|함|됐|되었)|철회(?:했|하였|함|됐|되었)|취소(?:했|하였|함|됐|되었))|(?:접수|신청)(?:\s*(?:건|절차))?(?:은|는|이|가)?\s*(?:이미\s*)?(?:(?:종료|종결|취소|완료)(?:됐|되었|함|\s*(?:확인|통지))|끝났))/u;
+const INSTALL_DISPOSITION_REFERENCE = /(?:[다라]는|(?:^|[\s,])(?:그|이|해당|같은)\s+)\s*/gu;
+const LINKED_INSTALL_FOLLOWUP = /^(?:그|이|해당|같은)\s+/u;
+const INSTALL_ACTION = /설치|프로그램\s*추가/u;
+const RENEWED_INSTALL_NOTICE = /(?:지만|는데|고|[,，;；])\s*[,，]?\s*(?=(?:이번|오늘|방금|새로|별도(?:의|로)?|다시)\s*(?:[가-힣]{1,12}(?:에서|의)\s*)?(?:(?:새|온|보낸|받은)\s+){0,2}(?:문자|메시지|통지|안내(?:문)?|공지|회신|답장|요구|요청))/u;
 const OFFICIAL_APP = /(?:공식\s*(?:앱|스토어|마켓|홈페이지)|(?:기존|이미\s*쓰는)\s*앱)/;
 const OPTIONAL_INSTALL = /^\s*(?:가|이)?\s*필수(?:가|는|이|은)?\s*아니/;
 const STAFF_INSTALL = /(?:운영|관리|직원용|업무용)\s*기기(?:에(?:서|는)?|에서)\s*$/;
@@ -102,15 +107,34 @@ function privateFields(clause) {
     !REDACTED_FIELD.test(clause.slice(match.index + match[0].length)));
 }
 
-function actionIn(clause, previous, attributionContext) {
-  if (EDUCATION.test(clause) || NO_REQUEST.test(clause)) return null;
+function reportedInstallationClosed(clause, following) {
+  const install = INSTALL_ACTION.exec(clause);
+  if (!install) return false;
+  const after = clause.slice(install.index + install[0].length);
+  if ([...after.matchAll(INSTALL_DISPOSITION_REFERENCE)].some(reference =>
+    INSTALL_DISPOSITION.test(after.slice(reference.index + reference[0].length)))) return true;
+  const followup = LINKED_INSTALL_FOLLOWUP.exec(following);
+  return Boolean(followup && INSTALL_DISPOSITION.test(following.slice(followup[0].length)));
+}
+
+export function hasOpenInstallationReport(clause, following, requiresInstallation) {
+  const notices = clause.split(RENEWED_INSTALL_NOTICE);
+  return notices.some((notice, index) => requiresInstallation(notice) &&
+    !reportedInstallationClosed(notice, index === notices.length - 1 ? following : ""));
+}
+
+function requiresExternalInstallation(clause) {
   const install = EXTERNAL_APP.exec(clause);
-  if (install && !OFFICIAL_APP.test(clause)) {
-    const before = clause.slice(0, install.index);
-    const after = clause.slice(install.index + install[0].length);
-    if (!STAFF_INSTALL.test(before) && !OPTIONAL_INSTALL.test(after) &&
-        (INSTALL_FIELD.test(before) || INSTALL_REQUIRED.test(after))) return SIG_APP_INSTALL;
-  }
+  if (!install || OFFICIAL_APP.test(clause)) return false;
+  const before = clause.slice(0, install.index);
+  const after = clause.slice(install.index + install[0].length);
+  return !STAFF_INSTALL.test(before) && !OPTIONAL_INSTALL.test(after) &&
+    (INSTALL_FIELD.test(before) || INSTALL_REQUIRED.test(after));
+}
+
+function actionIn(clause, previous, attributionContext, following) {
+  if (EDUCATION.test(clause) || NO_REQUEST.test(clause)) return null;
+  if (hasOpenInstallationReport(clause, following, requiresExternalInstallation)) return SIG_APP_INSTALL;
   const callback = DOCUMENT_NUMBER.exec(clause);
   if (callback) {
     const number = callback.groups.number;
@@ -144,7 +168,7 @@ export function addReportedNoticeFields(text, signals, { unverifiedLinks = [] } 
     if (next && !SUBJECT_CHANGE.test(next) && !OTHER_ORGANIZER.test(next) && !noticeSender(next, clause)) boundClauses.push(next);
     for (const [offset, body] of boundClauses.entries()) {
       if (EDUCATION.test(body) || NO_REQUEST.test(body) || OTHER_ORGANIZER.test(body)) continue;
-      const signal = actionIn(body, offset ? clause : "", previous + " " + clause);
+      const signal = actionIn(body, offset ? clause : "", previous + " " + clause, clauses[index + offset + 1] ?? "");
       if (signal) {
         signals.add(SIG_AGENCY_IMPERSONATION);
         signals.add(signal);

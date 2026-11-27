@@ -1,7 +1,7 @@
 import { currentReceivedRequests } from "./received-message.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
-import { startsOtherOrganizer } from "./reported-notice-fields.js";
+import { hasOpenInstallationReport, startsOtherOrganizer } from "./reported-notice-fields.js";
 import {
   SIG_AGENCY_IMPERSONATION, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER, SIG_CASH_HANDOVER,
   SIG_FOREIGN_PAYMENT_CALLBACK, SIG_LOAN_CASH_PICKUP, SIG_PERSONAL_INFO,
@@ -180,13 +180,13 @@ const relativeRepayment = /(?:대출(?:금)?\s*)?상환(?:금|액|을|은|하는
 const removedTransfer = /(?:분실물|습득물|유실물|돌려받|반환|보관함|연습|보증금|예치금|영수증|기록만)/u;
 
 function addReceivedInstitutionRequests(text, signals) {
-  for (const { body, previous } of currentReceivedRequests(text)) {
+  for (const { body, previous, next } of currentReceivedRequests(text)) {
     const localSender = declaredSender.exec(body) ?? roleInReport.exec(body);
     const priorSender = declaredSender.exec(previous) ?? roleInReport.exec(previous);
     const attribution = localSender ?? priorSender;
     const name = attribution?.groups.role ?? attribution?.groups.named;
-    const installation = !staffApp.test(body) &&
-      (addressedInstallation.test(body) || appObject.test(body) && appOnReceiver.test(body));
+    const installation = hasOpenInstallationReport(body, next, notice =>
+      !staffApp.test(notice) && (addressedInstallation.test(notice) || appObject.test(notice) && appOnReceiver.test(notice)));
     if (installation) signals.add(SIG_APP_INSTALL);
 
     const indirectCallback = reportedNumber.exec(body);
@@ -230,7 +230,7 @@ export function addInstitutionRequestContext(text, signals) {
     const next = clauses[index + 1];
     const actions = [clause.slice(sender.offset).trim()];
     if (next && !separateSource.test(next) && !startsOtherOrganizer(next) && !senderIn(next)) actions.push(next);
-    for (const action of actions) {
+    for (const [offset, action] of actions.entries()) {
       if (noObligation.test(action)) continue;
       const reported = requestReport.test(action) || requestField.test(action) || softwarePrerequisite.test(action) || conditionField.test(action) ||
         /(?:통지|문자|안내|쪽지|답장|문서|회신)|[:：]/.test(clause);
@@ -238,7 +238,7 @@ export function addInstitutionRequestContext(text, signals) {
         signals.add(SIG_AGENCY_IMPERSONATION);
         signals.add(SIG_PERSONAL_INFO);
       }
-      if (reported && hasSoftwareRequest(action)) {
+      if (reported && hasOpenInstallationReport(action, clauses[index + offset + 1] ?? "", hasSoftwareRequest)) {
         signals.add(SIG_AGENCY_IMPERSONATION);
         signals.add(SIG_APP_INSTALL);
       }
