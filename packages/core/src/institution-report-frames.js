@@ -426,6 +426,60 @@ function hasStructuredInstallation(text) {
     structuredInstallation(installationRows(lines, index + 1)));
 }
 
+const dispatchAssertion = "(?:소개|밝|설명|기재|표시|적)";
+const redirectRole = String.raw`(?<![\p{L}\p{N}])${reportedRole}(?:\s+[가-힣]{1,12}){0,3}?`;
+const declaredDispatch = new RegExp(redirectRole + String.raw`\s*(?:에서|이|가)\s*(?:보냈|발송했|전달했)(?:다고|다는)\s*` + dispatchAssertion, "u");
+const attributedRedirect = new RegExp(redirectRole + String.raw`\s*(?:이?라고)\s*` + dispatchAssertion +
+  String.raw`[가-힣]*\s*(?:쪽|곳|사람|상대|발신자)(?:에게서|한테서|에서)(?:\s*연락(?:이|은)?)?\s*(?:왔|도착했|받았)`, "u");
+const redirectSelfDescription = new RegExp(reportingSender + String.raw`(?:이|가|은|는)\s*` + redirectRole +
+  String.raw`\s*(?:이?라고)\s*(?:(?:자신|자기)(?:을|를)\s*)?` + dispatchAssertion, "u");
+
+function claimsRedirectIssuer(clause) {
+  return openDirectedReport(clause) && !anotherTopic.test(clause) &&
+    Boolean(issuerForCurrentReport(clause) || declaredDispatch.test(clause) ||
+      attributedRedirect.test(clause) || redirectSelfDescription.test(clause));
+}
+
+const establishedRoute = /(?:기존|(?:평소|늘)\s*(?:알던|쓰던|쓰는|사용하던)|청사에서\s*(?:쓰는|사용하는)|공식|대표)(?:\s*공식)?\s*(?:접수처|창구|민원실|페이지|주소|연락처|전화번호)(?:가|이|을|를|와는?|과는?)?\s*(?:아닌|아니라|대신|말고|별개|다른)/u;
+const requiredAddressUse = /^\s*(?:에서|으로|로|에)(?:만)?\s*(?:[가-힣]{1,12}\s+){0,4}?(?:(?:확인|열람|조회|접속|신청|접수)(?:하도록|하라고|하라는|해야)|읽(?:으라고|으라는|어야)|보(?:라고|라는)|봐야)/u;
+function replacesEstablishedAddress(action, unverifiedLinks) {
+  if (!unverifiedLinks.length || ORDINARY_LOOKUP.test(action) || informationalAddress.test(action) ||
+      !establishedRoute.test(action)) return false;
+  for (const token of action.matchAll(/\S+/gu)) {
+    if (requiredAddressUse.test(action.slice(token.index + token[0].length)) &&
+        isUnverifiedAddressToken(token[0], unverifiedLinks)) return true;
+  }
+  return false;
+}
+
+const selectedBySender = /(?:자기(?:들)?|자신(?:들)?|발신(?:자|인|처)|보낸\s*(?:사람|이|쪽)|상대(?:방)?)(?:이|가|은|는)?\s*(?:(?:아까|방금|직접|새로|따로)\s*)?(?:지정한|정한|정해\s*준|보낸|(?:적어|써)\s*보낸|알려\s*준)\s*$/u;
+const publishedPhone = /(?:전화|회신|통화|연락|상담|문의)\s*(?:전용\s*)?(?:번호|연락처)\s*[:：]?\s*(?<number>0\d{1,2}[- ]?\d{3,4}[- ]?\d{4}|1\d{3}[- ]?\d{4})(?![\d-])/gu;
+const requiredCallback = /^\s*(?:으로|로|에)(?:만)?\s*(?:직접\s*)?(?:(?:전화|통화|회신|연락|답(?:변)?|응답|문의)(?:을|를)?\s*(?:하라(?:고|는)?|하도록|해야|해\s*달라|받아야|보내야|줘야|주어야))/u;
+const optionalRoute = /선택\s*사항|(?:공식|대표|기존)\s*(?:연락처|번호|창구)(?:로도|에서도|에)\s*(?:가능|연결)|(?:전화|회신|연락)(?:을|를)?\s*(?:할\s*필요(?:가|는)?\s*없|하지\s*않아도)/u;
+function requiresSenderSelectedCallback(action) {
+  if (optionalRoute.test(action) || excludedReply.test(action)) return false;
+  for (const target of action.matchAll(publishedPhone)) {
+    if (!isCardCallbackNumber(target.groups.number) && selectedBySender.test(action.slice(0, target.index)) &&
+        requiredCallback.test(action.slice(target.index + target[0].length))) return true;
+  }
+  return false;
+}
+
+function* reportedRouteChanges(text, unverifiedLinks) {
+  const request = clause => replacesEstablishedAddress(clause, unverifiedLinks) || requiresSenderSelectedCallback(clause);
+  for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    for (const { body, previous, next } of currentReceivedRequests(record, claimsRedirectIssuer, request)) {
+      if (!openDirectedReport(body) || closedRemainder.test(next)) continue;
+      const action = body.split(quoteBoundary, 1)[0];
+      const sameReceivedSource = claimsRedirectIssuer(action) ||
+        (receivingContext.test(previous) || attributedRedirect.test(previous)) && claimsRedirectIssuer(previous);
+      if (!sameReceivedSource) continue;
+      if (replacesEstablishedAddress(action, unverifiedLinks)) yield SIG_LINK;
+      if (requiresSenderSelectedCallback(action)) yield SIG_CALL_THIS_NUMBER;
+    }
+  }
+}
+
 export function addInstitutionReportFrames(text, signals, { unverifiedLinks = [] } = {}) {
   const addAgencyAction = signal => {
     signals.add(SIG_AGENCY_IMPERSONATION);
@@ -445,6 +499,7 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
     if (signal === SIG_LINK || signal === SIG_PERSONAL_INFO) addAgencyAction(signal);
     else signals.add(signal);
   }
+  for (const signal of reportedRouteChanges(text, unverifiedLinks)) addAgencyAction(signal);
   for (const signal of institutionTransactionReports(text, unverifiedLinks)) {
     if (signal === SIG_LINK || signal === SIG_CALL_THIS_NUMBER || signal === SIG_PERSONAL_INFO) addAgencyAction(signal);
     else signals.add(signal);
