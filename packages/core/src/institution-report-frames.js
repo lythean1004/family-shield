@@ -1,7 +1,7 @@
 import { isCardCallbackNumber, isCardSenderName } from "./card-sender.js";
 import { INVESTIGATIVE } from "./cash-handover.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
-import { isOfficialLink } from "./official-links.js";
+import { isOfficialLink, readUnregisteredAddressDirection } from "./official-links.js";
 import { hasOpenInstallationReport, ORDINARY_LOOKUP, startsOtherOrganizer } from "./reported-notice-fields.js";
 import { currentReceivedRequests, isReceivedContinuation, receivedFieldLines } from "./received-message.js";
 import {
@@ -516,16 +516,12 @@ function claimsRedirectIssuer(clause) {
 
 const establishedRoute = /(?:기존|(?:평소|늘)\s*(?:알던|쓰던|쓰는|사용하던)|(?:청사|(?:시|군|구|도)청|해당\s*기관)(?:에서|이|가)\s*(?:쓰는|사용하는|운영하는)|공식|대표)(?:\s*공식)?\s*(?:접수처|창구|민원실|페이지|주소|연락처|전화번호|곳)(?:가|이|을|를|와는?|과는?)?\s*(?:아닌|아니라|대신|말고|별개|다른)/u;
 const requiredAddressUse = /^\s*(?:에서|으로|로|에)(?:만)?\s*(?:[가-힣]{1,12}\s+){0,4}?(?:(?:확인|열람|조회|접속|신청|접수)(?:하도록|하라고|하라는|해야|할(?:\s*것)?을\s*(?:요구|요청))|들어가(?:도록|라고|야)|들어갈\s*것을\s*(?:요구|요청)|읽(?:으라고|으라는|어야)|보(?:라고|라는)|봐야)/u;
-const hostWithDirection = /^(?<host>[A-Za-z0-9.-]+)(?<direction>으로|로|에서|에)$/u;
 function requiresParsedAddressToken(token, after, unverifiedLinks) {
   if (!isUnverifiedAddressToken(token, unverifiedLinks)) return false;
   if (requiredAddressUse.test(after)) return true;
 
-  // 조사가 붙어 두 호스트로 해석될 수 있으면 어느 쪽도 공식 주소에 해당하지 않아야 한다.
-  const attached = hostWithDirection.exec(token)?.groups;
-  if (!attached || !requiredAddressUse.test(attached.direction + after) || isOfficialLink(attached.host)) return false;
-  const { candidates, complete } = inspectLinkCandidates(attached.host);
-  return complete && candidates.length === 1 && candidates[0].raw === attached.host && candidates[0].complete;
+  const direction = readUnregisteredAddressDirection(token);
+  return Boolean(direction && requiredAddressUse.test(direction + after));
 }
 function replacesEstablishedAddress(action, unverifiedLinks) {
   if (!unverifiedLinks.length || ORDINARY_LOOKUP.test(action) || informationalAddress.test(action) ||

@@ -1,6 +1,6 @@
 import { currentReceivedRequests } from "./received-message.js";
 import { inspectLinkCandidates } from "./link-candidates.js";
-import { isOfficialLink } from "./official-links.js";
+import { isOfficialLink, readUnregisteredAddressDirection } from "./official-links.js";
 import { SIG_CREDENTIAL_DISCLOSURE, SIG_DOCUMENT_BUNDLE } from "./signals.js";
 
 const credential = "(?:(?:일회용|인증|원격\\s*(?:지원|제어|접속))\\s*(?:번호|코드|암호|값)|OTP)";
@@ -512,9 +512,73 @@ function reportsJointSubmissionInApplication(clause, previous, next, afterNext) 
     submitsToTheSameForm(next);
 }
 
-export function addReportedProtectedRequests(text, signals, hasUnverifiedLink) {
+const uncertainAddressOperator = /^(?:(?<receipt>(?:받은|수신한|전달받은)\s+(?:문자|메시지|안내(?:문)?)(?:에서|에는))\s+)?(?:(?<wallet>지갑\s*서비스)(?:와|과)(?:의)?\s*(?:관계|연관(?:성)?)(?:가|이)\s*확인되지\s*않(?:는|은)|운영(?:자|처)(?:를|을)\s*확인하지\s*못한)\s+(?:(?:주소|링크)\s*[:：]?\s*)?$/u;
+const bareWebHost = /^[a-z\d.-]+$/iu;
+const explicitWebAddress = /^https?:\/\/[a-z\d.-]+(?:[/?#]|$)/iu;
+const walletRecoveryValue = /^(?<wallet>지갑(?:의)?\s*)?(?:복구|시드)\s*(?:문구|구문)/u;
+const walletDemandReceived = /^(?:을|를)\s*입력하라는\s*(?:요구|요청)(?:를|을)\s*(?:받|전달받)(?:음|았(?:음|습니다|어요|다))[.!?。]?$/u;
+const walletValueRequired = /^\s*입력이\s*필수라고\s*(?:적혀|명시돼|기록돼)\s*있었(?:음|습니다|어요|다)[.!?。]?$/u;
+const applicationReceiptHeading = new RegExp(
+  "^(?:(?<receipt>받은|수신한|전달받은)\\s+)?(?:[가-힣]{1,8}\\s+){0,2}?" +
+  "(?<purpose>" + aidOrWork.source + "\\s*(?:신청|모집|접수|등록|채용|참여))" +
+  "\\s+(?:안내(?:문)?|공고|문자|메시지)(?:의)?\\s+(?:(?<recorded>수신|수령)\\s*)?(?:요약|기록)[.!?。]?$", "u",
+);
+const unrelatedApplicationHeading = /(?:^|\s)(?:예전|이전|지난번|별개|다른|예시|견본)(?=\s|$)/u;
+const reportedRequiredSubmission = /^(?:을|를)?\s*(?:(?:함께|같이|둘\s*다|모두|한꺼번에|동시에)\s*)?(?:제출|첨부)\s*(?:하는\s*조건이\s*(?:적혀|명시돼|기재돼)\s*있었|해야\s*한다고\s*(?:적혀|명시돼|기재돼)\s*있었)(?:음|습니다|어요|다)[.!?。]?$/u;
+const closedAddressRequirement = /^(?:(?:그|이|같은|해당)\s*)?(?:(?:입력|서류|제출)\s*)?(?:요구|요청|지시)(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:철회|취소|거절)/u;
+
+function requiresWalletRecovery(action, report) {
+  const value = walletRecoveryValue.exec(action);
+  if (!value || !(report.wallet || value.groups.wallet)) return false;
+  const demand = action.slice(value[0].length);
+  return walletDemandReceived.test(demand) || Boolean(report.receipt && walletValueRequired.test(demand));
+}
+
+function reportedApplicationPurpose(text) {
+  const heading = applicationReceiptHeading.exec(text)?.groups;
+  return Boolean(heading && (heading.receipt || heading.recorded) && !unrelatedApplicationHeading.test(text) &&
+    hasApplicationPurpose(heading.purpose));
+}
+
+function addRequirementsAtUnconfirmedAddress(text, signals, inspection) {
+  if (!inspection?.complete || inspection.candidates.length !== 1) return;
+  const [address] = inspection.candidates;
+  if (!address.complete || isOfficialLink(address.raw) || isOfficialLink(address.host)) return;
+  const attached = readUnregisteredAddressDirection(address.raw);
+  if (!attached && !bareWebHost.test(address.raw) && !explicitWebAddress.test(address.raw)) return;
+
+  for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    const clauses = record.split(clauseBreak).map(clause => clause.trim()).filter(Boolean);
+    for (const [index, clause] of clauses.entries()) {
+      const token = [...clause.matchAll(/\S+/gu)].find(match => match[0] === address.raw);
+      if (!token) continue;
+      const previous = clauses[index - 1] ?? "";
+      const next = clauses[index + 1] ?? "";
+      const report = uncertainAddressOperator.exec(clause.slice(0, token.index))?.groups;
+      if (!report || inactiveReport.test(previous + " " + clause) || formNotInUse.test(clause) ||
+          mereFormReference.test(clause) || closedAddressRequirement.test(next)) continue;
+      const tail = (attached + clause.slice(token.index + token[0].length)).trimStart();
+      const particle = applicationAddressParticle.exec(tail);
+      if (!particle) continue;
+      const action = tail.slice(particle[0].length).trimStart();
+      if ((particle[0] === "에" || particle[0] === "에서") && requiresWalletRecovery(action, report)) {
+        signals.add(SIG_CREDENTIAL_DISCLOSURE);
+      }
+      if (!reportedApplicationPurpose(previous)) continue;
+      const pair = jointSubmissionPair.exec(action);
+      if (pair?.index === 0 && reportedRequiredSubmission.test(action.slice(pair[0].length))) {
+        signals.add(SIG_DOCUMENT_BUNDLE);
+      }
+    }
+  }
+}
+
+export function addReportedProtectedRequests(text, signals, hasUnverifiedLink, inspection) {
   if (hasReceivedCredentialRequest(text, hasUnverifiedLink)) signals.add(SIG_CREDENTIAL_DISCLOSURE);
-  if (hasUnverifiedLink) addReceivedFormFields(text, signals);
+  if (hasUnverifiedLink) {
+    addReceivedFormFields(text, signals);
+    addRequirementsAtUnconfirmedAddress(text, signals, inspection);
+  }
   const clauses = text.split(clauseBreak).map(clause => clause.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
     if (inactiveReport.test(clause)) continue;

@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { OFFICIAL_DOMAIN_CARDS } from "./lookalike.js";
 import { SHARED_PARENTS, normalizeHost } from "./phishing-list.js";
 import { isShortener } from "./links.js";
-import { parseLinkCandidate } from "./link-candidates.js";
+import { inspectLinkCandidates, parseLinkCandidate } from "./link-candidates.js";
 
 const HOST_FILE = join(import.meta.dirname, "..", "..", "..", "content", "evidence", "official-link-hosts.json");
 
@@ -63,6 +63,21 @@ export function isOfficialLink(link) {
   if (EXACT_HOSTS.has(parsed.host)) return true;
   if (SHARED_PARENTS.some((p) => isUnder(host, p))) return false; // 포털 하위 주소는 정확한 호스트만
   return SUBTREE_DOMAINS.some((d) => isUnder(host, d));
+}
+
+const hostWithDirection = /^(?<host>[A-Za-z0-9.-]+)(?<direction>으로|로|에서|에)$/u;
+
+function isCompleteUnregisteredAddress(token) {
+  const { candidates, complete } = inspectLinkCandidates(token);
+  return complete && candidates.length === 1 && candidates[0].raw === token &&
+    candidates[0].complete && !isOfficialLink(token);
+}
+
+/** 원본과 조사를 뗀 해석이 모두 완전한 미등록 주소인 경우에만 조사를 읽는다. */
+export function readUnregisteredAddressDirection(token) {
+  const attached = hostWithDirection.exec(token)?.groups;
+  if (!attached || !isCompleteUnregisteredAddress(token) || !isCompleteUnregisteredAddress(attached.host)) return "";
+  return attached.direction;
 }
 
 /** 링크가 하나 이상 있고 모두 공식 주소인지 */

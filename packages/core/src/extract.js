@@ -338,7 +338,7 @@ export function extractCodeSignals(text, options = {}) {
 
   const directSignals = [...signals];
   if (options.inputComplete !== false) addReportedContactRestrictions(input, signals);
-  addReportedProtectedRequests(input, signals, unverifiedLink);
+  addReportedProtectedRequests(input, signals, unverifiedLink, inspection);
   for (const signal of reportedRequestSignals(input)) signals.add(signal);
   addReportedFamilySignals(input, signals);
   addFamilyRequestContextSignals(input, signals, { numberMismatch });
