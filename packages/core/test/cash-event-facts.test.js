@@ -42,10 +42,29 @@ describe("현금 행위와 수취인 관계", () => {
   for (const [name, text] of ordinary) {
     it(name, async () => {
       assert.deepEqual([...cashEventSignals(text)], []);
-      if (name === "수신자와 직원 사이에서 반대 방향") return;
       const result = await analyze({text});
       assert.ok(!result.fired_rules.includes("R15"));
       assert.ok(!result.fired_rules.includes("R18"));
+    });
+  }
+});
+
+describe("수사기관 현금 인계의 지급 방향", () => {
+  const receipt = "수사팀에서 보냈다는 문자를 받았다. ";
+  const cases = [
+    ["직원이 받아 간다는 통지", "방문 담당자가 수신자에게서 현찰을 받아 간다는 내용이 적혀 있었다.", true],
+    ["현금을 먼저 말한 인계 지시", "현금은 방문한 직원이 저한테서 직접 받아 간다는 요구였다.", true],
+    ["수신과 지급이 각각 적힌 두 절", "직원이 저에게 확인서를 건네고, 제게서 현금을 받아 간다는 요구였다.", true],
+    ["직원이 수신자에게 지급", "제가 맡긴 현금을 직원이 저에게 직접 건네겠다는 통지였다.", false],
+    ["수신자가 돈을 낼 일은 없다고 밝힘", "방문 직원이 제게 현찰을 건네겠다고 했고 제가 현금을 낼 일은 없다는 내용이었다.", false],
+    ["같은 돈을 되찾는 사람", "수신자의 현찰을 직원이 수신자에게 건네겠다는 내용이었다.", false],
+    ["다른 지급이 없다는 수신자의 말 뒤에 방문자의 지급", "제가 현찰을 낼 일은 없었고 직원이 저에게 현금을 직접 건네겠다는 통지였다.", false],
+    ["직원에게서 받는 돈과 별도로 실제 회수 요구", "직원이 저에게 현찰을 건네겠고, 제게서 다른 현금을 받아 간다는 요구였다.", true],
+  ];
+  for (const [name, action, expected] of cases) {
+    it(name, async () => {
+      const result = await analyze({ text: receipt + action });
+      assert.equal(result.fired_rules.includes("R15"), expected);
     });
   }
 });

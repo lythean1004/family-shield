@@ -197,11 +197,23 @@ const reportedNumber = /(?:문자|메시지|통지|문서|알림|안내문?|본�
 const fromReceiver = /(?:제게서|저에게서|저한테서|내게서|나에게서|수신자(?:에게서|한테서|의)|(?:제가|내가|수신자가)\s*[^,.!?\n]{0,22}(?:현금|현찰))/u;
 const mobileCollector = /(?:방문|찾아[오와가]|댁(?:에|으로)|집(?:에|으로)|자택(?:에|으로))/u;
 const activeCash = /(?:현금|현찰)(?:[을를은는이가]|으로)?[^,.!?\n]{0,44}(?:받아\s*간|받겠|받으러|가지러|가져\s*간|수거|넘겨|건네|인계|징수|회수|찾아[오와가])|(?:받|가지|수거)으?러\s*[^,.!?\n]{0,18}(?:현금|현찰)/u;
+const cashMovements = new RegExp(activeCash, "gu");
+const handedToRecipient = /(?:제게|내게|저에게|나에게|저한테|나한테|수신자에게|수신자한테)(?:만|는)?\s*(?:(?:현금|현찰)(?:을|를|은|만)?\s*)?(?:직접\s*)?(?:건네|넘겨|인계)$/u;
 const endedOrDeniedVisit = /(?:수거|징수|회수|방문|인계)(?:는|은|을|를|가|이)?\s*(?:없다|아니다|취소|철회|하지\s*않)|(?:약정|회신)(?:서|만)|모의|가상/u;
 const relativeRepayment = /(?:대출(?:금)?\s*)?상환(?:금|액|을|은|하는|할|과|\s*(?:받|수거|회수))|(?:대출|금융)\s*상담[^,.!?\n]{0,16}(?:갚|상환)/u;
 const removedTransfer = /(?:분실물|습득물|유실물|돌려받|반환|보관함|연습|보증금|예치금|영수증|기록만)/u;
 
 const hasLevyIssuer = clause => levyReceiver.test(clause) && levyOfficer.test(clause);
+
+// 돈이 누구에게서 나오는지는 해당 현금 이동까지의 기록에서 확인한다.
+// 이어지는 절에서 수신자가 별도로 돈을 언급할 수 있다.
+function reportsCashFromRecipient(body) {
+  for (const movement of body.matchAll(cashMovements)) {
+    const throughMovement = body.slice(0, movement.index + movement[0].length);
+    if (fromReceiver.test(throughMovement) && !handedToRecipient.test(throughMovement)) return true;
+  }
+  return false;
+}
 
 function hasReportedLevyDispatch(clause) {
   const service = reportedLevyDispatch.exec(clause)?.groups.service;
@@ -268,7 +280,7 @@ function addReceivedInstitutionRequests(text, signals) {
         fromCustomer && !endedOrDeniedVisit.test(body) && !removedTransfer.test(body)) {
       signals.add(SIG_LOAN_CASH_PICKUP);
     }
-    if (!removedTransfer.test(body) && activeCash.test(body) && fromReceiver.test(body) && investigator.test(name)) {
+    if (investigator.test(name) && !removedTransfer.test(body) && reportsCashFromRecipient(body)) {
       signals.add(SIG_CASH_HANDOVER);
     }
   }
