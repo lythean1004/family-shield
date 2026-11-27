@@ -69,6 +69,12 @@ const appointmentProcedure = /(?:예약\s*내역|(?:면담|상담|접수|심사|
 const namedAddress = /^\s*(?:주소|링크|페이지)(?:에서|로|에)(?:만)?\s*(?:신청|입력|등록|접수|확인)\s*절차(?:을|를)?\s*(?:밟으라|진행하라|진행하도록|거치라|밟아야|거쳐야)/u;
 const bodyAddress = /(?:본문|문자|안내문?|메시지)(?:의|에\s*(?:적힌|실린|있는))\s*$/u;
 const useAddress = /^\s*(?:에서|으로|로|에)\s*(?:(?:신청|입력|등록|접수|확인)(?:을|를)?\s*(?:하라(?:고|는)?|해야|하도록)|(?:로그인|접속)(?:하라(?:고|는)?|해야|하도록))/u;
+function isUnverifiedAddressToken(token, unverifiedLinks) {
+  const { complete, candidates } = inspectLinkCandidates(token);
+  return complete && candidates.length === 1 && ["http:", "https:"].includes(candidates[0].protocol) &&
+    unverifiedLinks.includes(candidates[0].raw);
+}
+
 function directsToUnverifiedAddress(action, unverifiedLinks, includesReading = false) {
   if (!unverifiedLinks.length || ORDINARY_LOOKUP.test(action)) return false;
   for (const token of action.matchAll(/\S+/gu)) {
@@ -77,9 +83,7 @@ function directsToUnverifiedAddress(action, unverifiedLinks, includesReading = f
     if (!(useAddress.test(after) && appointmentProcedure.test(before)) &&
         !(namedAddress.test(after) && bodyAddress.test(before)) &&
         !(includesReading && reportDocument.test(before) && readAtAddress.test(after))) continue;
-    const { complete, candidates } = inspectLinkCandidates(token[0]);
-    if (complete && candidates.length === 1 && ["http:", "https:"].includes(candidates[0].protocol) &&
-        unverifiedLinks.includes(candidates[0].raw)) return true;
+    if (isUnverifiedAddressToken(token[0], unverifiedLinks)) return true;
   }
   return false;
 }
@@ -210,6 +214,92 @@ function* reportedDirectedInstitutionActions(text, unverifiedLinks) {
   }
 }
 
+const recordRole = "(?<role>(?:" + reportedRole + "|공공\\s*(?:요금|서비스)|공과금))" +
+  "(?<unit>(?:(?:\\s+|의\\s*)(?:관리|민원|정산|처리|납부|상담|대출|상환|담당(?:자)?|부서|직원|소속|센터|창구|팀)){0,5})";
+const selfAttributedRole = "(?:이?라고\\s*(?:한|소개한|밝힌|주장한)|(?:[을를]\\s*)?(?:자처|자칭)(?:한|하는))";
+const deliveryArtifact = "(?:문자|메시지|알림|통지|안내(?:문)?|연락|회신|쪽지)";
+const receivedPredicate = "(?:받았|왔|도착했|수신했|받아\\s*(?:확인|기록))";
+const claimedPerson = new RegExp("(?<![\\p{L}\\p{N}])" + recordRole + "\\s*" + selfAttributedRole +
+  "\\s*(?:(?:사람|상대(?:방)?|발신(?:자|인)|쪽|곳)(?:이|가|은|는|에서)?)" + "(?=[\\s,，]|$)", "u");
+const claimedNotice = new RegExp("(?<![\\p{L}\\p{N}])" + recordRole + "\\s*(?:" +
+  selfAttributedRole + "\\s*|명의(?:로|의)\\s*)" + deliveryArtifact + "(?:를|을|이|가|은|는)?\\s*" + receivedPredicate, "u");
+const receivedArtifactHere = new RegExp(deliveryArtifact + "(?:를|을|이|가|은|는)?\\s*" + receivedPredicate, "u");
+const continuationEvidence = /(?:내용|요청|조건|안내|기록)(?:이|가|은|는)?(?:이었|였|이었음|이었다|입니다|이다|\s*(?:담겼|들어|적혀|붙어|실렸|이라고|이라고\s*했|임))|(?:라|다)고\s*(?:연락|알림|통보|적|안내)/u;
+const informationalAddress = /(?:참고|예시|기록|비교|교육|상담\s*이관)용|(?:참고|예시)(?:로|자료)|(?:옮겨|수동으로)\s*적은|보낸\s*쪽과\s*무관|주소만\s*기록/u;
+const bodyLinkLabel = /(?:^|[\s,，])(?:(?:같은|그|해당|이)\s*)?(?:본문|(?:문자|메시지|통지|안내문?)(?:의\s*본문)?)(?:에|\s*속)\s*(?:적힌|실린|나온|기재된|표시된|들어\s*있는)\s*(?:주소|페이지|링크)(?:은|는|이|가)?\s*(?:[:：]\s*)?(?<token>\S+)/u;
+const exclusiveDirection = /^\s*(?:으로|로|에)만\s*(?<action>연락|전화|통화|문의|회신|응답|접수)(?:를|을)?\s*(?:해야|하도록|하라(?:고|는)?|하라는|해야만|할\s*수\s*있)/u;
+const excludedReply = /(?:수신\s*거부|발신\s*전용|참고용|예시용|기존\s*(?:대표|공식)\s*(?:번호|연락처))|(?:번호|연락처)(?:로도|에서도)\s*(?:가능|연결)|(?:할|하실)\s*필요(?:는|가)?\s*없/u;
+
+function linkedDestination(action, unverifiedLinks) {
+  if (informationalAddress.test(action) || ORDINARY_LOOKUP.test(action)) return "";
+  const address = bodyLinkLabel.exec(action)?.groups.token;
+  if (address && isUnverifiedAddressToken(address, unverifiedLinks)) return SIG_LINK;
+  const contact = providedCallback.exec(action);
+  const number = contact?.groups.number;
+  if (!number || isCardCallbackNumber(number) || number.replace(/\D/g, "").length < 8 || excludedReply.test(action)) return "";
+  return exclusiveDirection.test(action.slice(contact.index + contact[0].length)) ? SIG_CALL_THIS_NUMBER : "";
+}
+
+const attributedLoan = /(?:남은|미상환|잔여)\s*(?:대출(?:금)?|융자금)|(?:대출(?:금)?|융자금)\s*(?:잔액|잔금|상환(?:금|액)?|갚)|(?:^|[\s,，])상환(?:금|액)(?=$|[을를은는이가\s,，])/u;
+const cashMedium = /(?:현금|현찰)(?:으로|로|을|를|은)?(?=$|[\s,，.!?])/u;
+const employeeVisit = /(?:^|[\s,，])(?:금융\s*(?:회사|기관)\s*|은행\s*)?(?:담당\s*(?:자|직원)|직원|수거인|수령인)(?:이|가|은|는)\s*(?:(?:직접|나중에|당일에?|별도로)\s*)?(?:(?:집|댁|자택|수신지|거주지)(?:으로|로|에)\s*)?(?:방문(?:해(?:서)?|하여(?:서)?|하고)|찾아\s*(?:와서|가서|온\s*뒤|간\s*뒤))/u;
+const cashReceipt = /^\s*(?:(?:직접|따로|당일에?)\s*)?(?:(?:현금|현찰)(?:으로|로|을|를)?\s*)?(?:받아\s*가(?:는|겠다고|기로)|받아\s*간(?:다는|다고)|(?:수거|회수|수령)하(?:는|겠다고|기로)|가져\s*가(?:는|겠다고)|가져\s*간(?:다는|다고))/u;
+const currentCollection = /(?:겠다고|ㄴ다고|다고|다는)\s*(?:연락|알려|적|설명|안내|내용|했다|했음)|(?:방식|방법|절차)(?:이)?라고\s*(?:연락|알려|알렸|적|안내|통보|설명)|(?:받아\s*간다는|수거한다는)\s*(?:내용|안내|연락)/u;
+const separateCashPart = /(?:하지만|다만|한편|와는?\s*별개|이번엔\s*다른)|(?:같은\s*(?:금액|자료|요금)|[가-힣]{1,10})(?:을|를)\s*(?:환급|반환|돌려주|지원)/u;
+
+function reportsWorkerCashCollection(action) {
+  const debt = attributedLoan.exec(action);
+  const visit = employeeVisit.exec(action);
+  if (!debt || !visit || noCashCollection.test(action) || separateCashPart.test(action) ||
+      !cashMedium.test(action) || !currentCollection.test(action)) return false;
+  const visitEnd = visit.index + visit[0].length;
+  if (debt.index < visit.index) return cashReceipt.test(action.slice(visitEnd));
+  if (debt.index < visitEnd || action.slice(visitEnd, debt.index).trim()) return false;
+  const afterDebt = action.slice(debt.index + debt[0].length).replace(/^[을를은는](?=\s|$)/u, "");
+  return cashReceipt.test(afterDebt);
+}
+
+const cashObject = /(?:^|[\s,，])(?:현금|현찰)(?:을|를|은|만)?(?=$|[\s,，])/u;
+const appointedPerson = /(?:(?:지정|지목|정해\s*놓|보내|안내)\s*(?:한|준|둔|온)|(?:정한|정해\s*준|보낸))\s*(?:사람|방문자|수거인|담당자|직원|대리인)(?:에게|한테)(?:만)?/u;
+const inPersonDelivery = /^\s*직접\s*(?:넘기|인계하|전달하|건네|교부하)(?:는\s*(?:방식|방법)|도록|라(?:고|는)|라고|라는|야)/u;
+const explicitDemand = /(?:요구|지시)(?:하라고|한\s*(?:내용|사실)|했다|했|함|하는|해\s*왔)|(?:하라(?:고|는)|하도록)\s*(?:요구|지시)/u;
+
+function reportsAppointedCashHandover(action) {
+  const money = cashObject.exec(action);
+  const target = appointedPerson.exec(action);
+  if (!money || !target || cashReturn.test(action) || separateCashPart.test(action) || !explicitDemand.test(action)) return false;
+  const actionStart = Math.max(money.index + money[0].length, target.index + target[0].length);
+  return inPersonDelivery.test(action.slice(actionStart));
+}
+
+function issuerForCurrentReport(text) {
+  if (!openDirectedReport(text) || anotherTopic.test(text)) return null;
+  return claimedNotice.exec(text) ?? claimedPerson.exec(text) ?? issuerInReport(text);
+}
+
+function* institutionTransactionReports(text, unverifiedLinks) {
+  const identifiesAction = clause => Boolean(linkedDestination(clause, unverifiedLinks)) ||
+    reportsWorkerCashCollection(clause) || reportsAppointedCashHandover(clause);
+  for (const record of text.split(/\r?\n[ \t]*\r?\n/u)) {
+    for (const { body, previous, next } of currentReceivedRequests(record, issuerForCurrentReport, identifiesAction)) {
+      if (!openDirectedReport(body) || closedRemainder.test(next)) continue;
+      const current = issuerForCurrentReport(body);
+      const previousSender = current ? null : issuerForCurrentReport(previous);
+      if (!current && (!previousSender || !receivedArtifactHere.test(previous))) continue;
+      const { role, unit } = (current ?? previousSender).groups;
+      const action = current ? body.slice(current.index + current[0].length) : body;
+      if (!openDirectedReport(action)) continue;
+      // 같은 수신 기록의 본문이 직접 지정한 목적지만 이전 발신 표시와 결합한다.
+      const arrived = receivedArtifactHere.test(current ? body : previous);
+      const destination = arrived && !ORDINARY_LOOKUP.test(current ? body : previous) && linkedDestination(action, unverifiedLinks);
+      if (destination) yield destination;
+      if (investigator.test(role) && reportsAppointedCashHandover(action)) yield SIG_CASH_HANDOVER;
+      if (financialIssuer.test(role) && /직원|담당/u.test(unit) &&
+          (current || continuationEvidence.test(body)) && reportsWorkerCashCollection(action)) yield SIG_LOAN_CASH_PICKUP;
+    }
+  }
+}
+
 const formRow = /^\|\s*(?<label>[^|]*?)\s*\|\s*(?<value>[^|]*?)\s*\|$/u;
 const formDivider = /^\|\s*:?-{3,}:?\s*\|\s*:?-{3,}:?\s*\|$/u;
 const labeledRow = /^(?<label>[^:：|]{1,32})\s*[:：|]\s*(?<value>.*)$/u;
@@ -326,6 +416,10 @@ export function addInstitutionReportFrames(text, signals, { unverifiedLinks = []
   }
   for (const signal of reportedDirectedInstitutionActions(text, unverifiedLinks)) {
     if (signal === SIG_LINK || signal === SIG_PERSONAL_INFO) addAgencyAction(signal);
+    else signals.add(signal);
+  }
+  for (const signal of institutionTransactionReports(text, unverifiedLinks)) {
+    if (signal === SIG_LINK || signal === SIG_CALL_THIS_NUMBER) addAgencyAction(signal);
     else signals.add(signal);
   }
   if (hasStructuredInstallation(text)) addAgencyAction(SIG_APP_INSTALL);
