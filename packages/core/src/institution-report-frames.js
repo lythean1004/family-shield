@@ -419,7 +419,7 @@ function* currentCashReports(text, extraRequest = () => false, extraIssuer = () 
       if (!speaker) continue;
       const { role, unit } = speaker.groups;
       const action = speakerHere ? body.slice(speaker.index + speaker[0].length) : body;
-      yield { role, unit, action, source: speakerHere ? body : previous, speakerHere: Boolean(speakerHere), next };
+      yield { role, unit, action, source: speakerHere ? body : previous, speakerHere: Boolean(speakerHere), previous, next };
     }
   }
 }
@@ -460,7 +460,25 @@ const claimedInvestigator = new RegExp(
   "다고\\s*(?:한|밝힌|설명한|말한)\\s*(?:사람|직원|담당자|상대(?:방)?|발신자)(?:이|가|은|는)(?=\\s|[,，])", "u");
 const representativePayee = /(?:(?:자기|자신|본인|우리)(?:가|이)?\s*(?:쪽|소속|보낸|파견한)|(?:같은|해당)\s*기관(?:의)?)\s*(?:직원|담당자|수사관|요원|대리인)(?:에게|한테)\s*(?:(?:현금|현찰)(?:을|를|은|만)?\s*)?(?:직접\s*)?(?:건네|넘기|넘겨|인계하|전달하|교부하)/u;
 
+const originalLenderClaim = /^(?<role>(?:(?:제가|내가|수신자가)\s*)?(?:대출|융자)(?:을|를)?\s*받(?:은|았던)\s*(?:곳|기관|업체|은행|금융회사))의\s*(?<unit>(?:(?:대출|상환)\s*)?담당(?:자|\s*직원))이?라고\s*(?:하|밝히|소개하|알리)면서\s*/u;
+const changesBranchRepayment = /^(?<debt>(?:(?:남은|잔여|미상환)\s*)?(?:(?:대출(?:금)?|융자금)\s*)?상환(?:금|액)(?:을|를|은|는)?)\s*(?:(?:그|해당|같은)\s*)?(?:지점|영업점)(?:에서|에)\s*(?:받지\s*않고|납부하지\s*않고|내지\s*않고|(?:받는|납부하는|내는)\s*대신)\s*[,，]?\s*/u;
+const lenderEmployee = /^(?:(?:(?:그|해당|같은)\s*(?:지점|영업점|회사|기관)(?:\s*소속)?|(?:우리|저희|자기|자신)(?:의)?\s*(?:회사|금융회사|업체|기관))(?:의)?\s*)?(?:담당\s*)?직원(?:이|가|은|는)(?=\s)/u;
+const personalLoan = /(?:지인|친구|가족|개인)(?:에게|한테)(?:서)?\s*(?:빌린|빌렸)|(?:개인\s*간|사적인)\s*(?:대여|차용)/u;
+const namedLoanAlreadyPaid = /^(?:그|해당|같은|이)\s*(?:대출금|융자금|상환(?:금|액))(?:은|는|이|가|을|를)?\s*(?:이미\s*)?(?:(?:모두|다|전부)\s*)?(?:갚았|갚은|완납했|완납됐|상환했|상환이\s*끝났)/u;
+
+function pendingBranchPickup(action, source, previous, next) {
+  if (!originalLenderClaim.test(source) || personalLoan.test(previous + " " + source) ||
+      namedLoanAlreadyPaid.test(previous) || namedLoanAlreadyPaid.test(next)) return "";
+  const branch = changesBranchRepayment.exec(action.trimStart());
+  if (!branch) return "";
+  // 명시적으로 제외한 창구는 방문 수거 경로에 포함하지 않는다.
+  const collector = action.trimStart().slice(branch[0].length);
+  return lenderEmployee.test(collector) ? branch.groups.debt + " " + collector : "";
+}
+
 function alternateCashSource(clause) {
+  const lender = originalLenderClaim.exec(clause);
+  if (lender) return lender;
   const document = readInvestigativeCashDocument(clause);
   if (document) return document;
   const representative = claimedInvestigator.exec(clause);
@@ -500,11 +518,12 @@ function* cashRecordFacts(text) {
 }
 
 export function* cashEventSignals(text) {
-  for (const { role, unit, action, source, speakerHere, next } of currentCashReports(text, couldDescribeCashTransaction, alternateCashSource)) {
+  for (const { role, unit, action, source, speakerHere, previous, next } of currentCashReports(text, couldDescribeCashTransaction, alternateCashSource)) {
     if (!openDirectedReport(action) || closedCashPickupPlan.test(next)) continue;
-    const evidence = cashEventEvidence(action, {
+    const branchPickup = speakerHere ? pendingBranchPickup(action, source, previous, next) : "";
+    const evidence = cashEventEvidence(branchPickup || action, {
       investigative: investigator.test(role),
-      financialStaff: (financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? ""),
+      financialStaff: Boolean(branchPickup) || (financialIssuer.test(role) || /^금융\s*사$/u.test(role)) && /직원|담당/u.test(unit ?? ""),
       loanFromSource: loanRoleContext.test(source),
       sourceInClause: speakerHere,
     });
