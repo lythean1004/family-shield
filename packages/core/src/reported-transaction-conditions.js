@@ -254,6 +254,30 @@ function requiresVerificationFeeBeforeContinuing(clause, context, next) {
     earlierVerificationCondition.test(before);
 }
 
+const establishedCounterpartyInstead = /(?<![\p{L}\p{N}])(?:판매자|계약\s*(?:업체|상대|당사자)|거래\s*(?:업체|상대|당사자))(?:가|이|은|는|에게|한테)?\s*(?:대신|말고|아니라)\s+/u;
+const notInTheTransaction = /^(?:(?:그|해당|같은|이)\s*)?(?:거래|계약)(?:에|와|과)(?:는)?\s*(?:관계가?\s*없(?:는)?|관련(?:이)?\s*없는|무관한|관여하지\s*않는)\s+/u;
+const payOtherAccount = /^(?:에|으로|로)(?:만)?\s*(?:(?<amount>거래\s*대금|대금|물품값|물건값|돈|금액)(?:을|를)?\s*)?(?<action>보내|납부해|입금해|송금해|이체해)\s*달라(?:는|고)\s*(?:요구|요청|지시|했|말했|기록)/u;
+
+function reportsPaymentDirectedToOutsider(clause, context, following) {
+  if (SWITCH.test(clause) || !currentlyReported(context) || NO_PAYMENT.test(context) ||
+      REVERSE_OR_AUTHORIZED.test(context) || samePaymentDemandEnded.test(following)) return false;
+
+  const intendedRecipient = establishedCounterpartyInstead.exec(clause);
+  if (!intendedRecipient) return false;
+  const payment = clause.slice(intendedRecipient.index + intendedRecipient[0].length);
+  const outsideOwner = notInTheTransaction.exec(payment);
+  if (!outsideOwner) return false;
+  const target = otherOwnedAccount.exec(payment.slice(outsideOwner[0].length));
+  if (!target || target.index > 0 || !/(?:계좌|통장)$/u.test(target[0])) return false;
+
+  // 원래 당사자와 별개라는 설명이 붙은 계좌 자체가 지급 동사의 목적지여야 한다.
+  const directive = payOtherAccount.exec(payment.slice(outsideOwner[0].length + target[0].length));
+  if (!directive) return false;
+  const object = clause.slice(0, intendedRecipient.index);
+  return directive.groups.action !== "보내" || Boolean(directive.groups.amount) ||
+    MONEY_OBJECT.test(object) || /(?:물건|물품)값/u.test(object);
+}
+
 export function addReportedTransactionConditions(text, signals) {
   const clauses = text.split(SENTENCES).map(value => value.trim()).filter(Boolean);
   for (const [index, clause] of clauses.entries()) {
@@ -268,7 +292,8 @@ export function addReportedTransactionConditions(text, signals) {
       signals.add(SIG_PREPAYMENT);
     }
     if (routedToOtherParty(clause) || bindsOtherOwnerToPayment(prior, clause, context, next) ||
-        namedPaymentToOutsider(clause, context) || mismatchInContinuation(prior, clause, context) ||
+        namedPaymentToOutsider(clause, context) || reportsPaymentDirectedToOutsider(clause, context, next) ||
+        mismatchInContinuation(prior, clause, context) ||
         bindsNamedAccountToAnotherPayee(prior, clause, context, next) ||
         explicitlyReassignedAccount(clause, next, context) || currentlyReported(context) && !NO_PAYMENT.test(context) && !REVERSE_OR_AUTHORIZED.test(context) &&
         ORIGINAL_RECIPIENT.test(prior) && MISMATCH.test(prior) && INDIVIDUAL_DESTINATION.test(clause)) {
