@@ -122,8 +122,10 @@ export function decide(context) {
   // 링크가 모두 공식 주소면 링크만으로는 R6를 켜지 않는다(실제 기관 안내 “[국세청] … hometax.go.kr”, D48).
   // 앱 설치·개인정보·전화 유도가 함께 있으면 그대로 위험이다
   // 새 AI 신호는 발신자를 특정할 수 없으므로 기존처럼 평가한다.
+  // D57(2026-11-28, D49 완화): 링크가 모두 공식 주소면 행동 신호는 코드가 찾은 것만 본다. AI가 홈택스·은행 앱·우체국
+  // 안내에 개인정보·앱 설치 요구를 붙여 위험이 나왔다. 평가 자료 위험 638건 중 이 경로에만 기대는 사례는 0건
   const agencyHasAction = AGENCY_ACTION_SIGNALS.some(signal =>
-    sig.has(signal) && (signal !== SIG_LINK || !officialOnly) &&
+    (officialOnly ? codeSignals : sig).has(signal) && (signal !== SIG_LINK || !officialOnly) &&
     (!codeSignals.has(SIG_AGENCY_IMPERSONATION) || !codeSignals.has(signal) || !unlinkedAgencyActions.includes(signal)));
   if (sig.has(SIG_AGENCY_IMPERSONATION) && agencyHasAction) fire("R6", "위험");
 

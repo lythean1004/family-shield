@@ -149,8 +149,14 @@ describe("⑤ 공식 주소만 있는 문자: R7은 코드가 찾은 재촉·돈
       assert.equal(decide({ signals_final: s, signals_code: s }).level, "주의", code);
     }
   });
-  it("AI의 개인정보·선입금·개인 계좌 요구는 그대로 위험", () => {
-    for (const ai of [SIG_PERSONAL_INFO, "SIG_PREPAYMENT", "SIG_THIRD_PARTY_ACCOUNT"]) {
+  // D57(2026-11-28): 공식 주소만 있으면 R6의 행동 신호는 코드가 찾은 것만 본다. AI만 붙인 개인정보 요구는 주의
+  it("AI만 붙인 개인정보 요구는 주의(D57), 코드가 찾으면 위험", () => {
+    assert.equal(decide({ signals_final: [...base, SIG_PERSONAL_INFO], signals_code: base }).level, "주의");
+    const code = [...base, SIG_PERSONAL_INFO];
+    assert.equal(decide({ signals_final: code, signals_code: code }).level, "위험");
+  });
+  it("AI의 선입금·개인 계좌 요구는 그대로 위험(R9)", () => {
+    for (const ai of ["SIG_PREPAYMENT", "SIG_THIRD_PARTY_ACCOUNT"]) {
       assert.equal(decide({ signals_final: [...base, ai], signals_code: base }).level, "위험", ai);
     }
   });

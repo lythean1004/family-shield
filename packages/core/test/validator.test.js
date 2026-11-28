@@ -126,6 +126,25 @@ describe("검증기 - 설명 문장 필터", () => {
     }
   });
 
+  // D58(2026-11-28): 카카오 R15 답변 “직접 만나 돈을 준다면 사기입니다.” — 조건을 붙여도 ‘사기입니다’로 끝나면 단정이다
+  it("조건부로 사기라고 단정하는 문장도 제거한다(D58)", () => {
+    for (const s of [
+      "직접 만나 돈을 준다면 사기입니다.",
+      "앱을 깔라고 하면 사기예요.",
+      "이런 요구는 사기다.",
+      "이건 사기 문자입니다.",
+      "링크를 누르라면 사기이에요!",
+    ]) {
+      const result = validate(base({ explanation_for_parent: [s] }));
+      assert.deepEqual(result.data.explanation_for_parent, [], s);
+    }
+  });
+
+  it("여지를 남기는 말과 사기 수법 설명은 남는다(D58)", () => {
+    const keep = ["사기가 의심돼요.", "사기일 수 있어요.", "자주 쓰이는 사기 수법과 비슷해요."];
+    assert.deepEqual(validate(base({ explanation_for_parent: keep })).data.explanation_for_parent, keep);
+  });
+
   it("단정이 아닌 안내·사칭 설명은 남는다", () => {
     const keep = [
       "검찰을 사칭하여 계좌 이체를 요구하고 있어요.",

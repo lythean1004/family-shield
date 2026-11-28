@@ -18,11 +18,13 @@ describe("전화번호가 없는 문자에서는 AI의 ‘전화 유도’를 �
   }
 });
 
-describe("R6는 D49대로 유지한다(공식 주소여도 AI 개인정보 요구는 위험)", () => {
+describe("D57: 링크가 모두 공식 주소면 R6 행동 신호는 코드 신호만 본다", () => {
   const code = [SIG_LINK, SIG_OFFICIAL_LINK];
-  it("AI 개인정보 요구 + 공식 주소 → 위험(D49, 바꾸려면 운영자 결정 필요)", () => {
-    const r = decide({ signals_final: [...code, SIG_AGENCY_IMPERSONATION, SIG_PERSONAL_INFO], signals_code: code });
-    assert.equal(r.level, "위험");
+  it("AI만 개인정보·앱 설치 요구를 붙이면 R6가 아니다", () => {
+    for (const ai of [SIG_PERSONAL_INFO, SIG_APP_INSTALL, SIG_CALL_THIS_NUMBER]) {
+      const r = decide({ signals_final: [...code, SIG_AGENCY_IMPERSONATION, ai], signals_code: code });
+      assert.ok(!r.fired_rules.includes("R6"), `${ai} ${r.fired_rules}`);
+    }
   });
   it("코드가 찾은 앱 설치 요구는 그대로 위험이다", () => {
     const c = [...code, SIG_APP_INSTALL];
