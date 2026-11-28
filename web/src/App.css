@@ -748,3 +748,4 @@ html {
   .legal-table td[data-label]::before { content: attr(data-label) ": "; font-weight: 700; }
   .legal-table td:first-child::before { content: none; }
 }
+.service-period { margin: var(--sp-3) 0; padding: var(--sp-3); border: 1px solid currentColor; border-radius: 8px; line-height: 1.6; }

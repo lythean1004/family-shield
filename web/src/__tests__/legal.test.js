@@ -58,3 +58,20 @@ describe('공통', () => {
     assert.match(footer, /to="\/terms"/)
   })
 })
+
+// 준비 계획 5단계(D60): 운영 기간 안내. 문구는 legal.js 한 곳, 첫 화면과 가입 화면에 보인다
+import { SERVICE_PERIOD_NOTICE } from '../data/legal.js'
+describe('운영 기간 안내 (D60)', () => {
+  it('12월 말까지 운영, 멈추는 날은 따로 알림, 멈춘 뒤 개인정보 파기를 적는다', () => {
+    assert.match(SERVICE_PERIOD_NOTICE, /12월 말까지/)
+    assert.match(SERVICE_PERIOD_NOTICE, /따로 알려/)
+    assert.match(SERVICE_PERIOD_NOTICE, /지워요/)
+    assert.doesNotMatch(SERVICE_PERIOD_NOTICE, /12월 11일|12\/11/)
+  })
+  it('첫 화면과 가입 화면에 보인다', () => {
+    for (const f of ['HomeScreen.jsx', 'SetupScreen.jsx']) {
+      const src = readFileSync(new URL(`../screens/${f}`, import.meta.url), 'utf8')
+      assert.match(src, /SERVICE_PERIOD_NOTICE/, f)
+    }
+  })
+})

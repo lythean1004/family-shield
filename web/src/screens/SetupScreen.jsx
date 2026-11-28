@@ -4,6 +4,7 @@ import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
 import SpeakButton from '../components/SpeakButton.jsx'
 import { api, getSession } from '../data/api.js'
+import { SERVICE_PERIOD_NOTICE } from '../data/legal.js'
 import { CONSENT_STEPS, CONSENT_VERSION, emptySelection, selectAll, setChoice, isComplete, consentPlan, comprehensionQuestion, quizQueue } from '../data/consent.js'
 export { CONSENT_VERSION }
 
@@ -50,6 +51,7 @@ export default function SetupScreen() {
     <h1 className="screen-title">가족 연결</h1>
     <p className="demo-badge">시연용 계정</p>
     <p className="screen-body">지금은 가상 문자로만 시험해 주세요. 동의 문구는 법률 검토 전이며 실제 개인정보를 입력하지 마세요.</p>
+    <p className="screen-body service-period" role="note">{SERVICE_PERIOD_NOTICE}</p>
     {error && <p role="alert" className="screen-body">{error}</p>}
     {session===undefined && !error && <p role="status">연결 상태를 확인하고 있어요.</p>}
     {session===null && <form onSubmit={login} className="setup-form">

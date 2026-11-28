@@ -10,6 +10,9 @@ export const CONTACT_TEXT = OPERATOR_CONTACT || '운영자 연락처를 준비�
 
 export const LEGAL_NOTICE = '시험 운영용 문서입니다. 전문가 검토 전이며, 확인되지 않은 내용은 가장 넓게 잡아 적었습니다.'
 
+// 준비 계획 5단계(D60): 운영 기간 안내. 첫 화면·가입 화면에 같은 문구를 쓴다
+export const SERVICE_PERIOD_NOTICE = '가족방패는 2026년 12월 말까지 운영하는 시험 서비스예요. 서버를 멈추는 날은 미리 따로 알려 드려요. 멈춘 뒤에는 계정·동의 기록 같은 개인정보를 모두 지워요.'
+
 /** @typedef {{ h: string, p?: string[], rows?: string[][], head?: string[] }} Section */
 
 /** @type {{ title: string, sections: Section[] }} */

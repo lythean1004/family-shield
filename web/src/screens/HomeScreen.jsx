@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { ContrastContext } from '../data/contrast-pref.js'
 import ActionButton from '../components/ActionButton.jsx'
 import NoLinkFooter from '../components/NoLinkFooter.jsx'
+import { SERVICE_PERIOD_NOTICE } from '../data/legal.js'
 
 export default function HomeScreen() {
   const navigate = useNavigate()
@@ -37,6 +38,7 @@ export default function HomeScreen() {
           오늘의 퀴즈 (연습)
         </ActionButton>
       </div>
+      <p className="screen-body service-period" role="note">{SERVICE_PERIOD_NOTICE}</p>
       {/* 설정은 맨 위 [메뉴]에도 있다 */}
       <p className="screen-body home-settings">
         <button type="button" className="text-link" onClick={() => navigate('/settings')}>설정</button>
