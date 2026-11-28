@@ -92,6 +92,20 @@ export const QUIZ_ITEMS = [
       checked_at: '2026-11-26',
     },
   },
+  {
+    id: 'q11',
+    title: '주민센터 명의도용 연락',
+    message: '[○○주민센터] 선생님 신분증과 위임장을 가진 분이 서류를 떼러 왔습니다. 본인이 아니시면 명의도용 신고 [번호]로 바로 전화 주세요.',
+    signals: ['SIG_AGENCY_IMPERSONATION', 'SIG_CALL_THIS_NUMBER'],
+    level: '위험',
+    explanation: '주민센터 직원이라며 명의도용을 알리고 번호를 불러 주는 수법이에요(전화로도 와요). 그 번호로 걸면 상대는 모두 사기범일 수 있어요. 직접 찾은 대표번호로 확인하거나 가까운 주민센터에 직접 가 보세요.',
+    months: [11, 12],
+    source: {
+      title: '금융감독원 소비자경보 2026-28호: 주민센터 직원 사칭(신분증·위임장) 보이스피싱 주의',
+      url: 'https://www.fss.or.kr/fss/bbs/B0000175/view.do?nttId=249833&menuNo=200204',
+      checked_at: '2026-11-28',
+    },
+  },
 ]
 
 /** 하루에 푸는 문항 수 */

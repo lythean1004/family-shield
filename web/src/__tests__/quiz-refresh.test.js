@@ -49,3 +49,14 @@ describe('오늘의 퀴즈 고르기', () => {
     for (const q of QUIZ_ITEMS) assert.equal(decide({ signals_final: q.signals }).level, q.level, q.id)
   })
 })
+
+// 12월 시즌 갱신(2026-11-28): 12월에는 공식 경고문 기반 시즌 문항이 2개 이상 맨 앞에 온다
+describe('12월 시즌 문항', () => {
+  it('12월 첫날 퀴즈의 앞 2문항이 시즌 문항이고, 출처가 2026-11 이후 확인됐다', () => {
+    const first = quizForDate(QUIZ_ITEMS, d('2026-12-01')).slice(0, 2)
+    for (const q of first) {
+      assert.ok(q.months?.includes(12), q.id)
+      assert.ok(q.source.checked_at >= '2026-11-01', q.id)
+    }
+  })
+})
