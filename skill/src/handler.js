@@ -33,6 +33,10 @@ import { createDbResultStore, createReceipts, createCheckRecorder } from './resu
 import { createConfirmService } from './confirm.js';
 import { createFamilyApi } from './family-api.js';
 import { createPushService, createPushApi } from './push.js';
+import {
+  createDbKakaoConsentStore, readKakaoConsent, parseConsentCommand,
+  KAKAO_AI_NOTICE, KAKAO_RULES_ONLY_NOTE, KAKAO_CONSENT_REPLY, KAKAO_CONSENT_COMMANDS,
+} from './kakao-consent.js';
 
 const HEADER_TOKEN_KEY = "x-skill-token";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -72,7 +76,7 @@ const GOOGLE_ATTRIBUTION = "Advisory provided by Google";
 const GOOGLE_ADVISORY_URL = "https://developers.google.com/safe-browsing/v4/advisory";
 const hasGoogleWarning = (result) => (result.signals_final ?? []).includes("SIG_SB_UNSAFE_URL");
 
-function buildReplyText(result) {
+function buildReplyText(result, { rulesOnlyNote = false } = {}) {
   const lvl = LEVEL_TEXT[result.level] ?? result.level;
   const lines = [];
 
@@ -104,6 +108,8 @@ function buildReplyText(result) {
   // 작업 ⑦: 건강 관련 안내라 해외 AI로 보내지 않은 경우
   if (result.ai_skipped === "health") lines.push(HEALTH_SKIPPED_TEXT);
   if (hasGoogleWarning(result)) lines.push(GOOGLE_ATTRIBUTION);
+  // D59: 해외 AI 동의 기록이 없어 규칙만 판정했을 때
+  if (rulesOnlyNote) lines.push(KAKAO_RULES_ONLY_NOTE);
   lines.push(FIXED.DISCLAIMER); // F4-8: 모든 결과 화면에 한계 문구
   return lines.join("\n");
 }
@@ -183,10 +189,15 @@ export async function handleRequest(params, cfg) {
     return { status: 200, body: simpleText(FIXED.ERROR) };
   }
 
-  const text = buildReplyText(result);
+  // D59: cfg.aiConsent가 있으면(카카오) 동의 상태에 따라 안내 줄과 버튼을 붙인다. 없으면(기존 호출) 그대로
+  const consent = cfg.aiConsent;
+  const text = buildReplyText(result, { rulesOnlyNote: consent === "unknown" });
   const replies = [];
   if (result.level === "위험" || result.level === "주의") {
     replies.push(quickReply.message("이미 당했어요", "이미 당했어요"));
+  }
+  if (consent && consent !== "granted") {
+    replies.push(quickReply.message(KAKAO_CONSENT_COMMANDS.notice, KAKAO_CONSENT_COMMANDS.notice));
   }
   replies.push(quickReply.message("처음으로", "처음으로"));
   const links = await buildResultLinks(result, cfg.webBaseUrl, cfg.resultStore);
@@ -200,6 +211,26 @@ const LEVEL_IMAGE = {
   위험: { path: "/kakao/level-danger.png", alt: "위험: 링크 누르지 마세요. 돈이나 정보를 보내지 마세요." },
   주의: { path: "/kakao/level-caution.png", alt: "주의: 보내기 전에 직접 확인하세요." },
 };
+
+/** D59: 동의 안내·동의·거절·끄기 명령에 답한다. 기록에 실패하면 규칙만 쓴다고 알린다. */
+export async function handleConsentCommand(command, botUserKey, store, webBaseUrl) {
+  const home = quickReply.message("처음으로", "처음으로");
+  if (command.notice) {
+    const body = simpleText(KAKAO_AI_NOTICE, [
+      quickReply.message(KAKAO_CONSENT_COMMANDS.agree, KAKAO_CONSENT_COMMANDS.agree),
+      quickReply.message(KAKAO_CONSENT_COMMANDS.refuse, KAKAO_CONSENT_COMMANDS.refuse),
+      home,
+    ]);
+    return webBaseUrl ? withLinkCard(body, [{ label: "개인정보 처리방침", url: `${webBaseUrl}/privacy` }]) : body;
+  }
+  try {
+    if (!store || !botUserKey) throw new Error("no store");
+    await store.set(botUserKey, command.granted);
+  } catch {
+    return simpleText(KAKAO_CONSENT_REPLY.unavailable, [home]);
+  }
+  return simpleText(command.granted ? KAKAO_CONSENT_REPLY.agreed : KAKAO_CONSENT_REPLY.refused, [home]);
+}
 
 /**
  * GET /api/result?t=… — 1회용 토큰으로 판별 결과 조회(PRD 13-4).
@@ -273,6 +304,9 @@ export function makeHandler(config) {
   const pushApi = push ? createPushApi(auth,push,config) : null;
   const familyApi = db ? createFamilyApi(auth,createConfirmService(db,receipts),config,{notify:push.notify,recordCheck}) : null;
   const resultStore = config.resultStore || (db && config.webBaseUrl ? createDbResultStore(db) : null);
+  // D59: 카카오 해외 AI 동의 저장소. 없으면(설정 누락) 아무도 동의하지 않은 것으로 보고 규칙만 판정한다
+  const kakaoConsent = config.kakaoConsentStore !== undefined ? config.kakaoConsentStore
+    : (db && config.hmacKey ? createDbKakaoConsentStore(db, config.hmacKey) : null);
   // 평판 조회기: 캐시를 프로세스 동안 공유한다. 키가 없으면 null(조회 안 함).
   // 국내 KISA 목록(D40 ①)은 메모리 대조라 외부 전송·지연이 없다. 둘 다 없으면 null(조회 안 함).
   const phishingList = config.phishingList === undefined ? loadPhishingListChecker().check : config.phishingList;
@@ -401,11 +435,17 @@ export function makeHandler(config) {
       });
     }
 
+    // D59: 동의 명령(버튼 문장과 정확히 같을 때만)은 판별하지 않고 동의 상태만 바꾼다
+    const command = parseConsentCommand(parsed.text);
+    if (command) return send(200, await handleConsentCommand(command, parsed.botUserKey, kakaoConsent, config.webBaseUrl));
+
     await concurrency.acquire();
     try {
+      const aiConsent = await readKakaoConsent(kakaoConsent, parsed.botUserKey);
       const { status, body } = await handleRequest(
         { utterance: parsed.text, parentInputs: parsed.parentInputs ?? {} },
-        { ai: config.ai, hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation, domainAge, signalMetrics },
+        { ai: aiConsent === "granted" ? config.ai : null, aiConsent,
+          hmacKey: config.hmacKey, cards: [], webBaseUrl: config.webBaseUrl, resultStore, urlReputation, domainAge, signalMetrics },
       );
       send(status, body);
     } finally {

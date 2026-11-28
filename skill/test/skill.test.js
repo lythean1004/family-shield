@@ -581,13 +581,17 @@ describe("HTTP 서버 - /api/analyze", () => {
       models.push(JSON.parse(options.body).model);
       return fakeGateway([])(url, options);
     };
+    // D59: 카카오는 해외 AI 동의가 있는 사용자만 AI를 부른다
+    const { createMemoryKakaoConsentStore } = await import("../src/kakao-consent.js");
+    config.kakaoConsentStore = createMemoryKakaoConsentStore();
+    await config.kakaoConsentStore.set("consented-user", true);
     const server = createServer(makeHandler(config));
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
     try {
       const web = await fetch(`${base}/api/analyze`, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({text:"합성 시험 문자입니다"})});
       assert.equal(web.status, 200);
-      const kakao = await fetch(`${base}/api/kakao-skill`, {method:"POST", headers:{"content-type":"application/json","x-skill-token":"h"}, body:JSON.stringify({userRequest:{utterance:"합성 시험 문자입니다"}})});
+      const kakao = await fetch(`${base}/api/kakao-skill`, {method:"POST", headers:{"content-type":"application/json","x-skill-token":"h"}, body:JSON.stringify({userRequest:{utterance:"합성 시험 문자입니다",user:{properties:{botUserKey:"consented-user"}}}})});
       assert.equal(kakao.status, 200);
       assert.deepEqual(models, ["fake-web", "fake"]);
     } finally { server.close(); }
