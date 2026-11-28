@@ -125,6 +125,15 @@ const SYSTEM_PROMPTS = {
 };
 SYSTEM_PROMPTS.v4 = `${SYSTEM_PROMPTS.v3}\n${SIGNAL_GUIDE_V4_MORE}`;
 
+// v5(2026-11-28): v4 오경보 — 배송조회·고지서 확인 링크만 있는 안내, “인증번호 알려주지 마세요” 같은 금지 안내
+const SIGNAL_GUIDE_V5_LIMITS = [
+  "요구가 아닌 것:",
+  "- 배송조회·고지서 확인·조회처럼 보기만 하는 링크를 안내하는 것은 정보 갱신·주소 수정 요구가 아니다. 이런 안내에는 SIG_AGENCY_IMPERSONATION을 표시하지 않는다.",
+  "- ‘알려주지 마세요’·‘입력하지 마세요’처럼 하지 말라는 말은 SIG_PERSONAL_INFO·SIG_APP_INSTALL이 아니다.",
+  "- 문자에 전화번호가 없으면 SIG_CALL_THIS_NUMBER를 표시하지 않는다.",
+].join("\n");
+SYSTEM_PROMPTS.v5 = `${SYSTEM_PROMPTS.v4}\n${SIGNAL_GUIDE_V5_LIMITS}`;
+
 /** 알 수 없는 버전은 v1으로 처리한다(서버 설정 오타가 AI를 끄지 않게). */
 export function systemPromptFor(promptVersion) {
   return SYSTEM_PROMPTS[promptVersion] ?? SYSTEM_PROMPTS.v1;

@@ -16,7 +16,16 @@ import { extractSignals } from "./ai-client.js";
 import { decide } from "./rule-engine.js";
 import { hasHealthInfo, maskHealth, shouldSkipAiForHealth } from "./sensitive.js";
 import { summarize } from "./summarizer.js";
-import { SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_SHORT_URL, SIG_NEW_DOMAIN } from "./signals.js";
+import { SIG_MALICIOUS_URL, SIG_SB_UNSAFE_URL, SIG_SHORT_URL, SIG_NEW_DOMAIN, SIG_CALL_THIS_NUMBER } from "./signals.js";
+
+// 전화번호처럼 보이는 숫자(구분 기호 포함 7자리 이상, 또는 1588-0000 같은 대표번호). 마스킹 전 원문으로 본다
+const PHONE_LIKE = /(?:\d[\s.-]?){7,}|(?<!\d)1[5-9]\d{2}[\s-]?\d{4}(?!\d)/;
+
+/** 문자에 전화번호가 없는데 AI가 ‘문자 속 번호로 전화 유도’를 붙이면 뺀다(2026-11-28, “고객센터로 문의”·“회신 부탁” 오경보). */
+export function groundAiSignals(text, signals) {
+  if (PHONE_LIKE.test(String(text))) return signals;
+  return signals.filter(s => s !== SIG_CALL_THIS_NUMBER);
+}
 
 /** F4-1 입력 길이 상한 [임시] */
 export const MAX_INPUT_CHARS = 2000;
@@ -94,7 +103,7 @@ export async function analyze({
   const age = await ageP;
 
   // ⑤ 합집합 (평판 조회 실패는 신호를 빼지 않을 뿐, 판정을 낮추지 않는다)
-  const signalsAi = aiData?.signals ?? [];
+  const signalsAi = groundAiSignals(text, aiData?.signals ?? []);
   const signalsCode = [...code.signals];
   // 출처별로 신호를 나눈다: Google 경고에는 Google 출처 표시가 필요하고, 다른 출처에는 붙이면 안 된다
   const bySource = !reputation?.malicious?.length ? {}
