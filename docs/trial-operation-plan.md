@@ -25,9 +25,9 @@
 - [x] 웹 동의 문구 v5와 해외 AI 이해 확인 배포
 - [x] 처리방침·약관 게시(`/privacy`, `/terms`)
 - [x] 운영 기간 안내: 웹 첫 화면·가입 화면
-- [ ] 처리방침에 운영자 연락처 넣어 다시 배포(`VITE_OPERATOR_CONTACT`)
-- [ ] 카카오 채널 소식·웰컴 메시지 게시([문안](notice-service-period.md))
-- [ ] 합성 문자 카드 준비(5장), 인쇄본은 `private/`에만
+- [x] 처리방침에 운영자 연락처 넣어 다시 배포(`VITE_OPERATOR_CONTACT`, 11/28)
+- [x] 카카오 채널 소식·웰컴 메시지 게시([문안](notice-service-period.md), 11/28)
+- [x] 합성 문자 카드 준비(5장, `private/trial-cards-2026-11-28.md`)
 - [ ] 이 계획서와 대본을 운영자가 확인
 
 ## 4. 합성 문자 시나리오
