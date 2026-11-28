@@ -110,11 +110,20 @@ const SIGNAL_GUIDE_V3_LIMITS = [
   "- 끝에 ‘문의: 고객센터’처럼 번호를 참고로 적어 둔 것은 SIG_CALL_THIS_NUMBER가 아니다. 문제(사건 연루·미납·결제 이상·계정 정지·택배 보류 등)를 풀려면 문자 속 번호로 전화하라고 재촉할 때만 표시한다.",
 ].join("\n");
 
+// v4(2026-11-28): v2·v3에서도 남은 놓침. 첫머리 [발신 이름] + 링크로 갱신·수정 요구, 중고거래 판매자 계좌 선입금
+const SIGNAL_GUIDE_V4_MORE = [
+  "더 볼 것(놓치기 쉬운 요구):",
+  "- 문자 첫머리의 [이름]·(이름)은 보낸 사람이 스스로 밝힌 것이다. 회사·기관 이름을 밝히고 링크로 정보 갱신·주소 수정·조회를 요구하면 SIG_AGENCY_IMPERSONATION이다.",
+  "- 거래 상대(판매자·처음 보는 사람)가 안전결제를 피하고 자기 계좌로 먼저 돈을 보내라고 하면 SIG_THIRD_PARTY_ACCOUNT와 SIG_PREPAYMENT다.",
+  "- 연인·지인이라며 돈을 빌려 달라고 하고 가족에게 숨기라고 하면 SIG_MONEY와 SIG_SECRECY다.",
+].join("\n");
+
 const SYSTEM_PROMPTS = {
   v1: SYSTEM_PROMPT,
   v2: `${SYSTEM_PROMPT}\n${SIGNAL_GUIDE_V2}`,
   v3: `${SYSTEM_PROMPT}\n${SIGNAL_GUIDE_V2.replace("\n회사·기관을 자처하면 impersonation_type은 agency다.", "\n회사·기관을 자처하며 무언가를 요구하면 impersonation_type은 agency다.")}\n${SIGNAL_GUIDE_V3_LIMITS}`,
 };
+SYSTEM_PROMPTS.v4 = `${SYSTEM_PROMPTS.v3}\n${SIGNAL_GUIDE_V4_MORE}`;
 
 /** 알 수 없는 버전은 v1으로 처리한다(서버 설정 오타가 AI를 끄지 않게). */
 export function systemPromptFor(promptVersion) {
