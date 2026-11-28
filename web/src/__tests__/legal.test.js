@@ -83,7 +83,7 @@ describe('처리방침 v2 보수적 보강', () => {
   const sec = (k) => PRIVACY.sections.find((s) => s.h.includes(k))
   const text = (s) => [s.h, ...(s.p ?? []), ...(s.rows ?? []).flat()].join('\n')
   it('문서 버전이 v2다', () => {
-    assert.equal(LEGAL_VERSION, 'legal-2026-11-28-v2')
+    assert.equal(LEGAL_VERSION, 'legal-2026-11-28-v3')
   })
   it('국외 이전의 법적 근거(별도 동의)와 받는 곳 연락처 확인 중을 적는다', () => {
     const t = text(sec('국외 이전'))
@@ -116,5 +116,13 @@ describe('처리방침 v2 보수적 보강', () => {
     const t = text(sec('인공지능'))
     assert.match(t, /자동으로/)
     assert.match(t, /이의/)
+  })
+})
+
+describe('처리방침 v3: AI 사용 상태(카카오·웹 일치, A안)', () => {
+  it('판별 기록에 AI 사용 상태를 적고, AI 문장은 저장하지 않는다고 밝힌다', () => {
+    const row = PRIVACY.sections.find((s) => s.h.includes('1.')).rows.find((r) => r[0] === '판별 기록')
+    assert.match(row[1], /AI 사용 상태/)
+    assert.match(row[1], /AI 설명 문장은 저장하지 않음/)
   })
 })

@@ -22,7 +22,7 @@ export function verdictDescription(level, impersonationType) {
 // AI 실패·시간 초과, 검증 또는 구조화된 기록 때문에 설명을 표시할 수 없을 때.
 export const AI_FALLBACK_TEXT = '표시할 추가 설명이 없어요. 판정은 그대로예요.'
 // 해외 AI 분석을 허락하지 않은 경우(동의 재설계 v3): 규칙만으로 판정
-export const AI_DECLINED_TEXT = '해외 AI 분석을 허락하지 않아 정해진 규칙으로만 확인했어요.'
+export { AI_DECLINED_TEXT } from '../../../packages/core/src/fixed-text.js' // 카카오와 같은 출처
 
 // 개발용 가짜 결과(SC1). VM API·토큰(D34) 연결 전까지 /check/result에서 쓴다.
 export const DEV_RESULT = {

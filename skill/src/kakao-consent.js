@@ -7,6 +7,7 @@
  * - 안내문은 보수적 가정(compliance-plan 0장)을 따른다. 확인되지 않은 것은 ‘확인 중’과 가장 넓은 값으로 적는다.
  */
 import { createHmac } from "node:crypto";
+import { RULES_ONLY_TEXT } from "../../packages/core/src/fixed-text.js";
 
 export const KAKAO_CONSENT_VERSION = "kakao-2026-11-28-v1";
 
@@ -32,7 +33,7 @@ export const KAKAO_AI_NOTICE = [
 ].join("\n");
 
 export const KAKAO_RULES_ONLY_NOTE =
-  `※ 지금은 규칙으로만 확인했어요. AI도 함께 보게 하려면 [${KAKAO_CONSENT_COMMANDS.notice}]를 눌러 주세요.`;
+  `※ ${RULES_ONLY_TEXT} AI도 함께 보게 하려면 [${KAKAO_CONSENT_COMMANDS.notice}]를 눌러 주세요.`;
 
 export const KAKAO_CONSENT_REPLY = {
   agreed: `동의를 기록했어요. 다음에 보내는 문자부터 AI가 함께 봐요. 방금 확인한 문자는 다시 보내 주세요.\n그만두려면 ‘${KAKAO_CONSENT_COMMANDS.off}’라고 보내 주세요.`,
@@ -89,11 +90,32 @@ export async function readKakaoConsent(store, botUserKey) {
   }
 }
 
+/**
+ * 명령 비교용 정규화: 전각→반각(NFKC), 소문자, 띄어쓰기 없앰, 끝 문장부호 없앰, ‘에이아이·인공지능’→ai.
+ * 메시지 전체가 짧은 명령 한 줄일 때만 명령으로 본다(문자 속에 섞인 말은 판별로 보냄).
+ */
+function normalizeCommand(utterance) {
+  return String(utterance ?? "").normalize("NFKC").toLowerCase()
+    .replace(/\s+/g, "").replace(/[.!?~…·,]+$/u, "").replace(/에이아이|인공지능/g, "ai");
+}
+const n = (list) => new Set(list.map(normalizeCommand));
+// 철회는 동의만큼 쉬워야 하므로 넓게 받는다(끝의 ‘요’도 허용)
+const OFF_WORDS = n([KAKAO_CONSENT_COMMANDS.off, "AI 꺼", "AI 꺼줘", "AI 꺼 주세요", "AI 꺼주라", "AI 끌게", "AI 끌래",
+  "AI 그만", "AI 그만할게", "AI 그만할래", "AI 안 쓸래", "AI 안 쓸게", "AI 안 써", "AI 끄기 해줘", "AI 끄기 해 주세요",
+  "AI 분석 끄기", "AI 분석 그만", "AI 분석 안 쓸래", "AI 동의 철회", "AI 분석 동의 철회", "동의 철회"]);
+// 동의는 좁게: 버튼 문장의 띄어쓰기·대소문자·문장부호 차이만
+const AGREE_WORDS = n([KAKAO_CONSENT_COMMANDS.agree, "AI 분석에 동의합니다", "AI 분석에 동의"]);
+const REFUSE_WORDS = n([KAKAO_CONSENT_COMMANDS.refuse, "규칙만 쓸게", "규칙만 쓸래요", "규칙만 쓸래", "규칙만"]);
+const NOTICE_WORDS = n([KAKAO_CONSENT_COMMANDS.notice, "AI 끄는 법", "AI 끄는 방법"]);
+const MAX_COMMAND_CHARS = 20;
+
 /** 동의 명령이면 { granted?: boolean, notice?: true }, 아니면 null */
 export function parseConsentCommand(utterance) {
-  const t = String(utterance ?? "").trim();
-  if (t === KAKAO_CONSENT_COMMANDS.notice) return { notice: true };
-  if (t === KAKAO_CONSENT_COMMANDS.agree) return { granted: true };
-  if (t === KAKAO_CONSENT_COMMANDS.refuse || t === KAKAO_CONSENT_COMMANDS.off) return { granted: false };
+  const t = normalizeCommand(utterance);
+  if (!t || t.length > MAX_COMMAND_CHARS) return null;
+  const has = (set) => set.has(t) || set.has(t.replace(/요$/u, ""));
+  if (has(NOTICE_WORDS)) return { notice: true };
+  if (AGREE_WORDS.has(t)) return { granted: true };
+  if (has(OFF_WORDS) || has(REFUSE_WORDS)) return { granted: false };
   return null;
 }

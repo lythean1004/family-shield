@@ -20,8 +20,9 @@ import ActionButton from './ActionButton.jsx'
 import CallButton from './CallButton.jsx'
 import MisjudgeLink from './MisjudgeLink.jsx'
 import SpeakButton from './SpeakButton.jsx'
-import { levelKey, verdictDescription, AI_FALLBACK_TEXT, AI_DECLINED_TEXT } from '../data/result.js'
-import { HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT, AI_EXPLANATION_NOTE } from '../../../packages/core/src/fixed-text.js'
+import { levelKey, verdictDescription, AI_FALLBACK_TEXT } from '../data/result.js'
+import { SHORT_URL_TEXT, OFFICIAL_LINK_TEXT, AI_EXPLANATION_NOTE, AI_EXPLANATION_ELSEWHERE_TEXT } from '../../../packages/core/src/fixed-text.js'
+import { aiStateNotice } from '../../../packages/core/src/ai-state.js'
 import { POLICE, sourceText } from '../data/contacts.js'
 
 export default function ResultView({
@@ -32,13 +33,15 @@ export default function ResultView({
   const type = result.impersonation_type
   const who = familyName || result.impersonated_relation || '가족'
   const explanation = result.explanation_for_parent ?? []
-  let reasons = explanation.slice(0, 3)
-  let aiWritten = reasons.length > 0 && !result.fallback_used
-  if (key !== 'check' && (result.fallback_used || reasons.length === 0)) {
-    const fixed = result.ai_skipped === 'health' ? HEALTH_SKIPPED_TEXT
-      : result.ai_consent === false ? AI_DECLINED_TEXT : AI_FALLBACK_TEXT
-    reasons = [fixed]
-    aiWritten = false
+  // AI 사용 상태(카카오 답과 같은 고정 문장, docs/plan-kakao-web-consistency.md). 저장 전 버전 결과는 옛 필드로 짐작
+  const aiState = result.ai_state
+    ?? (result.ai_skipped === 'health' ? 'health' : result.ai_consent === false ? 'declined' : null)
+  const stateNotice = aiStateNotice(aiState)
+  const aiWritten = explanation.length > 0 && !result.fallback_used
+  let reasons = aiWritten ? explanation.slice(0, 3) : []
+  if (key !== 'check' && !aiWritten) {
+    // AI 설명은 저장하지 않는다(A안): 카카오에서 온 결과면 설명이 어디 있는지만 알린다
+    reasons = aiState === 'explained' ? [AI_EXPLANATION_ELSEWHERE_TEXT] : stateNotice ? [] : [AI_FALLBACK_TEXT]
   }
 
   const askFamily = () => {
@@ -54,6 +57,7 @@ export default function ResultView({
     verdictDescription(result.level, type),
     ...reasons,
     ...(aiWritten ? [AI_EXPLANATION_NOTE] : []),
+    ...(stateNotice ? [stateNotice] : []),
     ...(result.signals_final?.includes('SIG_SHORT_URL') ? [SHORT_URL_TEXT] : []),
     ...(key === 'check' && result.signals_final?.includes('SIG_OFFICIAL_LINK') ? [OFFICIAL_LINK_TEXT] : []),
     LIMIT_NOTICE, // 화면과 같은 project.md 문장(2026-11-11 결정 B)
@@ -83,6 +87,9 @@ export default function ResultView({
           )}
         </section>
       )}
+
+      {/* 동의 전·거절·건강정보: 단계와 관계없이 카카오 답과 같은 문장 */}
+      {stateNotice && <p className="screen-body ai-state">{stateNotice}</p>}
 
       {key === 'danger' && (
         <>

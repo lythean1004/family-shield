@@ -25,3 +25,9 @@ export const HEALTH_SKIPPED_TEXT = "건강 관련 내용이 있어 해외 AI로 
  * AI 설명을 실제로 보여 줄 때만 붙인다(고정 문장·확인 필요에는 붙이지 않음). 2026-11-28 대조, 결정 7A.
  */
 export const AI_EXPLANATION_NOTE = "위 설명은 AI가 만든 문장이에요. 위험 단계는 AI가 아니라 정해진 규칙이 정해요.";
+
+/** AI를 쓰지 않은 까닭(카카오·웹 공용, docs/plan-kakao-web-consistency.md) */
+export const RULES_ONLY_TEXT = "지금은 규칙으로만 확인했어요.";
+export const AI_DECLINED_TEXT = "해외 AI 분석을 허락하지 않아 정해진 규칙으로만 확인했어요.";
+/** [자세히 보기]: AI 설명 문장은 저장하지 않으므로(원칙) 어디에 있는지만 알려 준다(운영자 A안) */
+export const AI_EXPLANATION_ELSEWHERE_TEXT = "AI가 만든 설명은 카카오톡 답에 있어요. 가족방패는 그 문장을 저장하지 않아요.";

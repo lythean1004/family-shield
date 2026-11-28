@@ -3,6 +3,7 @@ import { hashToken, fail } from './auth.js'
 import { createResultToken, isTokenFormat } from '../../packages/core/src/result-token.js'
 import { summarize } from '../../packages/core/src/summarizer.js'
 import { isKnownRuleId } from '../../packages/core/src/rule-engine.js'
+import { AI_STATES } from '../../packages/core/src/ai-state.js'
 import * as signals from '../../packages/core/src/signals.js'
 
 export const LEVEL_TO_DB = {위험:'danger',주의:'caution',확인필요:'check'}
@@ -18,6 +19,8 @@ export function storedResult(result) {
     impersonation_type:signals.IMPERSONATION_TYPES.has(result.impersonation_type)?result.impersonation_type:'unknown',
     impersonated_relation:relation,
     fallback_used:!!result.fallback_used,
+    // AI 문장은 저장하지 않고, 어떤 경우였는지만(카카오·웹 일치, 운영자 A안). 이전 결과는 null
+    ai_state:AI_STATES.includes(result.ai_state)?result.ai_state:null,
     explanation_for_parent:[],
     summary:summarize(validSignals,{impersonated_relation:relation}),
   }
@@ -49,13 +52,19 @@ export function createReceipts(key) {
     },
   }
 }
-export async function insertCheck(tx,result,{userId=null,circleId=null,channel='web',receiptHash=null}={}) {
+/** DB checks 행에 저장하는 칸(원문·AI 문장 없음). 시험에서 운영과 같은 저장 형태를 재현할 때도 쓴다 */
+export function checkColumns(result) {
   const r=storedResult(result)
+  return {level:LEVEL_TO_DB[r.level],signals_final:r.signals_final,fired_rules:r.fired_rules,impersonation_type:r.impersonation_type,
+    impersonated_relation:r.impersonated_relation,fallback_used:r.fallback_used,ai_state:r.ai_state}
+}
+export async function insertCheck(tx,result,{userId=null,circleId=null,channel='web',receiptHash=null}={}) {
+  const c=checkColumns(result)
   const {rows:[row]}=await tx.query(`insert into public.checks(circle_id,created_by,input_channel,level,signals_final,
-    fired_rules,impersonation_type,impersonated_relation,fallback_used,purge_at,receipt_hash)
-    values($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+$10::interval,$11) returning id`,
-    [circleId,userId,channel,LEVEL_TO_DB[r.level],r.signals_final,r.fired_rules,r.impersonation_type,r.impersonated_relation,r.fallback_used,
-      userId?'24 hours':'10 minutes',receiptHash])
+    fired_rules,impersonation_type,impersonated_relation,fallback_used,purge_at,receipt_hash,ai_state)
+    values($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+$10::interval,$11,$12) returning id`,
+    [circleId,userId,channel,c.level,c.signals_final,c.fired_rules,c.impersonation_type,c.impersonated_relation,c.fallback_used,
+      userId?'24 hours':'10 minutes',receiptHash,c.ai_state])
   return row.id
 }
 // Called only with server-issued results. Consent and storage share the circle lock

@@ -81,7 +81,9 @@ describe("카카오 해외 AI 동의(D59)", () => {
       await say(KAKAO_CONSENT_COMMANDS.off);
       const after = await say(SCAM);
       assert.equal(ai.calls.length, 1);
-      assert.doesNotMatch(after.text, /규칙으로만 확인했어요/, "거절한 사람에게는 매번 묻지 않는다");
+      // 거절한 사람에게는 매번 [AI 분석 안내]를 누르라고 하지 않는다. 왜 규칙만인지는 웹과 같은 문장으로 알린다(카카오·웹 일치)
+      assert.doesNotMatch(after.text, /눌러 주세요/, "거절한 사람에게는 매번 묻지 않는다");
+      assert.match(after.text, /허락하지 않아 정해진 규칙으로만 확인했어요/);
       assert.ok(after.replies.includes(KAKAO_CONSENT_COMMANDS.notice), "다시 켤 수 있는 버튼은 남긴다");
     });
   });

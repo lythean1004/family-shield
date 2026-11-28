@@ -23,7 +23,8 @@ import { loadPhishingListChecker, combineCheckers } from "../../packages/core/sr
 import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
 import { readRequest, simpleText, quickReply, withImage, withLinkCard } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
-import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT, AI_EXPLANATION_NOTE } from "../../packages/core/src/fixed-text.js";
+import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT, AI_EXPLANATION_NOTE, AI_DECLINED_TEXT } from "../../packages/core/src/fixed-text.js";
+import { aiState } from "../../packages/core/src/ai-state.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
 import { createDatabase } from './database.js';
@@ -76,7 +77,7 @@ const GOOGLE_ATTRIBUTION = "Advisory provided by Google";
 const GOOGLE_ADVISORY_URL = "https://developers.google.com/safe-browsing/v4/advisory";
 const hasGoogleWarning = (result) => (result.signals_final ?? []).includes("SIG_SB_UNSAFE_URL");
 
-function buildReplyText(result, { rulesOnlyNote = false } = {}) {
+function buildReplyText(result) {
   const lvl = LEVEL_TEXT[result.level] ?? result.level;
   const lines = [];
 
@@ -107,10 +108,11 @@ function buildReplyText(result, { rulesOnlyNote = false } = {}) {
   // 단축 링크 전용 안내(D48 ②): 속 주소를 모르니 누르지 말고 직접 확인
   if ((result.signals_final ?? []).includes("SIG_SHORT_URL")) lines.push(SHORT_URL_TEXT);
   // 작업 ⑦: 건강 관련 안내라 해외 AI로 보내지 않은 경우
-  if (result.ai_skipped === "health") lines.push(HEALTH_SKIPPED_TEXT);
+  if (result.ai_state === "health" || result.ai_skipped === "health") lines.push(HEALTH_SKIPPED_TEXT);
   if (hasGoogleWarning(result)) lines.push(GOOGLE_ATTRIBUTION);
-  // D59: 해외 AI 동의 기록이 없어 규칙만 판정했을 때
-  if (rulesOnlyNote) lines.push(KAKAO_RULES_ONLY_NOTE);
+  // D59: 해외 AI 동의 기록이 없어 규칙만 / 거절·끄기 뒤(웹 [자세히 보기]와 같은 문장, ai_state)
+  if (result.ai_state === "rules_only") lines.push(KAKAO_RULES_ONLY_NOTE);
+  if (result.ai_state === "declined") lines.push(AI_DECLINED_TEXT);
   lines.push(FIXED.DISCLAIMER); // F4-8: 모든 결과 화면에 한계 문구
   return lines.join("\n");
 }
@@ -192,7 +194,9 @@ export async function handleRequest(params, cfg) {
 
   // D59: cfg.aiConsent가 있으면(카카오) 동의 상태에 따라 안내 줄과 버튼을 붙인다. 없으면(기존 호출) 그대로
   const consent = cfg.aiConsent;
-  const text = buildReplyText(result, { rulesOnlyNote: consent === "unknown" });
+  // AI 사용 상태를 결과에 붙여 [자세히 보기]에도 저장한다(문장 아님, 운영자 A안)
+  result = { ...result, ai_state: aiState(result, { consent }) };
+  const text = buildReplyText(result);
   const replies = [];
   if (result.level === "위험" || result.level === "주의") {
     replies.push(quickReply.message("이미 당했어요", "이미 당했어요"));
@@ -396,6 +400,7 @@ export function makeHandler(config) {
             hmacKey: config.hmacKey, cards: [], urlReputation, domainAge, signalMetrics },
         );
         if (body.ok && !aiAllowed) body.result.ai_consent = false;
+        if (body.ok) body.result.ai_state = aiState(body.result, { consent: aiAllowed ? "granted" : "refused" });
         if (body.ok && receipts) {
           body.result.receipt = receipts.issue(body.result,req.auth.userId);
           await recordCheck(req.auth.userId,body.result.receipt);
