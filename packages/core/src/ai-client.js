@@ -102,9 +102,18 @@ const SIGNAL_GUIDE_V2 = [
   "회사·기관을 자처하면 impersonation_type은 agency다.",
 ].join("\n");
 
+// v3(2026-11-28): v2는 놓침을 크게 줄였지만(v15 41%→12%) 진짜 회사·기관 안내까지 기관 사칭과
+// ‘문자 속 번호로 전화 유도’로 표시해 R6 오경보가 늘었다(v2 세트 3.2%→9.5%). 두 신호의 경계를 덧붙인다
+const SIGNAL_GUIDE_V3_LIMITS = [
+  "경계(정상 안내를 사기로 표시하지 않기):",
+  "- 결제·배송·예약 완료, 일정·점검 공지처럼 이미 일어난 일을 알리기만 하고 받는 사람에게 돈·정보·설치·링크 접속·전화를 요구하지 않는 회사·기관 안내에는 SIG_AGENCY_IMPERSONATION을 표시하지 않고 impersonation_type은 none이다.",
+  "- 끝에 ‘문의: 고객센터’처럼 번호를 참고로 적어 둔 것은 SIG_CALL_THIS_NUMBER가 아니다. 문제(사건 연루·미납·결제 이상·계정 정지·택배 보류 등)를 풀려면 문자 속 번호로 전화하라고 재촉할 때만 표시한다.",
+].join("\n");
+
 const SYSTEM_PROMPTS = {
   v1: SYSTEM_PROMPT,
   v2: `${SYSTEM_PROMPT}\n${SIGNAL_GUIDE_V2}`,
+  v3: `${SYSTEM_PROMPT}\n${SIGNAL_GUIDE_V2.replace("\n회사·기관을 자처하면 impersonation_type은 agency다.", "\n회사·기관을 자처하며 무언가를 요구하면 impersonation_type은 agency다.")}\n${SIGNAL_GUIDE_V3_LIMITS}`,
 };
 
 /** 알 수 없는 버전은 v1으로 처리한다(서버 설정 오타가 AI를 끄지 않게). */

@@ -167,6 +167,10 @@ describe("프롬프트 버전·temperature", () => {
     assert.match(systemPromptFor("v2"), /SIG_AGENCY_IMPERSONATION: .*택배사/);
     assert.equal(systemPromptFor("v9"), systemPromptFor("v1"));
     assert.doesNotMatch(systemPromptFor("v1"), /신호 뜻/);
+    // v3 = v2 + 정상 안내 경계. v2의 ‘자처하면 agency’ 문장은 ‘요구하면’으로 바뀐다
+    assert.match(systemPromptFor("v3"), /SIG_AGENCY_IMPERSONATION: .*택배사/);
+    assert.match(systemPromptFor("v3"), /참고로 적어 둔 것은 SIG_CALL_THIS_NUMBER가 아니다/);
+    assert.doesNotMatch(systemPromptFor("v3"), /자처하면 impersonation_type/);
   });
   for (const [temperature, expected] of [[0, 0], [undefined, undefined]]) {
     it(`temperature ${temperature}`, async () => {
