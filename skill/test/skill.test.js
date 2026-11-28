@@ -721,3 +721,23 @@ describe("공식 주소 안내 교차 사례 — 카카오 답장", () => {
     assert.equal(text.includes(OFFICIAL_LINK_TEXT), c.notice);
   });
 });
+
+// 인공지능기본법 제31조②·시행령 제23조②(2026-11-28 대조, 결정 7A): AI가 만든 설명에는 그 사실을 표시한다
+import { AI_EXPLANATION_NOTE } from "../../packages/core/src/fixed-text.js";
+describe("AI 생성 설명 표시 (AI기본법 제31조②)", () => {
+  it("AI 설명을 붙이면 AI가 만든 문장이라고 표시한다", async () => {
+    const fetchImpl = fakeGateway(["SIG_PERSONAL_INFO", "SIG_URGENCY"], "none", ["주민번호를 묻고 서두르게 해요."]);
+    const r = await handleRequest({ utterance: "오늘 안에 주민번호 앞자리를 알려 주세요. 급합니다." }, { ...cfg, ai: { ...cfg.ai, fetchImpl } });
+    const reply = r.body.template.outputs.find(o => o.simpleText).simpleText.text;
+    assert.ok(reply.includes("주민번호를 묻고 서두르게 해요."), reply);
+    assert.ok(reply.includes(AI_EXPLANATION_NOTE), reply);
+  });
+  it("AI 설명이 없으면(걸러짐·확인 필요) 표시하지 않는다", async () => {
+    const fetchImpl = fakeGateway(["SIG_PERSONAL_INFO"], "none", ["이상 없어요."]);
+    const r = await handleRequest({ utterance: "교육용 사례를 살펴봅니다." }, { ...cfg, ai: { ...cfg.ai, fetchImpl } });
+    const reply = r.body.template.outputs.find(o => o.simpleText).simpleText.text;
+    assert.ok(!reply.includes(AI_EXPLANATION_NOTE), reply);
+    const r2 = await handleRequest({ utterance: "내일 모임 장소 알려 드려요." }, cfg);
+    assert.ok(!r2.body.template.outputs.find(o => o.simpleText).simpleText.text.includes(AI_EXPLANATION_NOTE));
+  });
+});

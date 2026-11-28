@@ -45,3 +45,18 @@ it('검증 뒤 설명이 모두 사라져도 받은 신호와 고정 안내를 �
   assert.ok(!html.includes('만들지 못했어요')) // 저장된 결과도 설명만 비어 있을 수 있다.
   assert.ok(!html.includes('이상이 없어요.'))
 })
+
+// 인공지능기본법 제31조②(결정 7A): AI가 만든 설명을 보여 줄 때만 그 사실을 표시한다
+import { AI_EXPLANATION_NOTE } from '../../../packages/core/src/fixed-text.js'
+describe('AI 생성 설명 표시 — 실제 웹 결과 화면', () => {
+  const base = { level: '주의', signals_final: ['SIG_LINK'], fired_rules: ['R7'], impersonation_type: 'none' }
+  it('AI 설명이 있으면 표시한다', () => {
+    const html = module.exports.render({ ...base, explanation_for_parent: ['링크를 누르게 해요.'], fallback_used: false })
+    assert.ok(html.includes('링크를 누르게 해요.'))
+    assert.ok(html.includes(AI_EXPLANATION_NOTE))
+  })
+  it('고정 문장으로 바뀌면 표시하지 않는다', () => {
+    const html = module.exports.render({ ...base, explanation_for_parent: [], fallback_used: true })
+    assert.ok(!html.includes(AI_EXPLANATION_NOTE))
+  })
+})

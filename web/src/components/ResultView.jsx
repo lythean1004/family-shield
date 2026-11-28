@@ -21,7 +21,7 @@ import CallButton from './CallButton.jsx'
 import MisjudgeLink from './MisjudgeLink.jsx'
 import SpeakButton from './SpeakButton.jsx'
 import { levelKey, verdictDescription, AI_FALLBACK_TEXT, AI_DECLINED_TEXT } from '../data/result.js'
-import { HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT } from '../../../packages/core/src/fixed-text.js'
+import { HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT, AI_EXPLANATION_NOTE } from '../../../packages/core/src/fixed-text.js'
 import { POLICE, sourceText } from '../data/contacts.js'
 
 export default function ResultView({
@@ -33,10 +33,12 @@ export default function ResultView({
   const who = familyName || result.impersonated_relation || '가족'
   const explanation = result.explanation_for_parent ?? []
   let reasons = explanation.slice(0, 3)
+  let aiWritten = reasons.length > 0 && !result.fallback_used
   if (key !== 'check' && (result.fallback_used || reasons.length === 0)) {
     const fixed = result.ai_skipped === 'health' ? HEALTH_SKIPPED_TEXT
       : result.ai_consent === false ? AI_DECLINED_TEXT : AI_FALLBACK_TEXT
     reasons = [fixed]
+    aiWritten = false
   }
 
   const askFamily = () => {
@@ -51,6 +53,7 @@ export default function ResultView({
   const speakText = [
     verdictDescription(result.level, type),
     ...reasons,
+    ...(aiWritten ? [AI_EXPLANATION_NOTE] : []),
     ...(result.signals_final?.includes('SIG_SHORT_URL') ? [SHORT_URL_TEXT] : []),
     ...(key === 'check' && result.signals_final?.includes('SIG_OFFICIAL_LINK') ? [OFFICIAL_LINK_TEXT] : []),
     LIMIT_NOTICE, // 화면과 같은 project.md 문장(2026-11-11 결정 B)
@@ -72,6 +75,8 @@ export default function ResultView({
         <section aria-label="이유">
           <SignalList signals={result.signals_final} impersonatedRelation={result.impersonated_relation} />
           {reasons.map((s) => <p key={s} className="screen-body">{s}</p>)}
+          {/* AI기본법 제31조②: AI가 만든 설명임을 표시 */}
+          {aiWritten && <p className="screen-body ai-note">{AI_EXPLANATION_NOTE}</p>}
           {/* D48 ②: 단축 링크는 펼치지 않아 어디로 가는지 모른다 */}
           {result.signals_final?.includes('SIG_SHORT_URL') && (
             <p className="screen-body">{SHORT_URL_TEXT}</p>

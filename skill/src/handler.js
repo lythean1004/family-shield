@@ -23,7 +23,7 @@ import { loadPhishingListChecker, combineCheckers } from "../../packages/core/sr
 import { createDomainAgeChecker } from "../../packages/core/src/domain-age.js";
 import { readRequest, simpleText, quickReply, withImage, withLinkCard } from "./kakao.js";
 import { summarizePhrases } from "../../packages/core/src/summarizer.js";
-import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT } from "../../packages/core/src/fixed-text.js";
+import { CHECK_LEVEL_TEXT, HEALTH_SKIPPED_TEXT, SHORT_URL_TEXT, OFFICIAL_LINK_TEXT, AI_EXPLANATION_NOTE } from "../../packages/core/src/fixed-text.js";
 import { tokenMatches } from "./config.js";
 import { createRateLimiter, createConcurrencyLimit, clientKey } from "./rate-limit.js";
 import { createDatabase } from './database.js';
@@ -99,6 +99,7 @@ function buildReplyText(result, { rulesOnlyNote = false } = {}) {
     const codeReasons = summarizePhrases((result.fired_rules ?? []).flatMap((r) => CODE_RULE_SIGNALS[r] ?? []).filter((id) => present.has(id)));
     if (codeReasons.length) lines.push(`위험 이유: ${codeReasons.join(" · ")}`);
     lines.push(...result.explanation_for_parent);
+    lines.push(AI_EXPLANATION_NOTE); // AI기본법 제31조②
   } else if (result.summary) {
     lines.push(`감지된 신호: ${result.summary}`);
   }

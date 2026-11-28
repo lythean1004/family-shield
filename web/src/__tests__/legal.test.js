@@ -64,6 +64,7 @@ import { SERVICE_PERIOD_NOTICE } from '../data/legal.js'
 describe('운영 기간 안내 (D60)', () => {
   it('12월 말까지 운영, 멈추는 날은 따로 알림, 멈춘 뒤 개인정보 파기를 적는다', () => {
     assert.match(SERVICE_PERIOD_NOTICE, /12월 말까지/)
+    assert.match(SERVICE_PERIOD_NOTICE, /더 일찍/) // 결정 1B: 확인 안 된 날짜를 약속하지 않는다
     assert.match(SERVICE_PERIOD_NOTICE, /따로 알려/)
     assert.match(SERVICE_PERIOD_NOTICE, /지워요/)
     assert.doesNotMatch(SERVICE_PERIOD_NOTICE, /12월 11일|12\/11/)
