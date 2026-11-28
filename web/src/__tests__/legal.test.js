@@ -75,3 +75,45 @@ describe('운영 기간 안내 (D60)', () => {
     }
   })
 })
+
+// 보수적 보강(11/28, 사무국·중계 답변 없음 가정, 대기업 처리방침 형식 참고): v2
+import { LEGAL_VERSION } from '../data/legal.js'
+describe('처리방침 v2 보수적 보강', () => {
+  const sec = (k) => PRIVACY.sections.find((s) => s.h.includes(k))
+  const text = (s) => [s.h, ...(s.p ?? []), ...(s.rows ?? []).flat()].join('\n')
+  it('문서 버전이 v2다', () => {
+    assert.equal(LEGAL_VERSION, 'legal-2026-11-28-v2')
+  })
+  it('국외 이전의 법적 근거(별도 동의)와 받는 곳 연락처 확인 중을 적는다', () => {
+    const t = text(sec('국외 이전'))
+    assert.match(t, /제28조의8 제1항 제1호/)
+    assert.match(t, /별도/)
+    assert.match(t, /연락처.*확인 중/)
+  })
+  it('위탁: 재위탁 확인 중, 확인 못 한 곳은 확인 중으로 적는다', () => {
+    const t = text(sec('처리 위탁'))
+    assert.match(t, /재위탁/)
+    assert.match(t, /확인 중/)
+  })
+  it('거부·철회 뒤 이미 보낸 문장의 보관을 숨기지 않는다', () => {
+    const t = text(sec('거부 방법'))
+    assert.match(t, /이미 보낸/)
+  })
+  it('건강정보 처리를 코드와 같게 적는다(요구·미끼가 있으면 가린 뒤 보냄)', () => {
+    const t = text(sec('2. 문자를'))
+    assert.doesNotMatch(t, /동의와 관계없이 해외 AI로 보내지 않습니다/)
+    assert.match(t, /\[건강정보\]/)
+  })
+  it('생성형 AI 안내: 학습 이용·학습 거부 방법·이상한 답 알리기·검증 실패 시 고정 문장', () => {
+    const t = text(sec('인공지능'))
+    assert.match(t, /학습/)
+    assert.match(t, /동의를 철회/)
+    assert.match(t, /이 판정이 이상해요/)
+    assert.match(t, /고정 문장/)
+  })
+  it('자동화된 결정 안내: 규칙이 자동으로 정하고 참고용, 설명·이의 요청 방법', () => {
+    const t = text(sec('인공지능'))
+    assert.match(t, /자동으로/)
+    assert.match(t, /이의/)
+  })
+})
