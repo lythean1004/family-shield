@@ -2,23 +2,24 @@
 // 동의 화면 구조(작업 ⑤, docs/consent-redesign.md): 해외 AI 분석을 가족 제공과 분리, 펼쳐 보기, 전체/개별 동의.
 // 문구는 전문가 확인 전 초안이다(D26). 제공사 기준은 2026-11-11 공식 문서 확인, 운영사 서면 답변으로 최종 확인.
 import { api, getSession } from './api.js'
-export const CONSENT_VERSION = 'demo-2026-11-16-v4'
+// v5(2026-11-28, 준비 계획 3단계): 국외 이전 5요소를 빠짐없이, 확인 안 된 것은 가장 넓게. 처리방침(legal.js)·카카오 안내와 같은 내용
+export const CONSENT_VERSION = 'demo-2026-11-28-v5'
 
 export const CONSENT_STEPS = [
   {
     item: 'overseas_ai',
     title: '① 해외 AI로 더 자세히 살펴볼까요?',
-    summary: '번호·계좌를 가린 문장을 해외 AI에 보내 분석해요.',
+    summary: '번호·계좌를 가린 문장을 해외(미국 등) AI 회사에 보내 함께 살펴봐요.',
     details: [
-      '보내는 것: 가린 문장만 보내요. 원문, 전화번호, 계좌번호는 보내지 않아요.',
-      '거쳐 가는 곳: 모두의 AI 실험실 중계 서버(국내)와 중계 업체 Alrouter(아토리서치(주)).',
-      '중계 서버 보관: 가린 문장과 AI 답변을 7일 보관한 뒤 자동으로 지워요. 그 전에 따로 지워 달라고 요청할 수는 없어요. Alrouter 쪽 처리는 확인 중이에요.',
-      '받는 곳: Anthropic, PBC(미국, Claude)와 Google(대한민국 계약 법인 Google Cloud Korea LLC, Gemini). Google은 시설이 있는 나라에서 처리할 수 있어요.',
-      '보관: Anthropic은 받은 뒤 30일 안에 지워요(정책 위반으로 분류되면 최대 2년). Google은 정책 위반 확인을 위해 제한된 기간 보관해요.',
-      '학습: 두 회사 모두 유료 API로 받은 내용은 학습에 쓰지 않는다고 밝혀요. 실험실이 유료로 쓰는지는 확인 중이에요.',
-      '보내는 때: 문자를 확인할 때마다 인터넷으로 바로 보내요.',
+      '보내는 것: 전화번호·계좌·카드·주민번호·이메일·링크 주소를 가린 문장. 가린 뒤에도 이름이나 주소 같은 정보가 남을 수 있어요. 문자 원문은 저장하지 않아요.',
+      '받는 곳: 모두의 AI 실험실 중계 서버 → 중계 업체 Alrouter(아토리서치(주)) → Anthropic, PBC(Claude, 웹)와 Google(Gemini, 카카오).',
+      '나라: 미국 등 AI 회사가 시설을 둔 나라예요. 정확한 나라는 확인 중이에요.',
+      '보내는 때와 방법: 문자를 확인할 때마다 암호화된 통신으로 바로 보내요.',
+      '목적: 사기 신호를 찾고 쉬운 설명 문장을 만들려고요. 위험 단계는 AI가 아니라 정해진 규칙이 정해요.',
+      '보관: 중계 서버는 7일 뒤 자동으로 지워요. 해외 회사의 보관 기간은 확인 중이며 최대 2년 보관될 수 있어요. 학습에 쓰는지는 확인 중이에요.',
+      '전체 내용은 아래 [개인정보 처리방침]의 ‘국외 이전’에 있어요.',
     ],
-    ifDeclined: '허락하지 않아도 쓸 수 있어요. 해외 AI 없이 정해진 규칙으로만 알려 드려요.',
+    ifDeclined: '허락하지 않아도 쓸 수 있어요. 해외 AI 없이 정해진 규칙으로만 알려 드려요. 다만 놓치는 사기 문자가 늘 수 있어요.',
   },
   {
     item: 'family_alert',
@@ -100,6 +101,27 @@ export function comprehensionQuestion(members, circleId) {
       { label: '잘 모르겠어요', correct: false },
     ],
   }
+}
+
+/** 해외 AI 이해 확인(멘토 Q5): 허락하면 가린 문장이 어디로 가는지 */
+export function overseasQuestion() {
+  return {
+    question: '방금 허락한 내용이 맞는지 확인할게요. 해외 AI 분석을 허락하면, 번호를 가린 문장은 어디로 가나요?',
+    options: [
+      { label: '해외(미국 등) AI 회사로 가요', correct: true },
+      { label: '내 휴대폰 안에만 있어요', correct: false },
+      { label: '잘 모르겠어요', correct: false },
+    ],
+    retry: '다시 알려 드릴게요. 해외 AI 분석을 허락하면 번호·계좌를 가린 문장이 미국 등 해외 AI 회사로 가요. 허락하지 않아도 규칙으로 확인할 수 있어요.',
+  }
+}
+
+/** 저장 뒤 물어볼 이해 확인 순서: 해외 AI를 허락했으면 먼저, 가족 보내기를 허락했고 받는 가족이 있으면 다음 */
+export function quizQueue(selection, familyQuestion) {
+  const queue = []
+  if (selection.overseas_ai === true) queue.push({ id: 'overseas', ...overseasQuestion() })
+  if (selection.family_alert === true && familyQuestion) queue.push({ id: 'family', ...familyQuestion })
+  return queue
 }
 
 export async function loadFamilyConsent() {

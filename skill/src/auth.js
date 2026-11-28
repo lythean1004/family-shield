@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, randomInt } from 'node:crypto'
 
-export const CONSENT_VERSION = 'demo-2026-11-16-v4'
+export const CONSENT_VERSION = 'demo-2026-11-28-v5'
 export const CONSENT_ITEMS = ['family_alert', 'impersonation_check', 'check_log', 'misjudge_share', 'overseas_ai', 'comprehension']
 export const RELATIONS = ['딸', '아들', '배우자', '가족']
 const SESSION_SECONDS = 30 * 24 * 60 * 60
@@ -118,12 +118,13 @@ export function createAuth(db, { hmacKey }) {
       return { ok: true }
     })
   }
-  // 해외 AI 분석(국외 이전) 동의: 부모님 그룹의 가장 최근 overseas_ai 기록이 허락일 때만. 기록이 없거나 보호자만이면 규칙만 판정
+  // 해외 AI 분석(국외 이전) 동의: 부모님 그룹의 가장 최근 overseas_ai 기록이 지금 문구 버전(CONSENT_VERSION)의 허락일 때만.
+  // 예전 문구로 받은 허락, 기록 없음, 보호자만인 경우는 규칙만 판정(준비 계획 3단계)
   async function overseasAiAllowed(userId) {
     return db.user(userId, async tx => {
-      const { rows: [row] } = await tx.query(`select c.granted from public.consents c
+      const { rows: [row] } = await tx.query(`select (c.granted and c.text_version = $2) as granted from public.consents c
         join public.circles ci on ci.id=c.circle_id and ci.protected_user_id=$1
-        where c.item='overseas_ai' order by c.created_at desc, c.id desc limit 1`, [userId])
+        where c.item='overseas_ai' order by c.created_at desc, c.id desc limit 1`, [userId, CONSENT_VERSION])
       return row?.granted === true
     })
   }

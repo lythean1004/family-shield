@@ -75,7 +75,7 @@ describe('real PostgreSQL: demo login, invitation, consent and isolation', { ski
     await assert.rejects(db.user(parent.userId,tx=>tx.query('select * from private.sessions')),{code:'42501'})
   })
   test('overseas AI consent is separate; analysis uses AI only after the parent allows it (consent redesign v3)',async()=>{
-    assert.equal(CONSENT_VERSION,'demo-2026-11-16-v4')
+    assert.equal(CONSENT_VERSION,'demo-2026-11-28-v5')
     const g=await guardian()
     const invitation=await auth.invite(g.userId,'아들')
     const parent=await auth.redeem(invitation.code,true,invitation.code,true)
@@ -90,6 +90,18 @@ describe('real PostgreSQL: demo login, invitation, consent and isolation', { ski
     await consent('comprehension',true)
     await assert.rejects(auth.consent(parent.userId,{circleId,item:'overseas_ai',granted:true,textVersion:'demo-2026-10-28-v2'}),{reason:'consent'})
     assert.equal(await auth.overseasAiAllowed(g.userId),false,'guardian without a parent circle: rules only')
+  })
+  test('overseas AI consent under an older text version does not count (v5, compliance step 3)',async()=>{
+    const g=await guardian()
+    const invitation=await auth.invite(g.userId,'딸')
+    const parent=await auth.redeem(invitation.code,true,invitation.code,true)
+    users.push(parent.userId)
+    const circleId=(await auth.profile(parent.userId)).circles[0].id
+    // 예전 문구(v4)로 받은 허락은 DB에 남아 있어도 새 문구로 다시 허락받기 전에는 규칙만 판정한다
+    await db.service(tx=>tx.query("insert into public.consents(circle_id,user_id,item,granted,text_version) values ($1,$2,'overseas_ai',true,'demo-2026-11-16-v4')",[circleId,parent.userId]))
+    assert.equal(await auth.overseasAiAllowed(parent.userId),false,'old-version consent: rules only')
+    await auth.consent(parent.userId,{circleId,item:'overseas_ai',granted:true,textVersion:CONSENT_VERSION})
+    assert.equal(await auth.overseasAiAllowed(parent.userId),true,'current-version consent: AI allowed')
   })
   test('session survives a new auth instance and logout revokes it',async()=>{
     const g=await guardian()
@@ -106,4 +118,14 @@ describe('real PostgreSQL: demo login, invitation, consent and isolation', { ski
     for(let i=0;i<10;i++) await assert.rejects(auth.redeem('bad',true,subject),{reason:'invalid_code'})
     await assert.rejects(createAuth(db,{hmacKey:key}).redeem('bad',true,subject),{reason:'rate_limited'})
   })
+})
+
+// v5(준비 계획 3단계): 해외 AI 허락은 지금 문구 버전으로 받은 것만 센다. DB 없이 질의 조건만 확인
+test('overseasAiAllowed only counts consent given under the current text version', async () => {
+  const seen = []
+  const fakeDb = { user: async (_id, fn) => fn({ query: async (sql, params) => { seen.push({ sql, params }); return { rows: [] } } }) }
+  const auth = createAuth(fakeDb, { hmacKey: 'unit-only' })
+  assert.equal(await auth.overseasAiAllowed('u1'), false)
+  assert.match(seen[0].sql, /text_version\s*=\s*\$2/)
+  assert.deepEqual(seen[0].params, ['u1', CONSENT_VERSION])
 })

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   CONSENT_STEPS, CONSENT_VERSION, emptySelection, selectAll, setChoice, isComplete, consentPlan, comprehensionQuestion,
+  overseasQuestion, quizQueue,
 } from '../data/consent.js'
 
 describe('동의 항목 (작업 ⑤, D43)', () => {
@@ -16,7 +17,46 @@ describe('동의 항목 (작업 ⑤, D43)', () => {
       assert.ok(s.ifDeclined, `${s.item}: 거절하면 어떻게 되는지`)
     }
   })
-  it('버전은 새 구조용', () => assert.equal(CONSENT_VERSION, 'demo-2026-11-16-v4'))
+  it('버전은 v5(국외 이전 5요소 보수적 문구)', () => assert.equal(CONSENT_VERSION, 'demo-2026-11-28-v5'))
+})
+
+describe('해외 AI 항목 v5 (준비 계획 3단계, 멘토 Q4·Q5)', () => {
+  const ai = CONSENT_STEPS.find(s => s.item === 'overseas_ai')
+  const text = [ai.summary, ...ai.details, ai.ifDeclined].join(' ')
+  it('국외 이전 5요소(항목·국가·시기와 방법·받는 자·목적과 보유 기간)를 모두 적는다', () => {
+    for (const label of ['보내는 것', '받는 곳', '나라', '보내는 때', '목적', '보관']) assert.match(text, new RegExp(label), label)
+    assert.match(text, /가린 뒤에도 이름/)
+    assert.match(text, /Alrouter/)
+    assert.match(text, /Google/)
+    assert.match(text, /Anthropic/)
+  })
+  it('확인되지 않은 것은 확인 중·가장 넓게로 적는다(학습 안 함·30일 같은 단정 없음)', () => {
+    assert.match(text, /최대 2년/)
+    assert.match(text, /학습에 쓰는지는 확인 중/)
+    assert.doesNotMatch(text, /학습에 쓰지 않는다고/)
+    assert.doesNotMatch(text, /30일 안에 지워요/)
+  })
+  it('거부해도 문자 확인은 되고, 처리방침 전문 위치를 알린다', () => {
+    assert.match(ai.ifDeclined, /규칙으로만/)
+    assert.match(text, /개인정보 처리방침/)
+  })
+  it('해외 AI 이해 확인 질문: 정답은 해외 AI 회사로 간다', () => {
+    const q = overseasQuestion()
+    assert.equal(q.options.filter(o => o.correct).length, 1)
+    assert.match(q.options.find(o => o.correct).label, /해외/)
+    assert.ok(q.options.some(o => /휴대폰 안에만/.test(o.label) && !o.correct))
+    assert.ok(q.retry && q.retry.length > 10)
+  })
+})
+
+describe('이해 확인 순서', () => {
+  const fam = { question: 'f', options: [] }
+  it('해외 AI를 허락하면 해외 질문 먼저, 가족 보내기를 허락하면 가족 질문', () => {
+    assert.deepEqual(quizQueue({ overseas_ai: true, family_alert: true }, fam).map(q => q.id), ['overseas', 'family'])
+    assert.deepEqual(quizQueue({ overseas_ai: true, family_alert: false }, fam).map(q => q.id), ['overseas'])
+    assert.deepEqual(quizQueue({ overseas_ai: false, family_alert: true }, fam).map(q => q.id), ['family'])
+    assert.deepEqual(quizQueue({ overseas_ai: false, family_alert: true }, null), [])
+  })
 })
 
 describe('전체 동의와 개별 동의', () => {
